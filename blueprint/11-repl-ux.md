@@ -147,6 +147,7 @@ label as a prefix:
 
 ```
 /select <name>    — select a project by partial name match
+/add project      — create a project (guided prompt + material picker)
 /admin            — enter Admin sub-mode
 /library          — switch to Library track
 /help             — show help
@@ -191,6 +192,7 @@ label as a prefix:
 
 ```
 /route [R.P]     — enter Route selection (or go direct to route R process P)
+/add process     — add a manufacturing process (route.process numbers)
 /risks           — enter project-level risk summary
 /select <name>   — switch to a different project
 /library         — switch to Library track
@@ -467,6 +469,20 @@ Active during multi-step `/add` and `/edit` flows.
 | `Enter` (empty) | Use default value if available; skip optional fields |
 | `Esc` | First Esc press — warns about data loss |
 | `Esc` × 2 | Abort the guided prompt; return to previous screen |
+
+### Typeahead Picker Mode
+
+Active when an `/add` flow must select an existing record by reference — a
+material for `/add project`, a counterion for `/add salt`. Candidates are loaded
+once and filtered in memory, so the match list updates on every keystroke.
+
+| Key | Action |
+|-----|--------|
+| Printable chars | Extend the filter query; matches re-render live |
+| `Backspace` | Shorten the filter query |
+| `↑` / `↓` | Move the highlight through the current matches |
+| `Enter` | Select the highlighted match |
+| `Esc` × 2 | Cancel the picker; return to the previous screen |
 
 ---
 

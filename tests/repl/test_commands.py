@@ -1,8 +1,9 @@
-"""Unit tests for repl command helpers: FieldSpec, PromptState."""
+"""Unit tests for repl command helpers: FieldSpec, PromptState, PickerState."""
 
 import pytest
 
-from riskmanager_cli.repl.commands import FieldSpec, PromptState
+from riskmanager_cli.repl.commands import FieldSpec, PickerState, PromptState
+from riskmanager_cli.repl.list_navigator import ListItem
 
 
 @pytest.mark.unit
@@ -61,6 +62,24 @@ def test_field_spec_int_type_raises_on_non_integer() -> None:
 
 
 @pytest.mark.unit
+def test_field_spec_float_type_accepts_decimal_string() -> None:
+    """A float FieldSpec accepts a valid decimal string and stores it as string."""
+    spec = FieldSpec(label="Stoichiometry", field_type="float")
+    state = PromptState(fields=[spec], collected=[None])
+    state.submit_value("1.5")
+    assert state.collected[0] == "1.5"
+
+
+@pytest.mark.unit
+def test_field_spec_float_type_raises_on_non_numeric() -> None:
+    """A float FieldSpec raises ValueError for non-numeric input."""
+    spec = FieldSpec(label="Stoichiometry", field_type="float")
+    state = PromptState(fields=[spec], collected=[None])
+    with pytest.raises(ValueError, match="number"):
+        state.submit_value("not_a_number")
+
+
+@pytest.mark.unit
 def test_field_spec_choice_type_accepts_valid_choice() -> None:
     """A choice FieldSpec accepts a matching choice value."""
     spec = FieldSpec(label="Type", field_type="choice", choices=["alpha", "beta"])
@@ -107,3 +126,46 @@ def test_prompt_state_as_dict_returns_label_keyed_values() -> None:
     result = state.as_dict()
     assert result["risk_type"] == "Safety"
     assert result["name"] == "H2O"
+
+
+def _picker(*labels: str) -> PickerState:
+    """Build a PickerState over the given item labels with a no-op callback."""
+    items = [ListItem(label=label, item_id=label) for label in labels]
+    return PickerState(label="Pick", all_items=items, on_select=lambda item: [item.item_id])
+
+
+@pytest.mark.unit
+def test_picker_empty_query_shows_all_items() -> None:
+    """A freshly built picker highlights the first of all candidates."""
+    picker = _picker("Caffeine", "Cafetannin", "Sodium")
+    assert picker.selected is not None
+    assert picker.selected.label == "Caffeine"
+
+
+@pytest.mark.unit
+def test_picker_set_query_filters_case_insensitively() -> None:
+    """set_query narrows candidates by case-insensitive substring match."""
+    picker = _picker("Caffeine", "Cafetannin", "Sodium")
+    picker.set_query("CAF")
+    assert picker.selected is not None
+    assert picker.selected.label == "Caffeine"
+    picker.move_down()
+    assert picker.selected is not None
+    assert picker.selected.label == "Cafetannin"
+
+
+@pytest.mark.unit
+def test_picker_query_with_no_matches_has_no_selection() -> None:
+    """A query that matches nothing leaves the picker with no selection."""
+    picker = _picker("Caffeine", "Sodium")
+    picker.set_query("zzz")
+    assert picker.selected is None
+
+
+@pytest.mark.unit
+def test_picker_move_up_wraps_to_last_match() -> None:
+    """Moving up from the first match wraps to the last."""
+    picker = _picker("Caffeine", "Cafetannin")
+    picker.move_up()
+    assert picker.selected is not None
+    assert picker.selected.label == "Cafetannin"

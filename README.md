@@ -308,6 +308,7 @@ Use arrow keys to navigate and `Enter` to select, or type:
 
 ```
 /select <project name>    — select a project by name (partial match supported)
+/add project              — create a project (guided prompt + material picker)
 /admin                    — enter admin sub-mode
 /library                  — switch to library track
 /help                     — show all commands
@@ -321,6 +322,7 @@ number of routes, and a risk summary table.
 
 ```
 /route [R.P]              — enter route selection (or go direct to route R.P)
+/add process              — add a manufacturing process (route.process numbers)
 /risks                    — enter project-level risk summary
 /select <project>         — switch to a different project
 /library                  — switch to library track

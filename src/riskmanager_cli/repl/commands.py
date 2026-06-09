@@ -14,7 +14,7 @@ from typing import Any
 from uuid import UUID
 
 from ..config.settings import Environment
-from ..model.enums import NcrmRole
+from ..model.enums import TA, NcrmRole
 from ..model.tables import Component, ManufacturingProcess, Project, Stage
 from ..operations.component_operations import (
     create_component,
@@ -27,6 +27,10 @@ from ..operations.component_risks_operations import (
     create_component_risk,
     list_risks_for_component,
 )
+from ..operations.component_salt_operations import (
+    create_component_salt,
+    list_salts_for_component,
+)
 from ..operations.counterion_operations import (
     create_counterion,
     delete_counterion,
@@ -34,6 +38,7 @@ from ..operations.counterion_operations import (
     update_counterion,
 )
 from ..operations.manufacturing_process_operations import (
+    create_manufacturing_process,
     get_process_by_id,
     get_process_by_route,
     list_processes_for_project,
@@ -59,6 +64,7 @@ from ..operations.ncrm_library_operations import (
     update_ncrm_library_entry,
 )
 from ..operations.project_operations import (
+    create_project,
     get_project_by_id,
     list_projects,
     search_projects,
@@ -88,10 +94,13 @@ from ..repl.renderers.route_renderer import render_route_screen
 from ..schema.create import (
     ComponentCreate,
     ComponentRiskCreate,
+    ComponentSaltCreate,
     CounterionCreate,
+    ManufacturingProcessCreate,
     ManufacturingProcessRiskCreate,
     MaterialCreate,
     NcrmLibraryCreate,
+    ProjectCreate,
     StageComponentCreate,
     StageCreate,
     StageNcrmCreate,
@@ -169,6 +178,11 @@ class PromptState:
                 normalized = str(int(text))
             except ValueError as exc:
                 raise ValueError(f"{field_spec.label} must be an integer.") from exc
+        elif field_spec.field_type == "float":
+            try:
+                normalized = str(float(text))
+            except ValueError as exc:
+                raise ValueError(f"{field_spec.label} must be a number.") from exc
         elif field_spec.field_type == "choice":
             matches = [choice for choice in field_spec.choices if choice.lower() == text.lower()]
             if not matches:
@@ -195,7 +209,60 @@ class PromptState:
         }
 
 
-class CommandDispatcher:
+@dataclass
+class PickerState:
+    """Active typeahead-picker state.
+
+    Why this exists: guided prompts collect a free-text line, but selecting a
+    foreign-key target (a material for a project, a counterion for a salt) is
+    far easier with a live, filterable list. The candidate set is loaded once
+    and filtered in memory per keystroke, so no database call is made while the
+    user types.
+
+    Attributes:
+        label: Prompt label shown while the picker is active.
+        all_items: Full candidate list, filtered in memory per keystroke.
+        on_select: Callback invoked with the highlighted item once chosen.
+        query: Current filter text.
+        navigator: Navigator over the current filtered matches.
+    """
+
+    label: str
+    all_items: list[ListItem]
+    on_select: Callable[[ListItem], Any]
+    query: str = ""
+    navigator: ListNavigator = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Build the navigator over the unfiltered candidate list."""
+        self.navigator = ListNavigator([], list(self.all_items))
+
+    def set_query(self, query: str) -> None:
+        """Filter candidates by case-insensitive substring match.
+
+        Args:
+            query: Raw filter text entered so far.
+        """
+        self.query = query
+        lowered = query.strip().lower()
+        matches = [item for item in self.all_items if lowered in item.label.lower()]
+        self.navigator = ListNavigator([], matches)
+
+    def move_up(self) -> None:
+        """Move the highlight up through the current matches."""
+        self.navigator.move_up()
+
+    def move_down(self) -> None:
+        """Move the highlight down through the current matches."""
+        self.navigator.move_down()
+
+    @property
+    def selected(self) -> ListItem | None:
+        """Return the highlighted match, if any."""
+        return self.navigator.selected
+
+
+class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prompt, picker, and list-navigator modes each need their own state
     """Parse slash commands, update REPL state, and call operations."""
 
     def __init__(
@@ -220,6 +287,7 @@ class CommandDispatcher:
         self._prompt_state: PromptState | None = None
         self._prompt_callback: Callable[..., Any] | None = None
         self._list_navigator: ListNavigator | None = None
+        self._picker_state: PickerState | None = None
 
     @property
     def prompt_state(self) -> PromptState | None:
@@ -230,6 +298,11 @@ class CommandDispatcher:
     def list_navigator(self) -> ListNavigator | None:
         """Return the active list navigator, if any."""
         return self._list_navigator
+
+    @property
+    def picker_state(self) -> PickerState | None:
+        """Return the active typeahead picker state, if any."""
+        return self._picker_state
 
     def start_prompt(self, fields: list[FieldSpec], on_complete: Callable[..., Any]) -> list[str]:
         """Enter guided prompt mode.
@@ -278,6 +351,79 @@ class CommandDispatcher:
         self._prompt_state = None
         self._prompt_callback = None
         return ["Guided prompt cancelled."]
+
+    def start_picker(
+        self,
+        label: str,
+        all_items: list[ListItem],
+        on_select: Callable[[ListItem], Any],
+    ) -> list[str]:
+        """Enter typeahead-picker mode.
+
+        Args:
+            label: Prompt label shown while the picker is active.
+            all_items: Full candidate list to filter in memory.
+            on_select: Callback invoked with the chosen item.
+
+        Returns:
+            Initial picker-render lines.
+        """
+        self._picker_state = PickerState(label=label, all_items=all_items, on_select=on_select)
+        return self._render_picker_lines()
+
+    def update_picker_query(self, query: str) -> list[str]:
+        """Re-filter the active picker for *query* and re-render matches.
+
+        Args:
+            query: Raw filter text entered so far.
+
+        Returns:
+            Updated picker-render lines.
+        """
+        if self._picker_state is None:
+            return ["No picker is active."]
+        self._picker_state.set_query(query)
+        return self._render_picker_lines()
+
+    def picker_move(self, direction: str) -> list[str]:
+        """Move the picker highlight up or down.
+
+        Args:
+            direction: Either ``"up"`` or ``"down"``.
+
+        Returns:
+            Updated picker-render lines.
+        """
+        if self._picker_state is None:
+            return ["No picker is active."]
+        if direction == "up":
+            self._picker_state.move_up()
+        else:
+            self._picker_state.move_down()
+        return self._render_picker_lines()
+
+    async def picker_select(self) -> list[str]:
+        """Choose the highlighted match and invoke the picker callback.
+
+        Returns:
+            The callback result, or a guidance line when nothing is selected.
+        """
+        if self._picker_state is None:
+            return ["No picker is active."]
+        selected = self._picker_state.selected
+        if selected is None:
+            return self._render_picker_lines()
+        callback = self._picker_state.on_select
+        self._picker_state = None
+        result = callback(selected)
+        if inspect.isawaitable(result):
+            return self._coerce_lines(await result)
+        return self._coerce_lines(result)
+
+    def cancel_picker(self) -> list[str]:
+        """Cancel the active typeahead picker, if any."""
+        self._picker_state = None
+        return ["Selection cancelled."]
 
     async def dispatch(  # pylint: disable=too-many-return-statements,too-many-branches  # top-level command router
         self, command: str
@@ -427,9 +573,23 @@ class CommandDispatcher:
             return await self._open_project(projects[0])
         if verb == "/search" and args:
             return await self._render_home(" ".join(args))
+        if verb == "/add" and args and args[0].lower() == "project":
+            return self.start_prompt(
+                [
+                    FieldSpec("name"),
+                    FieldSpec(
+                        "therapy_area",
+                        field_type="choice",
+                        choices=[ta.value for ta in TA],
+                    ),
+                ],
+                lambda **payload: self._start_project_material_picker(payload),
+            )
         return [f"Unknown command: {verb}. Type /help for commands."]
 
-    async def _dispatch_project(self, verb: str, args: list[str]) -> list[str]:
+    async def _dispatch_project(  # pylint: disable=too-many-return-statements  # one return per command verb
+        self, verb: str, args: list[str]
+    ) -> list[str]:
         project = await self._current_project()
         if project is None:
             return ["Project not found."]
@@ -459,6 +619,14 @@ class CommandDispatcher:
             )
             self.session.update_context(track="risk_mode", project_id=str(project.id))
             return await self._render_project_risks(project)
+        if verb == "/add" and args and args[0].lower() == "process":
+            return self.start_prompt(
+                [
+                    FieldSpec("route_number", field_type="int"),
+                    FieldSpec("process_number", field_type="int"),
+                ],
+                lambda **payload: self._create_manufacturing_process_from_prompt(project, payload),
+            )
         return [f"Unknown command: {verb}. Type /help for commands."]
 
     async def _dispatch_route_select(self, verb: str, args: list[str]) -> list[str]:
@@ -589,6 +757,8 @@ class CommandDispatcher:
         component = await self._current_component()
         if component is None:
             return ["Component not found."]
+        if verb == "/add" and args and args[0].lower() == "salt":
+            return await self._start_salt_picker(component)
         if verb == "/edit":
             return self.start_prompt(
                 [
@@ -738,12 +908,14 @@ class CommandDispatcher:
             return ["Component not found."]
         material = await get_material_by_id(UUID(str(component.material_id)), self.env)
         risks = await list_risks_for_component(UUID(str(component.id)), self.env)
+        salts = await list_salts_for_component(UUID(str(component.id)), self.env)
         return [
             f"Component: {material.name if material else component.id}",
             "",
             f"Control role: {component.control_strategy_role or '-'}",
             f"Isolated: {'yes' if component.is_isolated else 'no'}",
             f"Risks: {len(risks)}",
+            f"Salts: {len(salts)}",
         ]
 
     async def _render_library(
@@ -1627,6 +1799,111 @@ class CommandDispatcher:
         )
         return ["Counterion created."] if created else ["Failed to create counterion."]
 
+    async def _start_project_material_picker(self, payload: dict[str, str | None]) -> list[str]:
+        materials = await list_materials(self.env)
+        if not materials:
+            return ["Add a material first via /library materials."]
+        items = [ListItem(label=material.name, item_id=str(material.id)) for material in materials]
+        name = payload.get("name") or ""
+        therapy_area = payload.get("therapy_area") or ""
+        return self.start_picker(
+            f"Select material for project '{name}'",
+            items,
+            lambda item: self._create_project_from_selection(name, therapy_area, item),
+        )
+
+    async def _create_project_from_selection(
+        self,
+        name: str,
+        therapy_area: str,
+        material: ListItem,
+    ) -> list[str]:
+        created = await create_project(
+            ProjectCreate(
+                name=name,
+                therapy_area=TA(therapy_area),
+                material_id=UUID(material.item_id),
+            ),
+            self.env,
+        )
+        if created is None:
+            return ["Failed to create project."]
+        return [f"Created project '{created.name}'.", "", *await self._render_home()]
+
+    async def _create_manufacturing_process_from_prompt(
+        self,
+        project: Project,
+        payload: dict[str, str | None],
+    ) -> list[str]:
+        route_number = int(payload.get("route_number") or 0)
+        process_number = int(payload.get("process_number") or 0)
+        if route_number < 1 or process_number < 1:
+            return ["Route and process numbers must be 1 or greater."]
+        created = await create_manufacturing_process(
+            ManufacturingProcessCreate(
+                project_id=UUID(str(project.id)),
+                route_number=route_number,
+                process_number=process_number,
+            ),
+            self.env,
+        )
+        if created is None:
+            return ["Failed to create process."]
+        return [
+            f"Created process {created.route_number}.{created.process_number}.",
+            "",
+            *await render_project_screen(project, self.env),
+        ]
+
+    async def _start_salt_picker(self, component: Component) -> list[str]:
+        counterions = await list_counterions(self.env)
+        if not counterions:
+            return ["Add a counterion first via /library counterions."]
+        items = [
+            ListItem(label=counterion.name, item_id=str(counterion.id))
+            for counterion in counterions
+        ]
+        return self.start_picker(
+            "Select counterion for salt",
+            items,
+            lambda item: self._start_salt_details_prompt(component, item),
+        )
+
+    def _start_salt_details_prompt(self, component: Component, counterion: ListItem) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec("stoichiometry", field_type="float", required=False),
+                FieldSpec(
+                    "is_fully_defined",
+                    field_type="choice",
+                    choices=["true", "false"],
+                    required=False,
+                ),
+            ],
+            lambda **payload: self._create_component_salt_from_prompt(
+                component, counterion.item_id, payload
+            ),
+        )
+
+    async def _create_component_salt_from_prompt(
+        self,
+        component: Component,
+        counterion_id: str,
+        payload: dict[str, str | None],
+    ) -> list[str]:
+        created = await create_component_salt(
+            ComponentSaltCreate(
+                component_id=UUID(str(component.id)),
+                counterion_id=UUID(counterion_id),
+                stoichiometry=_optional_float(payload.get("stoichiometry")),
+                is_fully_defined=_optional_bool(payload.get("is_fully_defined")),
+            ),
+            self.env,
+        )
+        if created is None:
+            return ["Failed to create salt record."]
+        return ["Created salt record.", "", *await self._render_component_focus()]
+
     async def _update_material_entry(
         self, item_id: str, payload: dict[str, str | None]
     ) -> list[str]:
@@ -1792,6 +2069,16 @@ class CommandDispatcher:
             lines.extend(["", f"Enter {current.label}:"])
         return lines
 
+    def _render_picker_lines(self) -> list[str]:
+        if self._picker_state is None:
+            return []
+        return [
+            self._picker_state.label,
+            "Type to filter · arrows to move · Enter to select · Esc to cancel",
+            "",
+            *self._picker_state.navigator.render_lines(self.screen.width),
+        ]
+
     def _risk_fields(self) -> list[FieldSpec]:
         return [
             FieldSpec("risk_type"),
@@ -1826,8 +2113,8 @@ class CommandDispatcher:
 
 
 HELP_TOPICS: dict[str, list[str]] = {
-    "home": ["/select <name>", "/library [submode]", "/admin", "/quit"],
-    "project": ["/route [R.P]", "/risks", "/home"],
+    "home": ["/select <name>", "/add project", "/library [submode]", "/admin", "/quit"],
+    "project": ["/route [R.P]", "/add process", "/risks", "/home"],
     "route": [
         "/list stages|components|risks|ncrm",
         "/focus stage <name>",
@@ -1836,6 +2123,7 @@ HELP_TOPICS: dict[str, list[str]] = {
         "/add component <name>",
         "/add risk [stage <name>|component <name>|process]",
     ],
+    "component_focus": ["/add salt", "/edit", "/delete", "/risks", "/home"],
     "library": ["/list", "/search <query>", "/add", "/edit <name>", "/delete <name>"],
     "admin": [
         "/admin import <type> <file.csv> [--dry-run] [--skip-errors]",
@@ -1853,6 +2141,18 @@ def _optional_int(value: str | None) -> int | None:
     if value is None or value == "":
         return None
     return int(value)
+
+
+def _optional_float(value: str | None) -> float | None:
+    if value is None or value == "":
+        return None
+    return float(value)
+
+
+def _optional_bool(value: str | None) -> bool | None:
+    if value is None or value == "":
+        return None
+    return value.strip().lower() in {"1", "true", "yes", "y"}
 
 
 def _as_bool(value: str | None) -> bool:
