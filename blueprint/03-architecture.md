@@ -19,9 +19,9 @@ and replaceable.
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  Entry Point  (__main__.py)                                  │
-│  • Reads env vars (APP_ENV, APP_DB_PATH, GCLI_SESSION_PATH)  │
+│  • Reads env vars (APP_ENV, APP_DB_PATH, RMGR_SESSION_PATH)  │
 │  • Initialises SQLite DB on first run (create_all)           │
-│  • Loads SessionState from ~/.gcli/session.json              │
+│  • Loads SessionState from ~/.rmgr/session.json              │
 │  • Creates blessed Terminal instance                         │
 │  • Launches REPL event loop                                  │
 └───────────────────────┬──────────────────────────────────────┘
@@ -92,7 +92,7 @@ and replaceable.
 
 ┌──────────────────────────────────────────────────────────────┐
 │  Session State  (repl/session_state.py)           [sidecar]  │
-│  • JSON file at ~/.gcli/session.json                         │
+│  • JSON file at ~/.rmgr/session.json                         │
 │  • Persists: recent_projects, recent_routes, last context    │
 │  • Loaded at startup; saved on context change + clean exit   │
 │  • Corruption-safe: missing/invalid file → silent reset      │
@@ -106,7 +106,7 @@ and replaceable.
 ### Layer 1: Entry Point (`__main__.py`)
 
 **Responsibilities:**
-- Read `APP_ENV`, `APP_DB_PATH`, `GCLI_SESSION_PATH` from environment
+- Read `APP_ENV`, `APP_DB_PATH`, `RMGR_SESSION_PATH` from environment
 - Build `Environment` enum and DB URL
 - Run `init_db()` to create missing tables (idempotent)
 - Load `SessionState` from disk

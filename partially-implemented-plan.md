@@ -1,16 +1,16 @@
-# Governance CLI — Implementation Plan
+# Riskmanager CLI — Implementation Plan
 
 ## Problem Statement
 
-Implement the `governance-cli` application from scratch using the 11-document blueprint in
+Implement the `riskmanager-cli` application from scratch using the 11-document blueprint in
 `blueprint/`. The result is a `blessed`-based interactive REPL shell for managing
-pharmaceutical manufacturing governance data, backed by SQLite via SQLAlchemy async.
+pharmaceutical manufacturing riskmanager data, backed by SQLite via SQLAlchemy async.
 
 ## Mandatory Constraints
 
-- Virtual environment: `~/.venvs/riskworks` — **NEVER** use system Python
-- All Python commands must be prefixed: `~/.venvs/riskworks/bin/python` or activate venv first
-- `pip install` always targets the venv: `~/.venvs/riskworks/bin/pip install ...`
+- Virtual environment: `~/.venvs/riskmanager` — **NEVER** use system Python
+- All Python commands must be prefixed: `~/.venvs/riskmanager/bin/python` or activate venv first
+- `pip install` always targets the venv: `~/.venvs/riskmanager/bin/pip install ...`
 - Python >= 3.10 required
 
 ---
@@ -24,7 +24,7 @@ independently testable before the next begins.
 
 ## Stages
 
-### Stage 0 — Bootstrap (repo skeleton + mandatory governance files)
+### Stage 0 — Bootstrap (repo skeleton + mandatory riskmanager files)
 
 Create these files **first**, before any code:
 
@@ -44,7 +44,7 @@ from `blueprint/00-overview.md`. No logic — just the import tree.
 
 Directory structure:
 ```
-src/governance_cli/
+src/riskmanager_cli/
   __init__.py  __main__.py
   repl/  operations/  model/  schema/  database/  config/  service/  utils/
 tests/
@@ -138,15 +138,15 @@ Write tests following `08-code-quality.md`:
 
 ## Quality Gates (enforced at every stage)
 
-All commands use `~/.venvs/riskworks/bin/python` — **NEVER** system Python.
+All commands use `~/.venvs/riskmanager/bin/python` — **NEVER** system Python.
 
 | Tool | Command | Must produce |
 |------|---------|-------------|
-| Ruff lint | `~/.venvs/riskworks/bin/python -m ruff check src/ tests/` | 0 errors |
-| Ruff format | `~/.venvs/riskworks/bin/python -m ruff format --check src/ tests/` | 0 diffs |
-| Pylint | `~/.venvs/riskworks/bin/python -m pylint src/governance_cli/` | 0 errors/warnings (score 10/10) |
-| Mypy | `~/.venvs/riskworks/bin/python -m mypy src/governance_cli/` | 0 errors |
-| Pytest | `~/.venvs/riskworks/bin/python -m pytest tests/ -x` | all green |
+| Ruff lint | `~/.venvs/riskmanager/bin/python -m ruff check src/ tests/` | 0 errors |
+| Ruff format | `~/.venvs/riskmanager/bin/python -m ruff format --check src/ tests/` | 0 diffs |
+| Pylint | `~/.venvs/riskmanager/bin/python -m pylint src/riskmanager_cli/` | 0 errors/warnings (score 10/10) |
+| Mypy | `~/.venvs/riskmanager/bin/python -m mypy src/riskmanager_cli/` | 0 errors |
+| Pytest | `~/.venvs/riskmanager/bin/python -m pytest tests/ -x` | all green |
 
 ### Suppression Policy (mandatory)
 

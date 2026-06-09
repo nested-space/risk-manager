@@ -41,12 +41,12 @@ full specification._
 - Bulk CSV import via `/admin import` commands
 - SMILES canonicalization and validation via RDKit
 - Optional DMTA enrichment via external HTTP service
-- JSON-backed session state at `~/.gcli/session.json`
+- JSON-backed session state at `~/.rmgr/session.json`
 - Context-aware navigation: Project → Route → Stage/Component hierarchy
 
 ### Removed (vs reference implementation)
 
-- `governance_server` wheel dependency (all models re-implemented locally)
+- `riskmanager_server` wheel dependency (all models re-implemented locally)
 - PostgreSQL / asyncpg (replaced by SQLite / aiosqlite)
 - FastAPI / HTTP server (REPL-only application)
 - `argparse` / `argcomplete` (replaced by REPL command dispatcher)

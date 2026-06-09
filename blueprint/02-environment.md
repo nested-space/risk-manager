@@ -18,8 +18,8 @@ a JSON file and is separate from the database.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_ENV` | `dev` | Active environment. Accepted values: `dev`, `prod` |
-| `APP_DEV_DB_PATH` | `./governance-dev.db` | Path to the SQLite file used in `dev` environment |
-| `APP_PROD_DB_PATH` | `./governance.db` | Path to the SQLite file used in `prod` environment |
+| `APP_DEV_DB_PATH` | `./riskmanager-dev.db` | Path to the SQLite file used in `dev` environment |
+| `APP_PROD_DB_PATH` | `./riskmanager.db` | Path to the SQLite file used in `prod` environment |
 | `APP_DB_PATH` | _(none)_ | If set, overrides both `APP_DEV_DB_PATH` and `APP_PROD_DB_PATH` regardless of `APP_ENV` |
 
 **Precedence:**
@@ -31,7 +31,7 @@ a JSON file and is separate from the database.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GCLI_SESSION_PATH` | `~/.gcli/session.json` | Path to the JSON session state file |
+| `RMGR_SESSION_PATH` | `~/.rmgr/session.json` | Path to the JSON session state file |
 
 The session state file stores:
 - Recent projects (last 5 visited, in order of last use)
@@ -93,9 +93,9 @@ def build_db_url(env: Environment, verbose: bool = False) -> str:
     if override:
         db_path = override
     elif env is Environment.PROD:
-        db_path = os.getenv("APP_PROD_DB_PATH", "./governance.db")
+        db_path = os.getenv("APP_PROD_DB_PATH", "./riskmanager.db")
     else:
-        db_path = os.getenv("APP_DEV_DB_PATH", "./governance-dev.db")
+        db_path = os.getenv("APP_DEV_DB_PATH", "./riskmanager-dev.db")
 
     if verbose:
         print_key_value("Database", f"{db_path} ({env.value})")
@@ -106,13 +106,13 @@ def build_db_url(env: Environment, verbose: bool = False) -> str:
 def get_session_path() -> Path:
     """Return the path to the JSON session state file.
 
-    Respects the GCLI_SESSION_PATH environment variable. Defaults to
-    ~/.gcli/session.json. The parent directory is created if it does not exist.
+    Respects the RMGR_SESSION_PATH environment variable. Defaults to
+    ~/.rmgr/session.json. The parent directory is created if it does not exist.
 
     Returns:
         Resolved Path object for the session state file.
     """
-    raw = os.getenv("GCLI_SESSION_PATH", str(Path.home() / ".gcli" / "session.json"))
+    raw = os.getenv("RMGR_SESSION_PATH", str(Path.home() / ".rmgr" / "session.json"))
     path = Path(raw).expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
@@ -127,11 +127,11 @@ Add to `~/.zshrc` or `~/.bashrc`:
 ```bash
 # Default to dev environment
 export APP_ENV=dev
-export APP_DEV_DB_PATH="$HOME/.gcli/governance-dev.db"
-export APP_PROD_DB_PATH="$HOME/.gcli/governance.db"
+export APP_DEV_DB_PATH="$HOME/.rmgr/riskmanager-dev.db"
+export APP_PROD_DB_PATH="$HOME/.rmgr/riskmanager.db"
 
 # Optional: override session state file location
-# export GCLI_SESSION_PATH="$HOME/.gcli/session.json"
+# export RMGR_SESSION_PATH="$HOME/.rmgr/session.json"
 
 # Optional: DMTA enrichment
 # export DMTA_API_URL="https://dmta.example.com/api"
@@ -141,7 +141,7 @@ export APP_PROD_DB_PATH="$HOME/.gcli/governance.db"
 Create the data directory:
 
 ```bash
-mkdir -p ~/.gcli
+mkdir -p ~/.rmgr
 ```
 
 ---

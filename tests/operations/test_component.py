@@ -1,22 +1,22 @@
-"""Integration tests for governance_cli.operations.component_operations."""
+"""Integration tests for riskmanager_cli.operations.component_operations."""
 
 from uuid import UUID
 
 import pytest
 
-from governance_cli.config.settings import Environment
-from governance_cli.model.enums import TA
-from governance_cli.operations.component_operations import (
+from riskmanager_cli.config.settings import Environment
+from riskmanager_cli.model.enums import TA
+from riskmanager_cli.operations.component_operations import (
     create_component,
     get_component_by_id,
     list_components_for_process,
 )
-from governance_cli.operations.manufacturing_process_operations import (
+from riskmanager_cli.operations.manufacturing_process_operations import (
     create_manufacturing_process,
 )
-from governance_cli.operations.material_operations import create_material
-from governance_cli.operations.project_operations import create_project
-from governance_cli.schema.create import (
+from riskmanager_cli.operations.material_operations import create_material
+from riskmanager_cli.operations.project_operations import create_project
+from riskmanager_cli.schema.create import (
     ComponentCreate,
     ManufacturingProcessCreate,
     MaterialCreate,

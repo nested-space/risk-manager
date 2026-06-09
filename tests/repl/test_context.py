@@ -1,8 +1,8 @@
-"""Unit tests for governance_cli.repl.context."""
+"""Unit tests for riskmanager_cli.repl.context."""
 
 import pytest
 
-from governance_cli.repl.context import ContextFrame, ContextManager
+from riskmanager_cli.repl.context import ContextFrame, ContextManager
 
 
 @pytest.mark.unit

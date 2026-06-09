@@ -1,5 +1,5 @@
 """
-Enumeration types for the governance CLI data model.
+Enumeration types for the riskmanager CLI data model.
 
 Defines all Python ``enum.Enum`` subclasses used by SQLModel table definitions
 and Pydantic schema validators. SQLite stores enum values as ``TEXT`` via

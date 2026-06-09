@@ -531,8 +531,8 @@ The second Esc exits the application (equivalent to `/quit`).
 
 ### File Location
 
-Default: `~/.gcli/session.json`
-Override: `GCLI_SESSION_PATH` environment variable
+Default: `~/.rmgr/session.json`
+Override: `RMGR_SESSION_PATH` environment variable
 
 ### Schema
 

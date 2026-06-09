@@ -2,7 +2,7 @@
 
 import pytest
 
-from governance_cli.repl.commands import FieldSpec, PromptState
+from riskmanager_cli.repl.commands import FieldSpec, PromptState
 
 
 @pytest.mark.unit

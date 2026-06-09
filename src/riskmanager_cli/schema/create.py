@@ -1,5 +1,5 @@
 """
-Pydantic create schemas for all governance CLI entities.
+Pydantic create schemas for all riskmanager CLI entities.
 
 Each schema defines the required and optional fields that a caller must supply
 when creating a new database record. Pydantic validates types and enum values
@@ -9,7 +9,7 @@ Why this exists:
     Separating create/update contracts from SQLModel table definitions keeps
     the ORM layer focused on persistence and the schema layer focused on
     input validation. This matches the pattern used in the reference
-    implementation's ``governance_server`` wheel.
+    implementation's ``riskmanager_server`` wheel.
 """
 
 from uuid import UUID

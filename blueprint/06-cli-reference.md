@@ -3,12 +3,12 @@
 ## Launching the Application
 
 ```bash
-gcli
+rmgr
 # or
-governance-cli
+riskmanager-cli
 ```
 
-`gcli` launches the interactive REPL shell directly. There are no one-shot
+`rmgr` launches the interactive REPL shell directly. There are no one-shot
 command-line arguments — all interaction happens within the running session.
 
 ---

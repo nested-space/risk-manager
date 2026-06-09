@@ -1,20 +1,20 @@
-"""Integration tests for governance_cli.operations.project_operations."""
+"""Integration tests for riskmanager_cli.operations.project_operations."""
 
 from uuid import UUID, uuid4
 
 import pytest
 
-from governance_cli.config.settings import Environment
-from governance_cli.model.enums import TA
-from governance_cli.operations.material_operations import create_material
-from governance_cli.operations.project_operations import (
+from riskmanager_cli.config.settings import Environment
+from riskmanager_cli.model.enums import TA
+from riskmanager_cli.operations.material_operations import create_material
+from riskmanager_cli.operations.project_operations import (
     create_project,
     delete_project,
     get_project_by_id,
     list_projects,
     search_projects,
 )
-from governance_cli.schema.create import MaterialCreate, ProjectCreate
+from riskmanager_cli.schema.create import MaterialCreate, ProjectCreate
 
 
 async def _make_material(env: Environment, name: str = "TestMaterial") -> str:

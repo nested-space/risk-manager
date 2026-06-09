@@ -1,4 +1,4 @@
-"""Public exports for the governance-cli REPL layer."""
+"""Public exports for the riskmanager-cli REPL layer."""
 
 from __future__ import annotations
 

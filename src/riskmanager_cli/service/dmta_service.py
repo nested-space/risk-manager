@@ -7,7 +7,7 @@ enrichment as a best-effort operation.
 
 Configuration is done via the constructor; the caller is responsible for
 reading environment variables before instantiation (see
-:func:`~governance_cli.operations.dmta_operations.enrich_material_with_dmta`).
+:func:`~riskmanager_cli.operations.dmta_operations.enrich_material_with_dmta`).
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ class DmtaService:
             name: The compound name to search for (exact match).
 
         Returns:
-            A :class:`~governance_cli.service.smiles_comparison_result.SmilesComparisonResult`
+            A :class:`~riskmanager_cli.service.smiles_comparison_result.SmilesComparisonResult`
             if the compound was found, or ``None`` on error / not found.
         """
         return await self._get("/compounds/search", params={"name": name})
@@ -74,7 +74,7 @@ class DmtaService:
             smiles: SMILES string to look up (exact canonical match expected).
 
         Returns:
-            A :class:`~governance_cli.service.smiles_comparison_result.SmilesComparisonResult`
+            A :class:`~riskmanager_cli.service.smiles_comparison_result.SmilesComparisonResult`
             if the compound was found, or ``None`` on error / not found.
         """
         return await self._get("/compounds/search", params={"smiles": smiles})
@@ -86,7 +86,7 @@ class DmtaService:
             registry_id: The DMTA internal compound ID.
 
         Returns:
-            A :class:`~governance_cli.service.smiles_comparison_result.SmilesComparisonResult`
+            A :class:`~riskmanager_cli.service.smiles_comparison_result.SmilesComparisonResult`
             if the compound was found, or ``None`` on error / not found.
         """
         return await self._get(f"/compounds/{registry_id}")

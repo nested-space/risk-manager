@@ -1,4 +1,4 @@
-"""Blessed-backed screen drawing utilities for the governance REPL."""
+"""Blessed-backed screen drawing utilities for the riskmanager REPL."""
 
 from __future__ import annotations
 

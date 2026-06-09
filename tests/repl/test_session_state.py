@@ -1,11 +1,11 @@
-"""Unit tests for governance_cli.repl.session_state."""
+"""Unit tests for riskmanager_cli.repl.session_state."""
 
 import json
 from pathlib import Path
 
 import pytest
 
-from governance_cli.repl.session_state import SessionState
+from riskmanager_cli.repl.session_state import SessionState
 
 
 @pytest.mark.unit
