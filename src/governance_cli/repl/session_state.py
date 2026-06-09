@@ -66,7 +66,7 @@ class SessionState:
                 },
                 version=int(raw.get("version", cls.VERSION)),
             )
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught  # silently reset on any JSON/IO failure
             return cls(path=resolved_path)
 
     def save(self) -> None:
@@ -88,8 +88,8 @@ class SessionState:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-        except Exception:
-            return
+        except Exception:  # pylint: disable=broad-exception-caught  # save is best-effort; never crash the REPL
+            pass
 
     def push_project(self, project_id: str) -> None:
         """Record *project_id* as the most recently visited project.

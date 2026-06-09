@@ -11,6 +11,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Stage 9 test suite: 75 tests across `tests/operations/`, `tests/repl/`, and
+  `tests/utils/` covering material, project, and component CRUD operations;
+  SMILES validation; context-stack navigation; session state persistence; and
+  CSV parsing helpers
+- `tests/conftest.py` with `mock_session`, `db_session`, and `temp_env` fixtures
+- Testing guide section in `README.md` documenting test markers and quality gates
 - Initial project scaffold: `pyproject.toml`, `.gitignore`, `CHANGELOG.md`
 - `.github/copilot-instructions.md` with mandatory architecture, build, semver,
   code quality, and quality gate requirements
