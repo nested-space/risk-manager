@@ -74,7 +74,9 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
     def redraw() -> None:
         screen.draw_status_bar()
         screen.draw_output(current_output_lines)
-        if dispatcher.prompt_state is not None:
+        if dispatcher.picker_state is not None:
+            screen.draw_input_line(prompt="filter: ", text=input_buffer)
+        elif dispatcher.prompt_state is not None:
             prompt = f"{dispatcher.prompt_state.current_field.label}: "
             screen.draw_input_line(prompt=prompt, text=input_buffer)
         elif _in_list_mode(ctx) and not input_buffer:
@@ -105,9 +107,14 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                 raise KeyboardInterrupt
 
             if key_name == "KEY_ESCAPE":
-                message = escape_handler.handle_esc(dispatcher.prompt_state is not None)
+                in_modal = (
+                    dispatcher.prompt_state is not None or dispatcher.picker_state is not None
+                )
+                message = escape_handler.handle_esc(in_modal)
                 if message == "NAVIGATE_UP":
-                    if dispatcher.prompt_state is not None:
+                    if dispatcher.picker_state is not None:
+                        current_output_lines = dispatcher.cancel_picker()
+                    elif dispatcher.prompt_state is not None:
                         current_output_lines = dispatcher.cancel_prompt()
                     else:
                         popped = ctx.pop()
@@ -136,6 +143,22 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                     input_buffer = input_buffer[:-1]
                 elif _is_text_input(key):
                     input_buffer += key_text
+                redraw()
+                continue
+
+            if dispatcher.picker_state is not None:
+                if _is_enter(key_name, key_text):
+                    current_output_lines = _coerce_lines(run_async(dispatcher.picker_select()))
+                    input_buffer = ""
+                elif key_name in {"KEY_UP", "KEY_DOWN"}:
+                    direction = "up" if key_name == "KEY_UP" else "down"
+                    current_output_lines = dispatcher.picker_move(direction)
+                elif _is_backspace(key_name, key_text):
+                    input_buffer = input_buffer[:-1]
+                    current_output_lines = dispatcher.update_picker_query(input_buffer)
+                elif _is_text_input(key):
+                    input_buffer += key_text
+                    current_output_lines = dispatcher.update_picker_query(input_buffer)
                 redraw()
                 continue
 
