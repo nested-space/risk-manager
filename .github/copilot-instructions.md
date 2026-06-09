@@ -1,4 +1,4 @@
-# Copilot Instructions — `governance-cli`
+# Copilot Instructions — `riskmanager-cli`
 
 These rules are **mandatory** and apply to every contribution, AI-assisted or
 human. No exceptions without explicit project-owner approval documented in the
@@ -14,15 +14,15 @@ All Python commands MUST target the project virtual environment:
 
 ```bash
 # Correct — always use the venv
-~/.venvs/riskworks/bin/python ...
-~/.venvs/riskworks/bin/pip install ...
-~/.venvs/riskworks/bin/ruff ...
-~/.venvs/riskworks/bin/mypy ...
-~/.venvs/riskworks/bin/pylint ...
-~/.venvs/riskworks/bin/pytest ...
+~/.venvs/riskmanager/bin/python ...
+~/.venvs/riskmanager/bin/pip install ...
+~/.venvs/riskmanager/bin/ruff ...
+~/.venvs/riskmanager/bin/mypy ...
+~/.venvs/riskmanager/bin/pylint ...
+~/.venvs/riskmanager/bin/pytest ...
 
 # Alternative: activate first
-source ~/.venvs/riskworks/bin/activate
+source ~/.venvs/riskmanager/bin/activate
 python ...  # now safe
 
 # FORBIDDEN — system Python
@@ -31,7 +31,7 @@ python3 ...         # ← NEVER
 /usr/bin/python3 ...  # ← NEVER
 ```
 
-The virtual environment is located at `~/.venvs/riskworks`.
+The virtual environment is located at `~/.venvs/riskmanager`.
 It is NOT committed to the repository and NOT stored under the project root.
 It must never appear in `.gitignore` because it is outside the repo.
 
@@ -70,7 +70,7 @@ Entry Point (__main__.py)
 
 ```
 src/
-└── governance_cli/
+└── riskmanager_cli/
     ├── __init__.py
     ├── __main__.py
     ├── repl/
@@ -101,26 +101,26 @@ with `where = ["src"]`.
 
 ```bash
 # Install in editable mode (development)
-~/.venvs/riskworks/bin/pip install -e ".[dev]"
+~/.venvs/riskmanager/bin/pip install -e ".[dev]"
 
 # Install production dependencies only
-~/.venvs/riskworks/bin/pip install -e .
+~/.venvs/riskmanager/bin/pip install -e .
 ```
 
 ### Building a Distribution
 
 ```bash
-~/.venvs/riskworks/bin/python -m build
+~/.venvs/riskmanager/bin/python -m build
 ```
 
-Produces `dist/governance_cli-X.Y.Z-py3-none-any.whl` and `.tar.gz`.
+Produces `dist/riskmanager_cli-X.Y.Z-py3-none-any.whl` and `.tar.gz`.
 
 ### Entry Points
 
 | Command | Maps to |
 |---------|---------|
-| `gcli` | `governance_cli.__main__:cli_main` |
-| `governance-cli` | `governance_cli.__main__:cli_main` |
+| `rmgr` | `riskmanager_cli.__main__:cli_main` |
+| `riskmanager-cli` | `riskmanager_cli.__main__:cli_main` |
 
 ### Database Initialization
 
@@ -129,16 +129,16 @@ On first run, SQLite tables are created automatically via `init_db()` in
 
 For Alembic migrations (production):
 ```bash
-~/.venvs/riskworks/bin/alembic upgrade head
+~/.venvs/riskmanager/bin/alembic upgrade head
 ```
 
 ### Recommended Shell Setup
 
 ```bash
 export APP_ENV=dev
-export APP_DEV_DB_PATH="$HOME/.gcli/governance-dev.db"
-export APP_PROD_DB_PATH="$HOME/.gcli/governance.db"
-mkdir -p ~/.gcli
+export APP_DEV_DB_PATH="$HOME/.rmgr/riskmanager-dev.db"
+export APP_PROD_DB_PATH="$HOME/.rmgr/riskmanager.db"
+mkdir -p ~/.rmgr
 ```
 
 ---
@@ -150,7 +150,7 @@ Version is defined **only** in `pyproject.toml`. Do NOT duplicate it in
 
 ```python
 from importlib.metadata import version
-__version__ = version("governance-cli")
+__version__ = version("riskmanager-cli")
 ```
 
 ### Bump Rules
@@ -172,7 +172,7 @@ should pin to exact versions.
 2. Update `CHANGELOG.md` (move `[Unreleased]` to new version section)
 3. Commit: `chore: bump version to X.Y.Z`
 4. Tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
-5. Build: `~/.venvs/riskworks/bin/python -m build`
+5. Build: `~/.venvs/riskmanager/bin/python -m build`
 
 ---
 
@@ -268,16 +268,16 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 ## 6. Quality Gates (mandatory at every stage)
 
-All commands MUST use `~/.venvs/riskworks/bin/python`. Using system Python
+All commands MUST use `~/.venvs/riskmanager/bin/python`. Using system Python
 invalidates the quality gate.
 
 | Gate | Command | Required result |
 |------|---------|----------------|
-| Ruff lint | `~/.venvs/riskworks/bin/python -m ruff check src/ tests/` | 0 errors |
-| Ruff format | `~/.venvs/riskworks/bin/python -m ruff format --check src/ tests/` | 0 diffs |
-| Pylint | `~/.venvs/riskworks/bin/python -m pylint src/governance_cli/` | Score 10.00/10 |
-| Mypy | `~/.venvs/riskworks/bin/python -m mypy src/governance_cli/` | 0 errors |
-| Tests | `~/.venvs/riskworks/bin/python -m pytest tests/ -x` | All green |
+| Ruff lint | `~/.venvs/riskmanager/bin/python -m ruff check src/ tests/` | 0 errors |
+| Ruff format | `~/.venvs/riskmanager/bin/python -m ruff format --check src/ tests/` | 0 diffs |
+| Pylint | `~/.venvs/riskmanager/bin/python -m pylint src/riskmanager_cli/` | Score 10.00/10 |
+| Mypy | `~/.venvs/riskmanager/bin/python -m mypy src/riskmanager_cli/` | 0 errors |
+| Tests | `~/.venvs/riskmanager/bin/python -m pytest tests/ -x` | All green |
 
 ### Suppression Policy
 

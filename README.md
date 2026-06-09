@@ -1,8 +1,8 @@
-# governance-cli
+# riskmanager-cli
 
-**Interactive REPL shell for pharmaceutical manufacturing governance data.**
+**Interactive REPL shell for pharmaceutical manufacturing riskmanager data.**
 
-`governance-cli` (`gcli`) is a full-screen interactive terminal application for
+`riskmanager-cli` (`rmgr`) is a full-screen interactive terminal application for
 managing structured pharmaceutical manufacturing data: materials, projects,
 manufacturing routes, stages, components, risks, and non-controlled raw materials
 (NCRMs). It runs entirely locally with no server process required.
@@ -58,7 +58,7 @@ manufacturing routes, stages, components, risks, and non-controlled raw material
 
 ## Overview
 
-`governance-cli` provides command-line management of structured pharmaceutical
+`riskmanager-cli` provides command-line management of structured pharmaceutical
 data across the following entity hierarchy:
 
 ```
@@ -75,7 +75,7 @@ Material
                     └── ComponentSalt → Counterion
 ```
 
-Unlike traditional single-shot CLIs, `gcli` maintains a **persistent session
+Unlike traditional single-shot CLIs, `rmgr` maintains a **persistent session
 context**. Once a project and route are selected, subsequent commands operate
 within that context without re-specifying the full path.
 
@@ -90,7 +90,7 @@ within that context without re-specifying the full path.
 | RDKit | `>=2023.3.1` (for SMILES validation) |
 
 > **Note:** The system Python is NOT used. All commands use the project virtual
-> environment at `~/.venvs/riskworks`.
+> environment at `~/.venvs/riskmanager`.
 
 ---
 
@@ -98,15 +98,15 @@ within that context without re-specifying the full path.
 
 ### Virtual Environment Setup
 
-The project uses a dedicated virtual environment at `~/.venvs/riskworks`.
+The project uses a dedicated virtual environment at `~/.venvs/riskmanager`.
 **Never use the system Python.**
 
 ```bash
 # Create the virtual environment (one-time setup)
-python3 -m venv ~/.venvs/riskworks
+python3 -m venv ~/.venvs/riskmanager
 
 # Verify the venv Python version
-~/.venvs/riskworks/bin/python --version
+~/.venvs/riskmanager/bin/python --version
 # Should print Python 3.10 or higher
 ```
 
@@ -114,14 +114,14 @@ python3 -m venv ~/.venvs/riskworks
 
 ```bash
 # Clone the repository
-git clone <repo-url> riskworks
-cd riskworks
+git clone <repo-url> riskmanager
+cd riskmanager
 
 # Install in editable mode with dev dependencies
-~/.venvs/riskworks/bin/pip install -e ".[dev]"
+~/.venvs/riskmanager/bin/pip install -e ".[dev]"
 
 # Or install production dependencies only
-~/.venvs/riskworks/bin/pip install -e .
+~/.venvs/riskmanager/bin/pip install -e .
 ```
 
 ---
@@ -138,8 +138,8 @@ files are required — the defaults work out of the box for local development.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_ENV` | `dev` | Active environment. Accepted: `dev`, `prod` |
-| `APP_DEV_DB_PATH` | `./governance-dev.db` | SQLite file path for `dev` |
-| `APP_PROD_DB_PATH` | `./governance.db` | SQLite file path for `prod` |
+| `APP_DEV_DB_PATH` | `./riskmanager-dev.db` | SQLite file path for `dev` |
+| `APP_PROD_DB_PATH` | `./riskmanager.db` | SQLite file path for `prod` |
 | `APP_DB_PATH` | _(none)_ | Overrides both path vars regardless of `APP_ENV` |
 
 **Precedence:**
@@ -151,7 +151,7 @@ files are required — the defaults work out of the box for local development.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GCLI_SESSION_PATH` | `~/.gcli/session.json` | JSON session state file |
+| `RMGR_SESSION_PATH` | `~/.rmgr/session.json` | JSON session state file |
 
 The session state file is created automatically on first run. If missing or
 corrupt, the application starts fresh without error.
@@ -171,13 +171,13 @@ prints a warning and skips enrichment rather than failing.
 Add the following to `~/.zshrc` or `~/.bashrc`:
 
 ```bash
-# governance-cli environment
+# riskmanager-cli environment
 export APP_ENV=dev
-export APP_DEV_DB_PATH="$HOME/.gcli/governance-dev.db"
-export APP_PROD_DB_PATH="$HOME/.gcli/governance.db"
+export APP_DEV_DB_PATH="$HOME/.rmgr/riskmanager-dev.db"
+export APP_PROD_DB_PATH="$HOME/.rmgr/riskmanager.db"
 
 # Optional: custom session state location
-# export GCLI_SESSION_PATH="$HOME/.gcli/session.json"
+# export RMGR_SESSION_PATH="$HOME/.rmgr/session.json"
 
 # Optional: DMTA enrichment
 # export DMTA_API_URL="https://dmta.example.com/api"
@@ -187,7 +187,7 @@ export APP_PROD_DB_PATH="$HOME/.gcli/governance.db"
 Create the data directory:
 
 ```bash
-mkdir -p ~/.gcli
+mkdir -p ~/.rmgr
 ```
 
 ---
@@ -200,7 +200,7 @@ created via SQLAlchemy's `create_all()` — no manual schema setup required.
 For production deployments using Alembic migrations:
 
 ```bash
-~/.venvs/riskworks/bin/alembic upgrade head
+~/.venvs/riskmanager/bin/alembic upgrade head
 ```
 
 ---
@@ -209,14 +209,14 @@ For production deployments using Alembic migrations:
 
 ```bash
 # Using the entry point
-~/.venvs/riskworks/bin/gcli
+~/.venvs/riskmanager/bin/rmgr
 
 # Or after activating the venv
-source ~/.venvs/riskworks/bin/activate
-gcli
+source ~/.venvs/riskmanager/bin/activate
+rmgr
 ```
 
-`gcli` launches the interactive REPL shell directly. There are no one-shot
+`rmgr` launches the interactive REPL shell directly. There are no one-shot
 command-line arguments — all interaction happens within the running session.
 
 ---
@@ -628,7 +628,7 @@ The application uses [RDKit](https://www.rdkit.org/) for SMILES handling:
 RDKit must be installed in the virtual environment:
 
 ```bash
-~/.venvs/riskworks/bin/pip install rdkit>=2023.3.1
+~/.venvs/riskmanager/bin/pip install rdkit>=2023.3.1
 ```
 
 ---
@@ -653,7 +653,7 @@ If `DMTA_API_URL` is not set, enrichment is silently skipped.
 ## Session State
 
 The application persists navigation context between sessions in a JSON file
-(default: `~/.gcli/session.json`).
+(default: `~/.rmgr/session.json`).
 
 Stored data:
 - Recent projects (last 5 visited, in order of last use)
@@ -666,7 +666,7 @@ application starts fresh at the home screen without error.
 Customize the path:
 
 ```bash
-export GCLI_SESSION_PATH="$HOME/.gcli/session.json"
+export RMGR_SESSION_PATH="$HOME/.rmgr/session.json"
 ```
 
 ---
@@ -675,27 +675,27 @@ export GCLI_SESSION_PATH="$HOME/.gcli/session.json"
 
 ### Code Quality Gates
 
-**All commands use `~/.venvs/riskworks/bin/python` — never system Python.**
+**All commands use `~/.venvs/riskmanager/bin/python` — never system Python.**
 
 ```bash
 # Lint
-~/.venvs/riskworks/bin/python -m ruff check src/ tests/
+~/.venvs/riskmanager/bin/python -m ruff check src/ tests/
 
 # Format check
-~/.venvs/riskworks/bin/python -m ruff format --check src/ tests/
+~/.venvs/riskmanager/bin/python -m ruff format --check src/ tests/
 
 # Type checking
-~/.venvs/riskworks/bin/python -m mypy src/governance_cli/
+~/.venvs/riskmanager/bin/python -m mypy src/riskmanager_cli/
 
 # Lint (pylint)
-~/.venvs/riskworks/bin/python -m pylint src/governance_cli/
+~/.venvs/riskmanager/bin/python -m pylint src/riskmanager_cli/
 
 # All quality gates in one shot
-~/.venvs/riskworks/bin/python -m ruff check src/ tests/ && \
-~/.venvs/riskworks/bin/python -m ruff format --check src/ tests/ && \
-~/.venvs/riskworks/bin/python -m mypy src/governance_cli/ && \
-~/.venvs/riskworks/bin/python -m pylint src/governance_cli/ && \
-~/.venvs/riskworks/bin/python -m pytest tests/ -x
+~/.venvs/riskmanager/bin/python -m ruff check src/ tests/ && \
+~/.venvs/riskmanager/bin/python -m ruff format --check src/ tests/ && \
+~/.venvs/riskmanager/bin/python -m mypy src/riskmanager_cli/ && \
+~/.venvs/riskmanager/bin/python -m pylint src/riskmanager_cli/ && \
+~/.venvs/riskmanager/bin/python -m pytest tests/ -x
 ```
 
 Error suppression policy:
@@ -706,23 +706,23 @@ Error suppression policy:
 
 ```bash
 # Run all tests
-~/.venvs/riskworks/bin/python -m pytest tests/ -v
+~/.venvs/riskmanager/bin/python -m pytest tests/ -v
 
 # Run only unit tests (no database)
-~/.venvs/riskworks/bin/python -m pytest tests/ -m unit -v
+~/.venvs/riskmanager/bin/python -m pytest tests/ -m unit -v
 
 # Run only integration tests
-~/.venvs/riskworks/bin/python -m pytest tests/ -m integration -v
+~/.venvs/riskmanager/bin/python -m pytest tests/ -m integration -v
 
 # Stop on first failure
-~/.venvs/riskworks/bin/python -m pytest tests/ -x
+~/.venvs/riskmanager/bin/python -m pytest tests/ -x
 ```
 
 ### Project Structure
 
 ```
 src/
-└── governance_cli/
+└── riskmanager_cli/
     ├── __init__.py
     ├── __main__.py              # Entry point: init DB, load session, launch REPL
     ├── repl/                    # Interactive REPL shell layer
@@ -760,7 +760,7 @@ README.md
 ### Running the test suite
 
 ```bash
-~/.venvs/riskworks/bin/python -m pytest tests/ -v
+~/.venvs/riskmanager/bin/python -m pytest tests/ -v
 ```
 
 ### Test structure
@@ -787,8 +787,8 @@ Tests are tagged with `@pytest.mark.unit` (no database) or `@pytest.mark.integra
 (isolated in-memory or temp-file SQLite). Run a subset:
 
 ```bash
-~/.venvs/riskworks/bin/python -m pytest tests/ -m unit
-~/.venvs/riskworks/bin/python -m pytest tests/ -m integration
+~/.venvs/riskmanager/bin/python -m pytest tests/ -m unit
+~/.venvs/riskmanager/bin/python -m pytest tests/ -m integration
 ```
 
 ### Quality gates
@@ -799,11 +799,11 @@ All of the following must pass before any commit:
 |------|---------|-------------|
 | Ruff lint | `python -m ruff check src/ tests/` | 0 errors |
 | Ruff format | `python -m ruff format --check src/ tests/` | 0 diffs |
-| Pylint | `python -m pylint src/governance_cli/` | score 10/10 |
-| Mypy | `python -m mypy src/governance_cli/` | 0 errors |
+| Pylint | `python -m pylint src/riskmanager_cli/` | score 10/10 |
+| Mypy | `python -m mypy src/riskmanager_cli/` | 0 errors |
 | Pytest | `python -m pytest tests/ -x` | all green |
 
-> Always prefix `python` with `~/.venvs/riskworks/bin/python` — never use system Python.
+> Always prefix `python` with `~/.venvs/riskmanager/bin/python` — never use system Python.
 
 ---
 
@@ -821,7 +821,7 @@ Version is defined only in `pyproject.toml`. Read at runtime:
 
 ```python
 from importlib.metadata import version
-__version__ = version("governance-cli")
+__version__ = version("riskmanager-cli")
 ```
 
 ---

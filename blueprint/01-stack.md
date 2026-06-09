@@ -54,7 +54,7 @@
 |-----------------|--------|
 | `asyncpg` | PostgreSQL async driver — replaced by `aiosqlite` |
 | `fastapi` | HTTP server framework — REPL-only, not needed |
-| `governance_server` wheel | External wheel with Postgres models — replaced by local `model/` package |
+| `riskmanager_server` wheel | External wheel with Postgres models — replaced by local `model/` package |
 | `argparse` | stdlib argument parser — replaced by REPL command dispatcher |
 | `argcomplete` | Tab completion for argparse — removed with argparse |
 
@@ -78,9 +78,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "governance-cli"
+name = "riskmanager-cli"
 version = "0.3.0"
-description = "Interactive REPL shell for governance database operations"
+description = "Interactive REPL shell for riskmanager database operations"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
@@ -96,12 +96,12 @@ dependencies = [
 ]
 
 [project.scripts]
-governance-cli = "governance_cli.__main__:cli_main"
-gcli = "governance_cli.__main__:cli_main"
+riskmanager-cli = "riskmanager_cli.__main__:cli_main"
+rmgr = "riskmanager_cli.__main__:cli_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["governance_cli*"]
+include = ["riskmanager_cli*"]
 
 [tool.ruff]
 line-length = 100

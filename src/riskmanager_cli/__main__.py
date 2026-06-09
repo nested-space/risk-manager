@@ -1,12 +1,12 @@
-"""Entry point for the governance-cli interactive REPL shell.
+"""Entry point for the riskmanager-cli interactive REPL shell.
 
 Invoke with::
 
-    gcli
+    rmgr
     # or
-    governance-cli
+    riskmanager-cli
     # or
-    python -m governance_cli
+    python -m riskmanager_cli
 
 Startup sequence:
 
@@ -14,9 +14,9 @@ Startup sequence:
 2. Initialise the SQLite database (create tables if absent)
 3. Load session state from disk (silently resets on corrupt JSON)
 4. Create a :class:`blessed.Terminal` instance
-5. Create a :class:`~governance_cli.repl.context.ContextManager` and
-   :class:`~governance_cli.repl.screen.ScreenManager`
-6. Call :func:`~governance_cli.repl.loop.start_repl` to enter the event loop
+5. Create a :class:`~riskmanager_cli.repl.context.ContextManager` and
+   :class:`~riskmanager_cli.repl.screen.ScreenManager`
+6. Call :func:`~riskmanager_cli.repl.loop.start_repl` to enter the event loop
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def _register_atexit_cleanup(term: blessed.Terminal) -> None:
 
 
 def cli_main() -> None:
-    """Main entry point for the governance-cli REPL.
+    """Main entry point for the riskmanager-cli REPL.
 
     Reads environment, initialises the database, loads session state,
     and starts the interactive terminal loop. Handles ``KeyboardInterrupt``
@@ -94,7 +94,7 @@ def cli_main() -> None:
     try:
         asyncio.run(init_db(build_db_url(env)))
     except Exception as exc:  # pylint: disable=broad-except  # startup must report clearly
-        sys.stderr.write(f"governance-cli: database initialisation failed: {exc}\n")
+        sys.stderr.write(f"riskmanager-cli: database initialisation failed: {exc}\n")
         sys.exit(1)
 
     session = SessionState.load()
@@ -114,7 +114,7 @@ def cli_main() -> None:
     except EOFError:
         exit_code = 0
     except Exception:  # pylint: disable=broad-except  # crash handler: always restore terminal
-        sys.stderr.write("\n\ngovernance-cli crashed:\n")
+        sys.stderr.write("\n\nriskmanager-cli crashed:\n")
         traceback.print_exc()
         exit_code = 1
     finally:

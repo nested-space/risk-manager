@@ -49,9 +49,9 @@ def build_db_url(env: Environment, verbose: bool = False) -> str:
     if override:
         db_path = override
     elif env is Environment.PROD:
-        db_path = os.getenv("APP_PROD_DB_PATH", "./governance.db")
+        db_path = os.getenv("APP_PROD_DB_PATH", "./riskmanager.db")
     else:
-        db_path = os.getenv("APP_DEV_DB_PATH", "./governance-dev.db")
+        db_path = os.getenv("APP_DEV_DB_PATH", "./riskmanager-dev.db")
 
     if verbose:
         print(f"Database: {db_path} ({env.value})")
@@ -62,14 +62,14 @@ def build_db_url(env: Environment, verbose: bool = False) -> str:
 def get_session_path() -> Path:
     """Return the path to the JSON session state file.
 
-    Respects the ``GCLI_SESSION_PATH`` environment variable. Defaults to
-    ``~/.gcli/session.json``. The parent directory is created if it does not
+    Respects the ``RMGR_SESSION_PATH`` environment variable. Defaults to
+    ``~/.rmgr/session.json``. The parent directory is created if it does not
     exist.
 
     Returns:
         Resolved :class:`pathlib.Path` for the session state file.
     """
-    raw = os.getenv("GCLI_SESSION_PATH", str(Path.home() / ".gcli" / "session.json"))
+    raw = os.getenv("RMGR_SESSION_PATH", str(Path.home() / ".rmgr" / "session.json"))
     path = Path(raw).expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     return path

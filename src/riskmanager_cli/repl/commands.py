@@ -1,4 +1,4 @@
-"""Slash-command parsing and dispatch for the governance CLI REPL."""
+"""Slash-command parsing and dispatch for the riskmanager CLI REPL."""
 # pylint: disable=too-many-lines  # all 40+ command handlers live here intentionally; splitting would break cohesion
 
 from __future__ import annotations

@@ -1,12 +1,12 @@
 """
-SQLModel table definitions for the governance CLI data model.
+SQLModel table definitions for the riskmanager CLI data model.
 
 All 16 tables are defined here using SQLModel (SQLAlchemy + Pydantic integration).
 UUIDs are stored as TEXT, timestamps as DATETIME (UTC ISO 8601), and enums as
 TEXT via ``SAEnum(MyEnum, native_enum=False)``.
 
 Why this exists:
-    The reference implementation imports models from the ``governance_server``
+    The reference implementation imports models from the ``riskmanager_server``
     wheel. In this greenfield application all models are re-implemented locally
     so that the package has zero external wheel dependencies.
 """
@@ -39,7 +39,7 @@ from typing_extensions import Self
 from .enums import TA, NcrmRole
 
 # ---------------------------------------------------------------------------
-# CRUDMixin — replaces the governance_server wheel's base class
+# CRUDMixin — replaces the riskmanager_server wheel's base class
 # ---------------------------------------------------------------------------
 
 
@@ -51,7 +51,7 @@ class CRUDMixin:
 
     Why this exists:
         The reference implementation inherits these from ``CRUDBase`` in the
-        ``governance_server`` wheel. Implementing locally removes the external
+        ``riskmanager_server`` wheel. Implementing locally removes the external
         dependency while preserving the identical API used throughout the
         operations layer.
     """

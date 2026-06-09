@@ -1,17 +1,17 @@
-"""Unit and integration tests for governance_cli.operations.material_operations."""
+"""Unit and integration tests for riskmanager_cli.operations.material_operations."""
 
 from uuid import uuid4
 
 import pytest
 
-from governance_cli.config.settings import Environment
-from governance_cli.operations.material_operations import (
+from riskmanager_cli.config.settings import Environment
+from riskmanager_cli.operations.material_operations import (
     create_material,
     delete_material,
     get_material_by_id,
     list_materials,
 )
-from governance_cli.schema.create import MaterialCreate
+from riskmanager_cli.schema.create import MaterialCreate
 
 
 @pytest.mark.unit

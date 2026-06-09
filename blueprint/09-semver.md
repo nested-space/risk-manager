@@ -84,7 +84,7 @@ any other file. Always read it from the package metadata if needed at runtime:
 
 ```python
 from importlib.metadata import version
-__version__ = version("governance-cli")
+__version__ = version("riskmanager-cli")
 ```
 
 ---
@@ -122,7 +122,7 @@ format:
 4. Tag: `git tag vX.Y.Z`
 5. Push tag: `git push origin vX.Y.Z`
 6. Build: `python -m build`
-7. Install locally: `pip install dist/governance_cli-X.Y.Z-py3-none-any.whl`
+7. Install locally: `pip install dist/riskmanager_cli-X.Y.Z-py3-none-any.whl`
 
 ---
 

@@ -1,5 +1,5 @@
 """
-Pydantic update schemas for all governance CLI entities.
+Pydantic update schemas for all riskmanager CLI entities.
 
 Each schema defines fields that may be updated on an existing record. All
 fields are optional — callers supply only the fields they wish to change.

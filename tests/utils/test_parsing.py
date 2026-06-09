@@ -1,8 +1,8 @@
-"""Unit tests for governance_cli.utils.parsing."""
+"""Unit tests for riskmanager_cli.utils.parsing."""
 
 import pytest
 
-from governance_cli.utils.parsing import detect_delimiter, parse_csv_rows, split_aliases
+from riskmanager_cli.utils.parsing import detect_delimiter, parse_csv_rows, split_aliases
 
 
 @pytest.mark.unit

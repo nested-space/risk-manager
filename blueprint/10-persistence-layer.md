@@ -29,7 +29,7 @@ SQLAlchemy uses it via the `sqlite+aiosqlite://` dialect.
 "sqlite+aiosqlite:///:memory:"
 
 # Absolute path
-"sqlite+aiosqlite:////home/user/.gcli/governance.db"
+"sqlite+aiosqlite:////home/user/.rmgr/riskmanager.db"
 ```
 
 ---
@@ -43,7 +43,7 @@ The engine should be configured without pool settings:
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 engine = create_async_engine(
-    "sqlite+aiosqlite:///./governance-dev.db",
+    "sqlite+aiosqlite:///./riskmanager-dev.db",
     echo=False,
     # SQLite-specific settings:
     connect_args={
@@ -289,7 +289,7 @@ alembic init alembic
 from logging.config import fileConfig
 from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
-from governance_cli.model.tables import SQLModel
+from riskmanager_cli.model.tables import SQLModel
 
 config = context.config
 target_metadata = SQLModel.metadata
@@ -307,7 +307,7 @@ def run_migrations_online():
 ```ini
 [alembic]
 script_location = alembic
-sqlalchemy.url = sqlite+aiosqlite:///./governance-dev.db
+sqlalchemy.url = sqlite+aiosqlite:///./riskmanager-dev.db
 ```
 
 ### Creating a Migration
@@ -378,9 +378,9 @@ async def db_session():
 
 ---
 
-## CRUDMixin Pattern (Replacing governance_server wheel)
+## CRUDMixin Pattern (Replacing riskmanager_server wheel)
 
-The reference implementation uses a `CRUDMixin` from the `governance_server` wheel.
+The reference implementation uses a `CRUDMixin` from the `riskmanager_server` wheel.
 In the greenfield, implement this locally in `model/util.py`:
 
 ```python

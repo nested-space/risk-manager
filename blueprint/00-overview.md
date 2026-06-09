@@ -1,13 +1,13 @@
-# Governance CLI — Blueprint Overview
+# Riskmanager CLI — Blueprint Overview
 
 ## Purpose
 
 This blueprint describes the complete specification for a **greenfield, single-user,
 self-sufficient Python interactive REPL application** for managing pharmaceutical
-manufacturing governance data. It is derived from the `governance-cli` reference
+manufacturing riskmanager data. It is derived from the `riskmanager-cli` reference
 implementation but redesigned as a **persistent, full-screen interactive shell**
 using `blessed` for terminal control, adapted to use **SQLite** (not PostgreSQL),
-and contains **no dependency** on the `governance_server` wheel.
+and contains **no dependency** on the `riskmanager_server` wheel.
 
 The output of this blueprint is a standalone application a developer can build
 from scratch, covering the interactive REPL layer, business logic layer, and
@@ -22,7 +22,7 @@ slash-commands and arrow-key list selection. Once a project and route are
 selected, subsequent commands operate within that context without re-specifying
 the full path.
 
-**Entry point:** `gcli` launches the interactive REPL shell directly.
+**Entry point:** `rmgr` launches the interactive REPL shell directly.
 
 ---
 
@@ -70,7 +70,7 @@ Material
 - **Interactive REPL layer** — `blessed`-based full-screen shell; slash-command grammar; arrow-key list navigation; context-aware screen management
 - **Business logic layer** — operations, SMILES validation, DMTA enrichment
 - **Persistence layer** — SQLite via SQLAlchemy async + aiosqlite
-- **Session state** — JSON-backed recents/context memory at `~/.gcli/session.json`
+- **Session state** — JSON-backed recents/context memory at `~/.rmgr/session.json`
 - **All entities listed above**
 - **SMILES canonicalization and analysis tools** (requires RDKit)
 - **Bulk CSV import** via `/admin import` commands within the REPL
@@ -84,10 +84,10 @@ The following from the reference implementation are **not included** in the gree
 
 | Excluded | Reason |
 |----------|--------|
-| `project_status` table | Governance workflow feature; not needed for single-user app |
-| `interaction` (governance_interaction) table | Governance workflow feature; not needed |
+| `project_status` table | Riskmanager workflow feature; not needed for single-user app |
+| `interaction` (riskmanager_interaction) table | Riskmanager workflow feature; not needed |
 | All `*_version` audit tables | Require database triggers; not appropriate for SQLite single-user |
-| `governance_server` wheel | All models, schemas, and CRUD helpers are re-implemented locally |
+| `riskmanager_server` wheel | All models, schemas, and CRUD helpers are re-implemented locally |
 | PostgreSQL / asyncpg | Replaced by SQLite / aiosqlite |
 | FastAPI / HTTP server | Not needed; REPL-only application |
 | `argparse` / `argcomplete` | Replaced by the interactive REPL command dispatcher |
@@ -129,8 +129,8 @@ All JSONB columns from the reference implementation are either:
 
 | Attribute | Value |
 |-----------|-------|
-| Package name | `governance-cli` |
-| Entry points | `gcli`, `governance-cli` |
+| Package name | `riskmanager-cli` |
+| Entry points | `rmgr`, `riskmanager-cli` |
 | Python requirement | `>=3.10` |
 | Current version | `0.3.0` (pre-1.0) |
 | License | See `LICENSE` |
@@ -141,7 +141,7 @@ All JSONB columns from the reference implementation are either:
 
 ```
 src/
-└── governance_cli/
+└── riskmanager_cli/
     ├── __init__.py
     ├── __main__.py              # Entry point: init blessed terminal, load session, launch REPL
     ├── repl/                    # Interactive REPL shell layer
@@ -150,7 +150,7 @@ src/
     │   ├── screen.py            # Screen manager (status bar, output pane, input line)
     │   ├── context.py           # Navigation context state machine + breadcrumb
     │   ├── commands.py          # Slash command parser and dispatcher
-    │   ├── session_state.py     # JSON-backed session persistence (~/.gcli/session.json)
+    │   ├── session_state.py     # JSON-backed session persistence (~/.rmgr/session.json)
     │   ├── escape_handler.py    # Double-escape navigation logic + unsaved-data guard
     │   ├── list_navigator.py    # Arrow-key list widget (Recents + All sections)
     │   └── renderers/           # Output content renderers
@@ -178,7 +178,7 @@ src/
     │   ├── smiles_operations.py
     │   ├── dmta_operations.py
     │   └── visualization_operations.py
-    ├── model/                   # SQLModel table definitions (replaces governance_server wheel)
+    ├── model/                   # SQLModel table definitions (replaces riskmanager_server wheel)
     │   ├── __init__.py
     │   ├── tables.py
     │   └── enums.py

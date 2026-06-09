@@ -1,8 +1,8 @@
-"""Unit tests for governance_cli.operations.smiles_operations."""
+"""Unit tests for riskmanager_cli.operations.smiles_operations."""
 
 import pytest
 
-from governance_cli.operations.smiles_operations import (
+from riskmanager_cli.operations.smiles_operations import (
     canonicalize_smiles,
     detect_search_type,
     is_canonical_smiles,

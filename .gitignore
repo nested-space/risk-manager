@@ -16,7 +16,7 @@ MANIFEST
 wheels/
 *.whl
 
-# Virtual environments (project venv lives at ~/.venvs/riskworks — outside repo)
+# Virtual environments (project venv lives at ~/.venvs/riskmanager — outside repo)
 .venv/
 venv/
 env/
@@ -49,7 +49,7 @@ dmypy.json
 *.sqlite3
 
 # Session state (user-local, outside repo by default)
-.gcli/
+.rmgr/
 
 # IDE and editor files
 .vscode/

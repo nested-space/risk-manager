@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "governance-cli"
+name = "riskmanager-cli"
 version = "0.3.0"
-description = "Interactive REPL shell for pharmaceutical manufacturing governance data"
+description = "Interactive REPL shell for pharmaceutical manufacturing riskmanager data"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
@@ -31,12 +31,12 @@ dev = [
 ]
 
 [project.scripts]
-governance-cli = "governance_cli.__main__:cli_main"
-gcli = "governance_cli.__main__:cli_main"
+riskmanager-cli = "riskmanager_cli.__main__:cli_main"
+rmgr = "riskmanager_cli.__main__:cli_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["governance_cli*"]
+include = ["riskmanager_cli*"]
 
 # ---------------------------------------------------------------------------
 # Ruff — linter and formatter

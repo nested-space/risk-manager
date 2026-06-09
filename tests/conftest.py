@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for governance-cli tests."""
+"""Shared pytest fixtures for riskmanager-cli tests."""
 
 import os
 from pathlib import Path
@@ -9,8 +9,8 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 
-from governance_cli.config.settings import Environment
-from governance_cli.database.db_session import init_db
+from riskmanager_cli.config.settings import Environment
+from riskmanager_cli.database.db_session import init_db
 
 
 @pytest.fixture
