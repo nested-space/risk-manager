@@ -1,0 +1,348 @@
+# Copilot Instructions — `governance-cli`
+
+These rules are **mandatory** and apply to every contribution, AI-assisted or
+human. No exceptions without explicit project-owner approval documented in the
+PR description.
+
+---
+
+## 1. Virtual Environment (MANDATORY)
+
+**NEVER use the system Python interpreter.**
+
+All Python commands MUST target the project virtual environment:
+
+```bash
+# Correct — always use the venv
+~/.venvs/riskworks/bin/python ...
+~/.venvs/riskworks/bin/pip install ...
+~/.venvs/riskworks/bin/ruff ...
+~/.venvs/riskworks/bin/mypy ...
+~/.venvs/riskworks/bin/pylint ...
+~/.venvs/riskworks/bin/pytest ...
+
+# Alternative: activate first
+source ~/.venvs/riskworks/bin/activate
+python ...  # now safe
+
+# FORBIDDEN — system Python
+python ...          # ← NEVER
+python3 ...         # ← NEVER
+/usr/bin/python3 ...  # ← NEVER
+```
+
+The virtual environment is located at `~/.venvs/riskworks`.
+It is NOT committed to the repository and NOT stored under the project root.
+It must never appear in `.gitignore` because it is outside the repo.
+
+---
+
+## 2. Architecture
+
+### Seven-Layer Model
+
+The application follows a strict seven-layer architecture. Each layer
+communicates ONLY with immediately adjacent layers.
+
+```
+Entry Point (__main__.py)
+    └── REPL Loop (repl/loop.py)
+            ├── Screen Manager (repl/screen.py)
+            ├── Escape Handler (repl/escape_handler.py)
+            ├── Context Manager (repl/context.py)
+            └── Command Dispatcher (repl/commands.py)
+                    └── Operations Layer (operations/*_operations.py)
+                            └── Database Layer (database/, model/, schema/)
+                                            [sidecar] Session State (repl/session_state.py)
+```
+
+### Layer Boundary Rules
+
+| Rule | Enforcement |
+|------|------------|
+| `repl/` modules MUST NOT call `print()` directly | All screen output via `ScreenManager.draw_*()` |
+| `repl/` modules MUST NOT open database sessions | Delegate to operations layer |
+| Operations modules MUST NOT import from `repl/` | No upward dependencies |
+| `database/` and `model/` MUST NOT import from `operations/` | No circular deps |
+| Entry point MUST NOT contain business logic | Config + wiring only |
+
+### Source Layout
+
+```
+src/
+└── governance_cli/
+    ├── __init__.py
+    ├── __main__.py
+    ├── repl/
+    │   ├── renderers/
+    │   └── ...
+    ├── operations/
+    ├── model/
+    ├── schema/
+    ├── database/
+    ├── config/
+    ├── service/
+    └── utils/
+tests/
+├── conftest.py
+├── operations/
+├── repl/
+└── utils/
+```
+
+`src/` layout is used. `pyproject.toml` configures `setuptools.packages.find`
+with `where = ["src"]`.
+
+---
+
+## 3. Build
+
+### Installing the Package
+
+```bash
+# Install in editable mode (development)
+~/.venvs/riskworks/bin/pip install -e ".[dev]"
+
+# Install production dependencies only
+~/.venvs/riskworks/bin/pip install -e .
+```
+
+### Building a Distribution
+
+```bash
+~/.venvs/riskworks/bin/python -m build
+```
+
+Produces `dist/governance_cli-X.Y.Z-py3-none-any.whl` and `.tar.gz`.
+
+### Entry Points
+
+| Command | Maps to |
+|---------|---------|
+| `gcli` | `governance_cli.__main__:cli_main` |
+| `governance-cli` | `governance_cli.__main__:cli_main` |
+
+### Database Initialization
+
+On first run, SQLite tables are created automatically via `init_db()` in
+`__main__.py`. No manual schema setup is required.
+
+For Alembic migrations (production):
+```bash
+~/.venvs/riskworks/bin/alembic upgrade head
+```
+
+### Recommended Shell Setup
+
+```bash
+export APP_ENV=dev
+export APP_DEV_DB_PATH="$HOME/.gcli/governance-dev.db"
+export APP_PROD_DB_PATH="$HOME/.gcli/governance.db"
+mkdir -p ~/.gcli
+```
+
+---
+
+## 4. Semantic Versioning
+
+Version is defined **only** in `pyproject.toml`. Do NOT duplicate it in
+`__init__.py` or any `__version__` variable. Read at runtime via:
+
+```python
+from importlib.metadata import version
+__version__ = version("governance-cli")
+```
+
+### Bump Rules
+
+| Change type | Version component |
+|-------------|------------------|
+| Breaking: removed/renamed commands, incompatible schema migrations, renamed env vars | `MAJOR` |
+| New capability: new entity, new command, new optional flag, new integration | `MINOR` |
+| Bug fix, docs, formatting, internal refactor with identical behaviour | `PATCH` |
+
+### Current Version
+
+`0.3.0` (pre-1.0). Pre-1.0 versions may contain breaking changes; consumers
+should pin to exact versions.
+
+### Release Procedure
+
+1. Update `version` in `pyproject.toml`
+2. Update `CHANGELOG.md` (move `[Unreleased]` to new version section)
+3. Commit: `chore: bump version to X.Y.Z`
+4. Tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+5. Build: `~/.venvs/riskworks/bin/python -m build`
+
+---
+
+## 5. Code Quality Standards
+
+### Python Version
+
+- Minimum: `>=3.10`
+- Use modern syntax: `match`/`case`, `X | Y` unions, structural pattern matching
+
+### Style
+
+- Line length: **100 characters**
+- String quotes: **double quotes** preferred
+- Import order: stdlib → third-party → local (ruff enforces via `I` rules)
+- Type hints: **required** on all public functions; use `X | None` (Python 3.10+)
+
+### Docstrings (mandatory on all public modules, classes, and functions)
+
+```python
+def function_name(param1: Type, param2: Type) -> ReturnType:
+    """Brief one-line description.
+
+    Optional longer explanation for non-obvious behaviour.
+
+    Args:
+        param1: Description, constraints, expected format.
+        param2: Description.
+
+    Returns:
+        Description. For Optional returns, describe when None is returned.
+
+    Raises:
+        ExceptionType: When and why raised.
+    """
+```
+
+For non-obvious design choices, add a "Why this exists" section:
+
+```python
+def update_material_by_search(...):
+    """Search for a material by ID, name, or SMILES and update it.
+
+    Why this exists:
+        Different contexts provide different identifiers. Auto-detection
+        eliminates the need for explicit type specification in most cases.
+    """
+```
+
+### Naming Conventions
+
+| Category | Pattern | Example |
+|----------|---------|---------|
+| REPL command handler | `handle_<command>(args, context, env)` | `handle_add_risk` |
+| REPL renderer | `render_<entity>(data, term)` | `render_project_summary` |
+| Operation (async) | `<action>_<entity>(...)` | `create_material` |
+| Private helper | `_<name>(...)` | `_draw_recents_section` |
+
+### Comments
+
+- Comment only **non-obvious logic** — explain *why*, not *what*
+- Do NOT repeat what the code does
+- Prefer clear code over explanatory comments
+
+### Async Patterns
+
+- All operations functions MUST be `async def`
+- Each operation opens its own session via `async with get_db_session(...)`
+- NEVER share sessions between operations
+- NEVER call `asyncio.run()` from within the REPL loop — use `run_async()` from `repl/loop.py`
+
+### Error Handling
+
+- Operations layer: absorb exceptions, call `print_error()`, return `None`/`[]`/`False`
+- REPL command layer: check operation return value, return `RenderableContent.error(...)` 
+- REPL loop: NEVER exit the process on error (display in output pane, continue)
+- Application exits only on `/quit`, `Ctrl+C`, or `Ctrl+D`
+
+### Git Commit Conventions
+
+```
+feat: add manufacturing process risk sub-table
+fix: correct CSV delimiter detection for semicolon-separated files
+docs: update README with counterion import format
+refactor: extract CRUDMixin to model/util.py
+test: add integration tests for stage_ncrm_operations
+chore: bump version to 0.4.0
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+```
+
+---
+
+## 6. Quality Gates (mandatory at every stage)
+
+All commands MUST use `~/.venvs/riskworks/bin/python`. Using system Python
+invalidates the quality gate.
+
+| Gate | Command | Required result |
+|------|---------|----------------|
+| Ruff lint | `~/.venvs/riskworks/bin/python -m ruff check src/ tests/` | 0 errors |
+| Ruff format | `~/.venvs/riskworks/bin/python -m ruff format --check src/ tests/` | 0 diffs |
+| Pylint | `~/.venvs/riskworks/bin/python -m pylint src/governance_cli/` | Score 10.00/10 |
+| Mypy | `~/.venvs/riskworks/bin/python -m mypy src/governance_cli/` | 0 errors |
+| Tests | `~/.venvs/riskworks/bin/python -m pytest tests/ -x` | All green |
+
+### Suppression Policy
+
+**Global suppression is FORBIDDEN.**
+
+The following are prohibited:
+- `# pylint: disable=...` at module/file scope
+- `[[tool.mypy]] ignore_errors = true` or `ignore_missing_imports = true` globally
+- `# type: ignore` without a per-line justification
+- `# noqa` without a per-line justification
+
+**Inline suppression** is permitted ONLY when it is genuinely impossible to
+refactor the code. Every inline suppression MUST include a justification comment:
+
+```python
+# CORRECT — justified inline suppression
+op.add_column(...)  # pylint: disable=no-member  # Alembic virtual op not injected until runtime
+term.move_xy(x, y)  # type: ignore[attr-defined]  # blessed Terminal attrs generated dynamically
+
+# WRONG — no justification
+result = session.execute(stmt)  # type: ignore
+```
+
+When a suppression is added, a TODO comment referencing the upstream issue is
+encouraged:
+
+```python
+# pylint: disable=no-member  # SQLModel metaclass generates attrs at runtime (SQLModel#123)
+```
+
+---
+
+## 7. Testing Standards
+
+### Configuration
+
+```toml
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "asyncio: asyncio mark",
+    "unit: unit tests (no database required)",
+    "integration: integration tests (real SQLite in-memory session)",
+]
+```
+
+### Fixtures
+
+- `mock_session`: `AsyncMock(spec=AsyncSession)` — for unit tests
+- `db_session`: real `sqlite+aiosqlite:///:memory:` session — for integration tests
+
+### Test Naming
+
+```python
+async def test_<what_is_tested>_<expected_outcome>():
+    ...
+
+# Examples:
+async def test_create_material_returns_material_with_id(): ...
+async def test_create_material_with_duplicate_name_returns_none(): ...
+```
+
+### Marks
+
+```python
+@pytest.mark.unit       # no database; use mock_session
+@pytest.mark.integration  # requires db_session fixture
+```

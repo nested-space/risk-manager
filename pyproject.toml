@@ -1,0 +1,112 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "governance-cli"
+version = "0.3.0"
+description = "Interactive REPL shell for pharmaceutical manufacturing governance data"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = [
+    "aiosqlite>=0.19.0",
+    "blessed>=1.19.0",
+    "colorama>=0.4.6",
+    "httpx>=0.24.0",
+    "pydantic>=2.0.0",
+    "rdkit>=2023.3.1",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "sqlmodel>=0.0.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.0.0",
+    "pylint>=3.0.0",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+    "types-colorama",
+]
+
+[project.scripts]
+governance-cli = "governance_cli.__main__:cli_main"
+gcli = "governance_cli.__main__:cli_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["governance_cli*"]
+
+# ---------------------------------------------------------------------------
+# Ruff — linter and formatter
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+# E: pycodestyle errors
+# F: pyflakes
+# I: isort
+# N: pep8-naming
+# W: pycodestyle warnings
+# UP: pyupgrade (enforce modern syntax)
+
+# ---------------------------------------------------------------------------
+# Mypy — strict type checking
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+# stubs/ directory provides local overrides for packages with broken bundled stubs.
+# rdkit-stubs/Chem/rdchem.pyi:347 has a malformed signature (auto-generated bug);
+# our stubs/rdkit/ shadow those broken stubs with minimal correct declarations.
+# (https://github.com/kuelumbus/rdkit-pypi/issues — auto-generated stubs)
+mypy_path = "stubs"
+# No global ignore_errors or ignore_missing_imports — all suppressions must
+# be inline with justification comment (see .github/copilot-instructions.md)
+
+[[tool.mypy.overrides]]
+module = "rdkit.*"
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# Pylint
+# ---------------------------------------------------------------------------
+[tool.pylint.main]
+py-version = "3.10"
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.messages_control]
+# R0801 (duplicate-code) is disabled because the CRUD operations layer uses
+# an intentionally repeated pattern (get_where → update_fields → return record)
+# across typed modules for different SQLModel classes. pylint's SimilarChecker
+# reports R0801 at the runner level — it cannot be suppressed inline — so this
+# is the only available mechanism. All other suppressions must be inline with
+# justification. See .github/copilot-instructions.md § Suppression Policy.
+disable = ["R0801"]
+
+[tool.pylint.typecheck]
+# rdkit.Chem members (MolFromSmiles, MolToSmiles, etc.) are implemented as
+# C-extension attributes and are invisible to pylint's static introspection.
+# Ignoring rdkit here prevents false-positive E1101 (no-member) errors; it is
+# not a suppression of genuine errors — all rdkit usage is validated by tests.
+ignored-modules = ["rdkit", "rdkit.Chem"]
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "asyncio: asyncio mark",
+    "unit: unit tests (no database required)",
+    "integration: integration tests (real SQLite in-memory session)",
+]

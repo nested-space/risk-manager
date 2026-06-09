@@ -1,0 +1,48 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [Unreleased]
+
+### Added
+
+- Initial project scaffold: `pyproject.toml`, `.gitignore`, `CHANGELOG.md`
+- `.github/copilot-instructions.md` with mandatory architecture, build, semver,
+  code quality, and quality gate requirements
+
+---
+
+## [0.3.0] — Initial greenfield target
+
+_Greenfield implementation from blueprint. See `blueprint/` directory for the
+full specification._
+
+### Added
+
+- Seven-layer interactive REPL architecture using `blessed`
+- SQLite persistence via SQLAlchemy async + `aiosqlite`
+- Entities: Material, Project, ManufacturingProcess, Stage, Component,
+  ManufacturingProcessRisk, StageRisk, ComponentRisk, ComponentSalt,
+  NcrmLibrary, StageNcrm, StageComponent, Counterion
+- Full slash-command grammar: `/select`, `/route`, `/risks`, `/focus`, `/add`,
+  `/edit`, `/delete`, `/list`, `/search`, `/filter`, `/library`, `/admin`,
+  `/home`, `/help`, `/quit`
+- Bulk CSV import via `/admin import` commands
+- SMILES canonicalization and validation via RDKit
+- Optional DMTA enrichment via external HTTP service
+- JSON-backed session state at `~/.gcli/session.json`
+- Context-aware navigation: Project → Route → Stage/Component hierarchy
+
+### Removed (vs reference implementation)
+
+- `governance_server` wheel dependency (all models re-implemented locally)
+- PostgreSQL / asyncpg (replaced by SQLite / aiosqlite)
+- FastAPI / HTTP server (REPL-only application)
+- `argparse` / `argcomplete` (replaced by REPL command dispatcher)
+- `project_status` and `interaction` tables (not needed for single-user app)
+- All `*_version` audit tables (PostgreSQL trigger dependency removed)
