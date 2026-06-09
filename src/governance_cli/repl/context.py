@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class ContextFrame:
+class ContextFrame:  # pylint: disable=too-many-instance-attributes  # navigation frame mirrors all nav levels
     """One navigation frame in the REPL context stack.
 
     Attributes:
@@ -88,27 +88,26 @@ class ContextManager:
         component_name = frame.component_name or "Unknown"
         library_sub = frame.library_sub or "select"
         match frame.track:
-            case "home":
-                return "[ Home ]"
             case "project":
-                return f"[ Project: {project_name} ]"
+                label = f"[ Project: {project_name} ]"
             case "route_select":
-                return f"[ Project: {project_name} ]  ›  [ Route ]"
+                label = f"[ Project: {project_name} ]  ›  [ Route ]"
             case "route":
-                return f"[ Project: {project_name} ]  ›  [ Route: {route_label} ]"
+                label = f"[ Project: {project_name} ]  ›  [ Route: {route_label} ]"
             case "stage_focus":
-                return (
+                label = (
                     f"[ Project: {project_name} ]  ›  [ Route: {route_label} ]  ›  "
                     f"[ Stage: {stage_name} ]"
                 )
             case "component_focus":
-                return (
+                label = (
                     f"[ Project: {project_name} ]  ›  [ Route: {route_label} ]  ›  "
                     f"[ Component: {component_name} ]"
                 )
             case "library":
-                return f"[ Library: {library_sub} ]"
+                label = f"[ Library: {library_sub} ]"
             case "admin":
-                return "[ Admin ]"
+                label = "[ Admin ]"
             case _:
-                return "[ Home ]"
+                label = "[ Home ]"
+        return label

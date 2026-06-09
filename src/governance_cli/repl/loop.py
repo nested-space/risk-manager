@@ -47,7 +47,7 @@ async def _async_bridge(coro: Coroutine[Any, Any, T]) -> T:
     return await coro
 
 
-def start_repl(
+def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,too-many-branches,too-many-statements  # blessed event loop; all deps injected, cannot reduce
     term: blessed.Terminal,
     ctx: ContextManager,
     session: SessionState,
@@ -91,7 +91,7 @@ def start_repl(
     signal.signal(signal.SIGWINCH, handle_resize)
     redraw()
 
-    try:
+    try:  # pylint: disable=too-many-nested-blocks  # blessed inkey loop; escape/prompt/list branches require deep nesting
         while True:
             key = term.inkey()
             if not key:

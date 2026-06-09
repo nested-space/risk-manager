@@ -755,6 +755,58 @@ README.md
 
 ---
 
+## Testing
+
+### Running the test suite
+
+```bash
+~/.venvs/riskworks/bin/python -m pytest tests/ -v
+```
+
+### Test structure
+
+```
+tests/
+├── conftest.py                  # Shared fixtures: mock_session, db_session, temp_env
+├── operations/
+│   ├── test_material.py         # Material CRUD + SMILES validation
+│   ├── test_project.py          # Project CRUD + search
+│   ├── test_component.py        # Component CRUD
+│   └── test_smiles.py           # SMILES validation / canonicalization (unit)
+├── repl/
+│   ├── test_context.py          # ContextManager navigation stack
+│   ├── test_session_state.py    # SessionState load/save/push
+│   └── test_commands.py         # FieldSpec / PromptState validation
+└── utils/
+    └── test_parsing.py          # CSV delimiter detection and row parsing
+```
+
+### Test markers
+
+Tests are tagged with `@pytest.mark.unit` (no database) or `@pytest.mark.integration`
+(isolated in-memory or temp-file SQLite). Run a subset:
+
+```bash
+~/.venvs/riskworks/bin/python -m pytest tests/ -m unit
+~/.venvs/riskworks/bin/python -m pytest tests/ -m integration
+```
+
+### Quality gates
+
+All of the following must pass before any commit:
+
+| Tool | Command | Must produce |
+|------|---------|-------------|
+| Ruff lint | `python -m ruff check src/ tests/` | 0 errors |
+| Ruff format | `python -m ruff format --check src/ tests/` | 0 diffs |
+| Pylint | `python -m pylint src/governance_cli/` | score 10/10 |
+| Mypy | `python -m mypy src/governance_cli/` | 0 errors |
+| Pytest | `python -m pytest tests/ -x` | all green |
+
+> Always prefix `python` with `~/.venvs/riskworks/bin/python` — never use system Python.
+
+---
+
 ## Versioning
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/).

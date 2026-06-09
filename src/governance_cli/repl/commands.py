@@ -1,4 +1,5 @@
 """Slash-command parsing and dispatch for the governance CLI REPL."""
+# pylint: disable=too-many-lines  # all 40+ command handlers live here intentionally; splitting would break cohesion
 
 from __future__ import annotations
 
@@ -278,7 +279,9 @@ class CommandDispatcher:
         self._prompt_callback = None
         return ["Guided prompt cancelled."]
 
-    async def dispatch(self, command: str) -> list[str] | str:
+    async def dispatch(  # pylint: disable=too-many-return-statements,too-many-branches  # top-level command router
+        self, command: str
+    ) -> list[str] | str:
         """Parse and execute a slash command.
 
         Args:
@@ -349,7 +352,9 @@ class CommandDispatcher:
             return await self._open_route(project, process)
         return await self.render_current()
 
-    async def render_current(self) -> list[str]:
+    async def render_current(  # pylint: disable=too-many-return-statements  # one render path per navigation track
+        self,
+    ) -> list[str]:
         """Render the screen matching the current navigation context."""
         track = self.ctx.current.track
         if track == "home":
@@ -378,7 +383,9 @@ class CommandDispatcher:
             return await self._render_risk_mode()
         return ["Home"]
 
-    async def _dispatch_global(self, verb: str, args: list[str]) -> list[str] | str | None:
+    async def _dispatch_global(  # pylint: disable=too-many-return-statements  # one return per global command
+        self, verb: str, args: list[str]
+    ) -> list[str] | str | None:
         if verb == "/quit":
             return "__QUIT__"
         if verb == "/home":
@@ -467,7 +474,9 @@ class CommandDispatcher:
             return await self._open_route(project, process)
         return [f"Unknown command: {verb}. Type /help for commands."]
 
-    async def _dispatch_route(self, verb: str, args: list[str]) -> list[str]:
+    async def _dispatch_route(  # pylint: disable=too-many-return-statements  # one return per command verb
+        self, verb: str, args: list[str]
+    ) -> list[str]:
         process = await self._current_process()
         project = await self._current_project()
         if process is None or project is None:
@@ -514,7 +523,9 @@ class CommandDispatcher:
             return await self._search_route(process, " ".join(args))
         return [f"Unknown command: {verb}. Type /help for commands."]
 
-    async def _dispatch_stage_focus(self, verb: str, args: list[str]) -> list[str]:
+    async def _dispatch_stage_focus(  # pylint: disable=too-many-return-statements  # one return per command verb
+        self, verb: str, args: list[str]
+    ) -> list[str]:
         stage = await self._current_stage()
         process = await self._current_process()
         if stage is None or process is None:
@@ -614,7 +625,9 @@ class CommandDispatcher:
             return await self._render_component_risks(component)
         return [f"Unknown command: {verb}. Type /help for commands."]
 
-    async def _dispatch_library(self, verb: str, args: list[str]) -> list[str]:
+    async def _dispatch_library(  # pylint: disable=too-many-return-statements  # one return per command verb
+        self, verb: str, args: list[str]
+    ) -> list[str]:
         sub_mode = self.ctx.current.library_sub or "select"
         if verb == "/list":
             return await self._render_library(sub_mode)
@@ -753,7 +766,9 @@ class CommandDispatcher:
             items = [item for item in items if not item.get("smiles")]
         return await render_library_screen(sub_mode, items)
 
-    async def _render_risk_mode(self) -> list[str]:
+    async def _render_risk_mode(  # pylint: disable=too-many-return-statements  # one return per risk scope
+        self,
+    ) -> list[str]:
         scope = self.ctx.current.risk_scope or "project"
         if scope == "project":
             project = await self._current_project()
@@ -872,7 +887,9 @@ class CommandDispatcher:
             ]
         return ["Usage: /list risks|components|ncrm"]
 
-    async def _handle_route_add(self, process: ManufacturingProcess, args: list[str]) -> list[str]:
+    async def _handle_route_add(  # pylint: disable=too-many-return-statements  # one return per dispatch branch
+        self, process: ManufacturingProcess, args: list[str]
+    ) -> list[str]:
         subject = args[0].lower()
         if subject == "stage" and "--number" in args and len(args) >= 4:
             number_index = args.index("--number")
@@ -1050,9 +1067,9 @@ class CommandDispatcher:
             return [*lines, "(none)"]
         for component in components:
             material = await get_material_by_id(UUID(str(component.material_id)), self.env)
-            lines.append(
-                f"{material.name if material else component.id} — {component.control_strategy_role or '-'}"
-            )
+            mat_label = material.name if material else str(component.id)
+            role = component.control_strategy_role or "-"
+            lines.append(f"{mat_label} — {role}")
         return lines
 
     async def _list_process_ncrm_lines(self, process: ManufacturingProcess) -> list[str]:
@@ -1165,9 +1182,10 @@ class CommandDispatcher:
                 skip_errors=skip_errors,
                 dry_run=dry_run,
             )
-            return [
-                f"materials import: created={counts['created']} skipped={counts['skipped']} errors={counts['errors']}"
-            ]
+            created = counts["created"]
+            skipped = counts["skipped"]
+            errors = counts["errors"]
+            return [f"materials import: created={created} skipped={skipped} errors={errors}"]
         return await self._admin_simple_import(
             import_type, content, dry_run=dry_run, skip_errors=skip_errors
         )
@@ -1223,7 +1241,7 @@ class CommandDispatcher:
                         break
                 else:
                     created += 1
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught  # import loop must not abort on single-row error
                 errors += 1
                 if not skip_errors:
                     break
