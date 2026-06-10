@@ -32,6 +32,10 @@ class ScreenManager:
         """Return the current terminal width."""
         return self._term.width
 
+    def dim(self, text: str) -> str:
+        """Wrap *text* in the terminal's dim (greyed) styling."""
+        return f"{self._term.dim}{text}{self._term.normal}"
+
     def draw_full(self, lines: list[str], input_line: str = "", info_line: str = "") -> None:
         """Fully repaint the screen.
 
@@ -57,8 +61,19 @@ class ScreenManager:
         for row in range(2, max(self._term.height - 2, 2)):
             sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol)
         for offset, line in enumerate(lines[: self.output_height], start=2):
-            sys.stdout.write(self._term.move_xy(0, offset) + line[: self._term.width])
+            sys.stdout.write(self._term.move_xy(0, offset) + self._fit_width(line))
         sys.stdout.flush()
+
+    def _fit_width(self, line: str) -> str:
+        """Truncate *line* to the terminal width by visible length.
+
+        Plain slicing would corrupt lines containing escape sequences (e.g.
+        dimmed text), so only clip when the *printable* length overruns; blessed
+        ``Terminal.length`` ignores escape codes.
+        """
+        if self._term.length(line) <= self._term.width:
+            return line
+        return line[: self._term.width]
 
     def draw_input_line(self, prompt: str = "> ", text: str = "") -> None:
         """Render the input line at the bottom row.

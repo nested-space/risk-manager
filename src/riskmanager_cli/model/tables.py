@@ -371,8 +371,8 @@ class Component(SQLModel, CRUDMixin, table=True):
     )
     control_strategy_role: str | None = Field(default=None, sa_column=Column(Text))
     is_isolated: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, default=False),
+        default=True,
+        sa_column=Column(Boolean, nullable=False, default=True),
     )
     created_at: datetime | None = Field(
         default_factory=_now,
