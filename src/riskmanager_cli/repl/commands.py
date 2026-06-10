@@ -2089,6 +2089,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             FieldSpec("mitigated_level", field_type="int", required=False),
         ]
 
+    def command_hints(self) -> str:
+        """Return a single-line command hint for the current screen.
+
+        Always reflects the active track's slash-commands from ``HELP_TOPICS``,
+        independent of any modal or list-navigation state.
+        """
+        track = self.ctx.current.track
+        return " · ".join(HELP_TOPICS.get(track, ["/help", "/home", "/quit"]))
+
     def _help_lines(self, topic: str | None) -> list[str]:
         if topic is not None:
             return [
@@ -2115,6 +2124,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
 HELP_TOPICS: dict[str, list[str]] = {
     "home": ["/select <name>", "/add project", "/library [submode]", "/admin", "/quit"],
     "project": ["/route [R.P]", "/add process", "/risks", "/home"],
+    "route_select": ["/route <R.P>", "/search <query>", "/home"],
     "route": [
         "/list stages|components|risks|ncrm",
         "/focus stage <name>",
@@ -2123,6 +2133,15 @@ HELP_TOPICS: dict[str, list[str]] = {
         "/add component <name>",
         "/add risk [stage <name>|component <name>|process]",
     ],
+    "stage_focus": [
+        "/add risk",
+        "/add ncrm <name>",
+        "/add component <material>",
+        "/list <type>",
+        "/edit",
+        "/delete",
+        "/home",
+    ],
     "component_focus": ["/add salt", "/edit", "/delete", "/risks", "/home"],
     "library": ["/list", "/search <query>", "/add", "/edit <name>", "/delete <name>"],
     "admin": [
@@ -2130,6 +2149,7 @@ HELP_TOPICS: dict[str, list[str]] = {
         "/admin db analyze [--ncrm]",
         "/admin db canonicalize [--dry-run] [--ncrm]",
     ],
+    "risk_mode": ["/list risks", "/home"],
 }
 
 

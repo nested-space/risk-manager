@@ -83,9 +83,10 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             screen.draw_nav_hint()
         else:
             screen.draw_input_line(text=input_buffer)
+        screen.draw_info_line(dispatcher.command_hints())
 
     def handle_resize(_signum: int, _frame: FrameType | None) -> None:
-        screen.draw_full(current_output_lines, input_buffer)
+        screen.draw_full(current_output_lines, input_buffer, dispatcher.command_hints())
         if _in_list_mode(ctx) and not input_buffer and dispatcher.prompt_state is None:
             screen.draw_nav_hint()
 
