@@ -106,7 +106,7 @@ class ComponentCreate(BaseModel):
     process_id: UUID
     material_id: UUID
     control_strategy_role: str | None = None
-    is_isolated: bool = False
+    is_isolated: bool = True
 
 
 class ComponentRiskCreate(BaseModel):

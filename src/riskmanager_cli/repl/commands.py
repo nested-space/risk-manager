@@ -516,7 +516,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             process = await self._current_process()
             if process is None:
                 return ["Route not found."]
-            return await render_route_screen(process, self.env)
+            return await render_route_screen(
+                process, self.env, width=self.screen.width, dim=self.screen.dim
+            )
         if track == "stage_focus":
             return await self._render_stage_focus()
         if track == "component_focus":
@@ -720,25 +722,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                         payload,
                     ),
                 )
-            if args[0].lower() == "component" and len(args) >= 2:
-                material_name = " ".join(args[1:])
-                return self.start_prompt(
-                    [
-                        FieldSpec("control_strategy_role", required=False),
-                        FieldSpec(
-                            "is_isolated",
-                            field_type="choice",
-                            choices=["true", "false"],
-                            default="false",
-                        ),
-                    ],
-                    lambda **payload: self._create_component_for_stage(
-                        stage,
-                        process,
-                        material_name,
-                        payload,
-                    ),
-                )
+            if args[0].lower() == "component":
+                # Components are created at the route level; in a stage we only
+                # assign an existing process component. /add component is kept as
+                # a muscle-memory alias for /assign component.
+                return await self._start_stage_component_picker(stage, process)
+        if verb == "/assign" and args and args[0].lower() == "component":
+            return await self._start_stage_component_picker(stage, process)
         if verb == "/list" and args:
             return await self._handle_stage_list(stage, args[0].lower())
         if verb == "/edit":
@@ -1043,11 +1033,16 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             component_links = await list_stage_components(UUID(str(stage.id)), self.env)
             if not component_links:
                 return ["Stage components", "", "(none)"]
-            return [
-                "Stage components",
-                "",
-                *[f"{link.component_type}: {link.component_id}" for link in component_links],
-            ]
+            lines = ["Stage components", ""]
+            for link in component_links:
+                component = await get_component_by_id(UUID(str(link.component_id)), self.env)
+                name = str(link.component_id)
+                if component is not None:
+                    material = await get_material_by_id(UUID(str(component.material_id)), self.env)
+                    if material is not None:
+                        name = material.name
+                lines.append(f"{link.component_type}: {name}")
+            return lines
         if kind == "ncrm":
             ncrm_links = await list_ncrms_for_stage(UUID(str(stage.id)), self.env)
             if not ncrm_links:
@@ -1086,7 +1081,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                         "is_isolated",
                         field_type="choice",
                         choices=["true", "false"],
-                        default="false",
+                        default="true",
                     ),
                 ],
                 lambda **payload: self._create_component_from_prompt(
@@ -1523,7 +1518,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             stage_id=None,
             component_id=None,
         )
-        return await render_route_screen(process, self.env)
+        return await render_route_screen(
+            process, self.env, width=self.screen.width, dim=self.screen.dim
+        )
 
     async def _open_stage(self, stage: Stage) -> list[str]:
         self.ctx.push(
@@ -1576,36 +1573,67 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         )
         return ["Component created."] if created else ["Failed to create component."]
 
-    async def _create_component_for_stage(
+    async def _start_stage_component_picker(
         self,
         stage: Stage,
         process: ManufacturingProcess,
-        material_name: str,
+    ) -> list[str]:
+        """Open a picker of the process's components to assign one to *stage*.
+
+        Components are created once at the route level; assigning one to a stage
+        creates a :class:`StageComponent` link without creating a new component,
+        so a single component can appear in several stages with different roles.
+        """
+        components = await list_components_for_process(UUID(str(process.id)), self.env)
+        if not components:
+            return [
+                "No components yet. Create one at the route level with /add component <material>.",
+            ]
+        items: list[ListItem] = []
+        for component in components:
+            material = await get_material_by_id(UUID(str(component.material_id)), self.env)
+            material_name = material.name if material else str(component.id)
+            label = material_name
+            if component.control_strategy_role:
+                label = f"{material_name} ({component.control_strategy_role})"
+            items.append(ListItem(label=label, item_id=str(component.id)))
+        return self.start_picker(
+            "Assign component to stage",
+            items,
+            lambda item: self._start_assign_role_prompt(stage, item),
+        )
+
+    def _start_assign_role_prompt(self, stage: Stage, component_item: ListItem) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "component_type",
+                    field_type="choice",
+                    choices=["reactant", "product"],
+                ),
+            ],
+            lambda **payload: self._assign_component_to_stage(
+                stage, component_item.item_id, payload
+            ),
+        )
+
+    async def _assign_component_to_stage(
+        self,
+        stage: Stage,
+        component_id: str,
         payload: dict[str, str | None],
     ) -> list[str]:
-        material = await get_material_by_search(material_name, self.env)
-        if material is None:
-            return [f"Material '{material_name}' not found."]
-        component = await create_component(
-            ComponentCreate(
-                process_id=UUID(str(process.id)),
-                material_id=UUID(str(material.id)),
-                control_strategy_role=payload.get("control_strategy_role"),
-                is_isolated=_as_bool(payload.get("is_isolated")),
-            ),
-            self.env,
-        )
-        if component is None:
-            return ["Failed to create component."]
         link = await create_stage_component(
             StageComponentCreate(
                 stage_id=UUID(str(stage.id)),
-                component_id=UUID(str(component.id)),
-                component_type="reactant",
+                component_id=UUID(component_id),
+                component_type=payload.get("component_type") or "reactant",
             ),
             self.env,
         )
-        return ["Stage component created."] if link else ["Failed to link component to stage."]
+        if link is None:
+            return ["Failed to assign component to stage."]
+        return ["Component assigned to stage.", "", *await self._render_stage_focus()]
 
     async def _create_stage_risk_from_prompt(
         self,
@@ -2136,7 +2164,7 @@ HELP_TOPICS: dict[str, list[str]] = {
     "stage_focus": [
         "/add risk",
         "/add ncrm <name>",
-        "/add component <material>",
+        "/assign component",
         "/list <type>",
         "/edit",
         "/delete",
