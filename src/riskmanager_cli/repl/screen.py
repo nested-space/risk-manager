@@ -25,24 +25,26 @@ class ScreenManager:
     @property
     def output_height(self) -> int:
         """Return the number of rows available in the output pane."""
-        return max(self._term.height - 3, 0)
+        return max(self._term.height - 4, 0)
 
     @property
     def width(self) -> int:
         """Return the current terminal width."""
         return self._term.width
 
-    def draw_full(self, lines: list[str], input_line: str = "") -> None:
+    def draw_full(self, lines: list[str], input_line: str = "", info_line: str = "") -> None:
         """Fully repaint the screen.
 
         Args:
             lines: Output pane lines.
             input_line: Current input buffer content.
+            info_line: Command-hint text for the bottom information line.
         """
         self.clear_screen()
         self.draw_status_bar()
         self.draw_output(lines)
         self.draw_input_line(text=input_line)
+        self.draw_info_line(info_line)
 
     def draw_status_bar(self) -> None:
         """Render the two-line status bar."""
@@ -52,7 +54,7 @@ class ScreenManager:
 
     def draw_output(self, lines: list[str]) -> None:
         """Clear the output pane and write lines, truncating to fit."""
-        for row in range(2, max(self._term.height - 1, 2)):
+        for row in range(2, max(self._term.height - 2, 2)):
             sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol)
         for offset, line in enumerate(lines[: self.output_height], start=2):
             sys.stdout.write(self._term.move_xy(0, offset) + line[: self._term.width])
@@ -65,7 +67,7 @@ class ScreenManager:
             prompt: Prompt prefix.
             text: User-entered text.
         """
-        row = max(self._term.height - 1, 0)
+        row = max(self._term.height - 2, 0)
         content = f"{prompt}{text}"[: self._term.width]
         sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol + content)
         sys.stdout.flush()
@@ -79,9 +81,29 @@ class ScreenManager:
         Args:
             hint: Hint text to display.
         """
-        row = max(self._term.height - 1, 0)
+        row = max(self._term.height - 2, 0)
         sys.stdout.write(
             self._term.move_xy(0, row) + self._term.clear_eol + hint[: self._term.width]
+        )
+        sys.stdout.flush()
+
+    def draw_info_line(self, hints: str = "") -> None:
+        """Render the command-hint information line at the bottom row.
+
+        Args:
+            hints: Command-hint text to display, dimmed and truncated to width.
+        """
+        row = max(self._term.height - 1, 0)
+        width = self._term.width
+        text = hints
+        if len(text) > width:
+            text = text[: max(width - 1, 0)] + ("…" if width >= 1 else "")
+        sys.stdout.write(
+            self._term.move_xy(0, row)
+            + self._term.clear_eol
+            + self._term.dim
+            + text
+            + self._term.normal
         )
         sys.stdout.flush()
 

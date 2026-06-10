@@ -2,7 +2,14 @@
 
 import pytest
 
-from riskmanager_cli.repl.commands import FieldSpec, PickerState, PromptState
+from riskmanager_cli.repl.commands import (
+    HELP_TOPICS,
+    CommandDispatcher,
+    FieldSpec,
+    PickerState,
+    PromptState,
+)
+from riskmanager_cli.repl.context import ContextFrame, ContextManager
 from riskmanager_cli.repl.list_navigator import ListItem
 
 
@@ -169,3 +176,38 @@ def test_picker_move_up_wraps_to_last_match() -> None:
     picker.move_up()
     assert picker.selected is not None
     assert picker.selected.label == "Cafetannin"
+
+
+def _hints_dispatcher(track: str) -> CommandDispatcher:
+    """Build a dispatcher whose context points at *track* for hint tests.
+
+    ``command_hints`` only reads ``self.ctx`` and ``HELP_TOPICS``, so the
+    session/screen/env collaborators are unused and passed as ``None``.
+    """
+    ctx = ContextManager()
+    if track != "home":
+        ctx.push(ContextFrame(track=track))
+    return CommandDispatcher(ctx, None, None, None)  # type: ignore[arg-type]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("track", list(HELP_TOPICS))
+def test_command_hints_joins_help_topics_for_track(track: str) -> None:
+    """command_hints renders the track's HELP_TOPICS joined by ' · '."""
+    hints = _hints_dispatcher(track).command_hints()
+    assert hints == " · ".join(HELP_TOPICS[track])
+
+
+@pytest.mark.unit
+def test_command_hints_falls_back_for_unknown_track() -> None:
+    """An unknown track yields the generic /help · /home · /quit fallback."""
+    hints = _hints_dispatcher("does_not_exist").command_hints()
+    assert hints == "/help · /home · /quit"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("track", ["route_select", "stage_focus", "risk_mode"])
+def test_help_topics_define_previously_missing_tracks(track: str) -> None:
+    """The tracks that lacked hints now resolve to real commands."""
+    assert HELP_TOPICS[track]
+    assert all(cmd.startswith("/") for cmd in HELP_TOPICS[track])
