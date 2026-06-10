@@ -77,8 +77,11 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
         if dispatcher.picker_state is not None:
             screen.draw_input_line(prompt="filter: ", text=input_buffer)
         elif dispatcher.prompt_state is not None:
-            prompt = f"{dispatcher.prompt_state.current_field.label}: "
-            screen.draw_input_line(prompt=prompt, text=input_buffer)
+            if dispatcher.prompt_state.is_select_field:
+                screen.draw_nav_hint("↑↓ to move · Enter to select · Esc to cancel")
+            else:
+                prompt = f"{dispatcher.prompt_state.current_field.label}: "
+                screen.draw_input_line(prompt=prompt, text=input_buffer)
         elif _in_list_mode(ctx) and not input_buffer:
             screen.draw_nav_hint()
         else:
@@ -135,6 +138,17 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             escape_handler.disarm()
 
             if dispatcher.prompt_state is not None:
+                if dispatcher.prompt_state.is_select_field:
+                    if _is_enter(key_name, key_text):
+                        current_output_lines = _coerce_lines(
+                            run_async(dispatcher.submit_prompt_selection())
+                        )
+                        input_buffer = ""
+                    elif key_name in {"KEY_UP", "KEY_DOWN"}:
+                        direction = "up" if key_name == "KEY_UP" else "down"
+                        current_output_lines = dispatcher.prompt_move(direction)
+                    redraw()
+                    continue
                 if _is_enter(key_name, key_text):
                     current_output_lines = _coerce_lines(
                         run_async(dispatcher.advance_prompt(input_buffer))

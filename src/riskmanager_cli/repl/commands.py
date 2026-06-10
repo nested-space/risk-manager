@@ -8,6 +8,7 @@ import inspect
 import shlex
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from enum import Enum
 from io import StringIO
 from pathlib import Path
 from typing import Any
@@ -125,17 +126,72 @@ class FieldSpec:
 
     Attributes:
         label: Human-readable field label.
-        field_type: Validation kind: ``text``, ``int``, or ``choice``.
+        field_type: Validation kind: ``text``, ``int``, ``float``, or ``select``.
         required: Whether a value is mandatory.
-        default: Optional default value.
-        choices: Allowed values for ``choice`` fields.
+        default: Optional default value (a stored value for ``select`` fields).
+        options: ``(label, value)`` pairs for ``select`` fields. The label is
+            shown in the list while the value is what gets stored, so booleans
+            can present ``Yes``/``No`` yet persist ``"true"``/``"false"``.
     """
 
     label: str
     field_type: str = "text"
     required: bool = True
     default: str | None = None
-    choices: list[str] = field(default_factory=list)
+    options: list[tuple[str, str]] = field(default_factory=list)
+
+
+#: Yes/No options for required boolean ``select`` fields.
+BOOL_OPTIONS: list[tuple[str, str]] = [("Yes", "true"), ("No", "false")]
+
+#: Yes/No options for optional boolean ``select`` fields, with an unset choice
+#: that stores an empty string (coerced to ``None`` downstream).
+OPTIONAL_BOOL_OPTIONS: list[tuple[str, str]] = [("Not specified", ""), *BOOL_OPTIONS]
+
+#: Allowed component-type values for stage-component links.
+COMPONENT_TYPE_OPTIONS: list[tuple[str, str]] = [
+    ("reactant", "reactant"),
+    ("product", "product"),
+]
+
+
+def _enum_options(enum_cls: type[Enum]) -> list[tuple[str, str]]:
+    """Return ``(label, value)`` select options for a string enum.
+
+    Args:
+        enum_cls: The enum to enumerate. Members must have string values.
+
+    Returns:
+        One ``(value, value)`` pair per member, in definition order.
+    """
+    return [(str(member.value), str(member.value)) for member in enum_cls]
+
+
+def _match_select_value(field_spec: FieldSpec, text: str) -> str:
+    """Resolve typed *text* to a select field's stored value.
+
+    Matches case-insensitively against each option's value first, then its label,
+    so both interactive selection and text-driven callers (e.g. tests) work.
+
+    Args:
+        field_spec: The active select field.
+        text: Non-empty user-entered text.
+
+    Returns:
+        The stored value of the matched option.
+
+    Raises:
+        ValueError: If *text* matches no option.
+    """
+    lowered = text.lower()
+    for _, value in field_spec.options:
+        if value.lower() == lowered:
+            return value
+    for label, value in field_spec.options:
+        if label.lower() == lowered:
+            return value
+    allowed = ", ".join(label for label, _ in field_spec.options)
+    raise ValueError(f"{field_spec.label} must be one of: {allowed}.")
 
 
 @dataclass
@@ -145,11 +201,68 @@ class PromptState:
     fields: list[FieldSpec]
     collected: list[str | None]
     current_index: int = 0
+    _select_navigator: ListNavigator | None = field(default=None, init=False, repr=False)
 
     @property
     def current_field(self) -> FieldSpec:
         """Return the currently active field specification."""
         return self.fields[self.current_index]
+
+    @property
+    def is_select_field(self) -> bool:
+        """Return ``True`` when the active field is a list selection."""
+        return not self.is_complete() and self.current_field.field_type == "select"
+
+    def select_navigator(self) -> ListNavigator | None:
+        """Return the navigator for the active select field, building it lazily.
+
+        Returns ``None`` when the active field is not a ``select`` field.
+        """
+        if not self.is_select_field:
+            self._select_navigator = None
+            return None
+        if self._select_navigator is None:
+            field_spec = self.current_field
+            items = [ListItem(label=label, item_id=value) for label, value in field_spec.options]
+            navigator = ListNavigator([], items)
+            if field_spec.default is not None:
+                navigator.select_item_id(field_spec.default)
+            self._select_navigator = navigator
+        return self._select_navigator
+
+    def move_selection(self, direction: str) -> None:
+        """Move the highlight of the active select field up or down.
+
+        Args:
+            direction: Either ``"up"`` or ``"down"``.
+        """
+        navigator = self.select_navigator()
+        if navigator is None:
+            return
+        if direction == "up":
+            navigator.move_up()
+        else:
+            navigator.move_down()
+
+    def submit_selection(self) -> bool:
+        """Store the highlighted option of the active select field and advance.
+
+        Returns:
+            ``True`` when the prompt becomes complete.
+
+        Raises:
+            ValueError: If the active field is not a select or nothing is highlighted.
+        """
+        navigator = self.select_navigator()
+        if navigator is None:
+            raise ValueError("The current field is not a selection.")
+        selected = navigator.selected
+        if selected is None:
+            raise ValueError(f"{self.current_field.label} requires a selection.")
+        self.collected[self.current_index] = selected.item_id
+        self.current_index += 1
+        self._select_navigator = None
+        return self.is_complete()
 
     def submit_value(self, value: str) -> bool:
         """Submit a value for the active field.
@@ -183,18 +296,14 @@ class PromptState:
                 normalized = str(float(text))
             except ValueError as exc:
                 raise ValueError(f"{field_spec.label} must be a number.") from exc
-        elif field_spec.field_type == "choice":
-            matches = [choice for choice in field_spec.choices if choice.lower() == text.lower()]
-            if not matches:
-                raise ValueError(
-                    f"{field_spec.label} must be one of: {', '.join(field_spec.choices)}."
-                )
-            normalized = matches[0]
+        elif field_spec.field_type == "select":
+            normalized = _match_select_value(field_spec, text)
         else:
             normalized = text
 
         self.collected[self.current_index] = normalized
         self.current_index += 1
+        self._select_navigator = None
         return self.is_complete()
 
     def is_complete(self) -> bool:
@@ -333,6 +442,47 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             is_complete = self._prompt_state.submit_value(value)
         except ValueError as exc:
             return self._render_prompt_lines(str(exc))
+        return await self._complete_prompt(is_complete)
+
+    def prompt_move(self, direction: str) -> list[str]:
+        """Move the highlight of the active select field up or down.
+
+        Args:
+            direction: Either ``"up"`` or ``"down"``.
+
+        Returns:
+            Updated prompt-render lines.
+        """
+        if self._prompt_state is None:
+            return ["No guided prompt is active."]
+        self._prompt_state.move_selection(direction)
+        return self._render_prompt_lines()
+
+    async def submit_prompt_selection(self) -> list[str]:
+        """Submit the highlighted option of the active select field.
+
+        Returns:
+            Updated prompt lines or the completed callback result.
+        """
+        if self._prompt_state is None or self._prompt_callback is None:
+            return ["No guided prompt is active."]
+        try:
+            is_complete = self._prompt_state.submit_selection()
+        except ValueError as exc:
+            return self._render_prompt_lines(str(exc))
+        return await self._complete_prompt(is_complete)
+
+    async def _complete_prompt(self, is_complete: bool) -> list[str]:
+        """Re-render the prompt, or run its callback once all fields are collected.
+
+        Args:
+            is_complete: Whether the active prompt has collected every field.
+
+        Returns:
+            Updated prompt lines or the completed callback result.
+        """
+        if self._prompt_state is None or self._prompt_callback is None:
+            return ["No guided prompt is active."]
         if not is_complete:
             return self._render_prompt_lines()
 
@@ -581,8 +731,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                     FieldSpec("name"),
                     FieldSpec(
                         "therapy_area",
-                        field_type="choice",
-                        choices=[ta.value for ta in TA],
+                        field_type="select",
+                        options=_enum_options(TA),
                     ),
                 ],
                 lambda **payload: self._start_project_material_picker(payload),
@@ -712,8 +862,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                     [
                         FieldSpec(
                             "role",
-                            field_type="choice",
-                            choices=[role.value for role in NcrmRole],
+                            field_type="select",
+                            options=_enum_options(NcrmRole),
                         )
                     ],
                     lambda **payload: self._create_stage_ncrm_from_prompt(
@@ -759,8 +909,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                     ),
                     FieldSpec(
                         "is_isolated",
-                        field_type="choice",
-                        choices=["true", "false"],
+                        field_type="select",
+                        options=BOOL_OPTIONS,
                         default="true" if component.is_isolated else "false",
                     ),
                 ],
@@ -820,6 +970,35 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             return await self._render_risk_mode()
         return [f"Unknown command: {verb}. Type /help for commands."]
 
+    def _rebuild_list_navigator(
+        self, recents: list[ListItem], all_items: list[ListItem]
+    ) -> ListNavigator:
+        """Rebuild the list navigator, preserving the current selection by id.
+
+        The arrow-key loop re-renders the active list screen after every key
+        press, which rebuilds the navigator. Carrying the previously selected
+        item id forward keeps the cursor where the user moved it instead of
+        snapping back to the first item.
+
+        Args:
+            recents: Recently used items for the new navigator.
+            all_items: Full set of items for the new navigator.
+
+        Returns:
+            The freshly built navigator, also stored on ``self``.
+        """
+        previous = self._list_navigator
+        previous_id = (
+            previous.selected.item_id
+            if previous is not None and previous.selected is not None
+            else None
+        )
+        navigator = ListNavigator(recents, all_items)
+        if previous_id:
+            navigator.select_item_id(previous_id)
+        self._list_navigator = navigator
+        return navigator
+
     async def _render_home(self, query: str | None = None) -> list[str]:
         projects = await list_projects(self.env)
         if query:
@@ -834,9 +1013,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             for project in projects
             if str(project.id) not in recent_map
         ]
-        self._list_navigator = ListNavigator(recents, all_items)
+        navigator = self._rebuild_list_navigator(recents, all_items)
         header = ["Projects", "", "Use arrows to navigate or /select <name>.", ""]
-        return [*header, *self._list_navigator.render_lines(self.screen.width)]
+        return [*header, *navigator.render_lines(self.screen.width)]
 
     async def _render_route_select(self, query: str | None = None) -> list[str]:
         project = await self._current_project()
@@ -868,13 +1047,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             for process in processes
             if str(process.id) not in recent_lookup
         ]
-        self._list_navigator = ListNavigator(recents, all_items)
+        navigator = self._rebuild_list_navigator(recents, all_items)
         return [
             f"Routes for {project.name}",
             "",
             "Use arrows to navigate or /route <R.P>.",
             "",
-            *self._list_navigator.render_lines(self.screen.width),
+            *navigator.render_lines(self.screen.width),
         ]
 
     async def _render_stage_focus(self) -> list[str]:
@@ -1079,8 +1258,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                     FieldSpec("control_strategy_role", required=False),
                     FieldSpec(
                         "is_isolated",
-                        field_type="choice",
-                        choices=["true", "false"],
+                        field_type="select",
+                        options=BOOL_OPTIONS,
                         default="true",
                     ),
                 ],
@@ -1091,27 +1270,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         if subject == "risk":
             return await self._start_route_risk_prompt(process, args[1:])
         if subject == "stage-component":
-            return self.start_prompt(
-                [
-                    FieldSpec("stage_name"),
-                    FieldSpec("component_name"),
-                    FieldSpec(
-                        "component_type", field_type="choice", choices=["reactant", "product"]
-                    ),
-                ],
-                lambda **payload: self._create_stage_component_from_prompt(process, payload),
-            )
+            return await self._start_stage_component_link_picker(process)
         if subject == "stage-ncrm":
-            return self.start_prompt(
-                [
-                    FieldSpec("stage_name"),
-                    FieldSpec("ncrm_name"),
-                    FieldSpec(
-                        "role", field_type="choice", choices=[role.value for role in NcrmRole]
-                    ),
-                ],
-                lambda **payload: self._create_stage_ncrm_link_from_prompt(process, payload),
-            )
+            return await self._start_stage_ncrm_link_picker(process)
         return ["Unsupported /add command."]
 
     async def _start_route_risk_prompt(
@@ -1173,8 +1334,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                     ),
                     FieldSpec(
                         "is_isolated",
-                        field_type="choice",
-                        choices=["true", "false"],
+                        field_type="select",
+                        options=BOOL_OPTIONS,
                         default="true" if component.is_isolated else "false",
                     ),
                 ],
@@ -1271,8 +1432,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                     FieldSpec("common_name"),
                     FieldSpec(
                         "interpret_chemically",
-                        field_type="choice",
-                        choices=["true", "false"],
+                        field_type="select",
+                        options=BOOL_OPTIONS,
                         default="false",
                     ),
                     FieldSpec("smiles", required=False),
@@ -1305,8 +1466,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                     FieldSpec("common_name", default=str(item["common_name"])),
                     FieldSpec(
                         "interpret_chemically",
-                        field_type="choice",
-                        choices=["true", "false"],
+                        field_type="select",
+                        options=BOOL_OPTIONS,
                         default="true" if bool(item.get("interpret_chemically")) else "false",
                     ),
                     FieldSpec("smiles", required=False, default=_default_text(item.get("smiles"))),
@@ -1584,11 +1745,27 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         creates a :class:`StageComponent` link without creating a new component,
         so a single component can appear in several stages with different roles.
         """
-        components = await list_components_for_process(UUID(str(process.id)), self.env)
-        if not components:
+        items = await self._process_component_items(process)
+        if not items:
             return [
                 "No components yet. Create one at the route level with /add component <material>.",
             ]
+        return self.start_picker(
+            "Assign component to stage",
+            items,
+            lambda item: self._start_assign_role_prompt(stage, item),
+        )
+
+    async def _process_component_items(self, process: ManufacturingProcess) -> list[ListItem]:
+        """Build picker items for every component in *process*, labelled by material.
+
+        Args:
+            process: The manufacturing process whose components to list.
+
+        Returns:
+            One :class:`ListItem` per component (empty when the process has none).
+        """
+        components = await list_components_for_process(UUID(str(process.id)), self.env)
         items: list[ListItem] = []
         for component in components:
             material = await get_material_by_id(UUID(str(component.material_id)), self.env)
@@ -1597,19 +1774,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             if component.control_strategy_role:
                 label = f"{material_name} ({component.control_strategy_role})"
             items.append(ListItem(label=label, item_id=str(component.id)))
-        return self.start_picker(
-            "Assign component to stage",
-            items,
-            lambda item: self._start_assign_role_prompt(stage, item),
-        )
+        return items
 
     def _start_assign_role_prompt(self, stage: Stage, component_item: ListItem) -> list[str]:
         return self.start_prompt(
             [
                 FieldSpec(
                     "component_type",
-                    field_type="choice",
-                    choices=["reactant", "product"],
+                    field_type="select",
+                    options=COMPONENT_TYPE_OPTIONS,
                 ),
             ],
             lambda **payload: self._assign_component_to_stage(
@@ -1692,19 +1865,48 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         )
         return ["Component risk created."] if risk else ["Failed to create component risk."]
 
-    async def _create_stage_component_from_prompt(
-        self,
-        process: ManufacturingProcess,
-        payload: dict[str, str | None],
+    async def _start_stage_component_link_picker(
+        self, process: ManufacturingProcess
     ) -> list[str]:
-        stage = await self._find_stage(process, payload.get("stage_name") or "")
-        component = await self._find_component(process, payload.get("component_name") or "")
-        if stage is None or component is None:
-            return ["Stage or component not found."]
+        """Begin the stage → component → type typeahead chain for a link.
+
+        Args:
+            process: The manufacturing process owning the stages and components.
+        """
+        items = await self._stage_items(process)
+        if not items:
+            return ["Add a stage first with /add stage <name> --number N."]
+        return self.start_picker(
+            "Select stage for component link",
+            items,
+            lambda item: self._start_stage_component_component_picker(process, item.item_id),
+        )
+
+    async def _start_stage_component_component_picker(
+        self, process: ManufacturingProcess, stage_id: str
+    ) -> list[str]:
+        items = await self._process_component_items(process)
+        if not items:
+            return ["No components yet. Create one with /add component <material>."]
+        return self.start_picker(
+            "Select component to link",
+            items,
+            lambda item: self._start_stage_component_type_prompt(stage_id, item.item_id),
+        )
+
+    def _start_stage_component_type_prompt(self, stage_id: str, component_id: str) -> list[str]:
+        return self.start_prompt(
+            [FieldSpec("component_type", field_type="select", options=COMPONENT_TYPE_OPTIONS)],
+            lambda **payload: self._create_stage_component_link(stage_id, component_id, payload),
+        )
+
+    async def _create_stage_component_link(
+        self, stage_id: str, component_id: str, payload: dict[str, str | None]
+    ) -> list[str]:
         link = await create_stage_component(
             StageComponentCreate(
-                stage_id=UUID(str(stage.id)),
-                component_id=UUID(str(component.id)),
+                stage_id=UUID(stage_id),
+                component_id=UUID(component_id),
                 component_type=payload.get("component_type") or "reactant",
             ),
             self.env,
@@ -1715,24 +1917,64 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             else ["Failed to create stage-component link."]
         )
 
-    async def _create_stage_ncrm_link_from_prompt(
-        self,
-        process: ManufacturingProcess,
-        payload: dict[str, str | None],
+    async def _start_stage_ncrm_link_picker(self, process: ManufacturingProcess) -> list[str]:
+        """Begin the stage → NCRM → role typeahead chain for a link.
+
+        Args:
+            process: The manufacturing process owning the stages.
+        """
+        items = await self._stage_items(process)
+        if not items:
+            return ["Add a stage first with /add stage <name> --number N."]
+        return self.start_picker(
+            "Select stage for NCRM link",
+            items,
+            lambda item: self._start_stage_ncrm_ncrm_picker(item.item_id),
+        )
+
+    async def _start_stage_ncrm_ncrm_picker(self, stage_id: str) -> list[str]:
+        entries = await list_ncrm_library(self.env)
+        if not entries:
+            return ["Add an NCRM first via /library ncrm."]
+        items = [
+            ListItem(label=entry.display_name, item_id=str(entry.id)) for entry in entries
+        ]
+        return self.start_picker(
+            "Select NCRM to link",
+            items,
+            lambda item: self._start_stage_ncrm_role_prompt(stage_id, item.item_id),
+        )
+
+    def _start_stage_ncrm_role_prompt(self, stage_id: str, ncrm_id: str) -> list[str]:
+        return self.start_prompt(
+            [FieldSpec("role", field_type="select", options=_enum_options(NcrmRole))],
+            lambda **payload: self._create_stage_ncrm_link(stage_id, ncrm_id, payload),
+        )
+
+    async def _create_stage_ncrm_link(
+        self, stage_id: str, ncrm_id: str, payload: dict[str, str | None]
     ) -> list[str]:
-        stage = await self._find_stage(process, payload.get("stage_name") or "")
-        ncrm = await get_ncrm_by_display_name(payload.get("ncrm_name") or "", self.env)
-        if stage is None or ncrm is None:
-            return ["Stage or NCRM not found."]
         link = await create_stage_ncrm(
             StageNcrmCreate(
-                stage_id=UUID(str(stage.id)),
-                ncrm_id=UUID(str(ncrm.id)),
+                stage_id=UUID(stage_id),
+                ncrm_id=UUID(ncrm_id),
                 role=NcrmRole(payload.get("role") or NcrmRole.REAGENT.value),
             ),
             self.env,
         )
         return ["Stage-NCRM link created."] if link else ["Failed to create stage-NCRM link."]
+
+    async def _stage_items(self, process: ManufacturingProcess) -> list[ListItem]:
+        """Build picker items for every stage in *process*, labelled by name.
+
+        Args:
+            process: The manufacturing process whose stages to list.
+
+        Returns:
+            One :class:`ListItem` per stage (empty when the process has none).
+        """
+        stages = await list_stages_for_process(UUID(str(process.id)), self.env)
+        return [ListItem(label=stage.name, item_id=str(stage.id)) for stage in stages]
 
     async def _create_stage_ncrm_from_prompt(
         self,
@@ -1903,8 +2145,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                 FieldSpec("stoichiometry", field_type="float", required=False),
                 FieldSpec(
                     "is_fully_defined",
-                    field_type="choice",
-                    choices=["true", "false"],
+                    field_type="select",
+                    options=OPTIONAL_BOOL_OPTIONS,
+                    default="",
                     required=False,
                 ),
             ],
@@ -2094,7 +2337,19 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             lines.append(f"{prefix} {field_spec.label}: {display}")
         if not self._prompt_state.is_complete():
             current = self._prompt_state.current_field
-            lines.extend(["", f"Enter {current.label}:"])
+            if self._prompt_state.is_select_field:
+                lines.extend(
+                    [
+                        "",
+                        f"Select {current.label}:",
+                        "↑↓ to move · Enter to select · Esc to cancel",
+                    ]
+                )
+                navigator = self._prompt_state.select_navigator()
+                if navigator is not None:
+                    lines.extend(navigator.render_lines(self.screen.width))
+            else:
+                lines.extend(["", f"Enter {current.label}:"])
         return lines
 
     def _render_picker_lines(self) -> list[str]:

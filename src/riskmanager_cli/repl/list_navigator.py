@@ -58,6 +58,17 @@ class ListNavigator:
             return None
         return self._items[self._selected_index]
 
+    def select_item_id(self, item_id: str) -> None:
+        """Highlight the item whose ``item_id`` matches *item_id*, if present.
+
+        Args:
+            item_id: Identifier of the item to highlight.
+        """
+        for index, item in enumerate(self._items):
+            if item.item_id == item_id:
+                self._selected_index = index
+                return
+
     def render_lines(self, width: int) -> list[str]:
         """Render section headers and items for display.
 
