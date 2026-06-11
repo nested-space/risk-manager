@@ -36,6 +36,24 @@ class ScreenManager:
         """Wrap *text* in the terminal's dim (greyed) styling."""
         return f"{self._term.dim}{text}{self._term.normal}"
 
+    def style_notice(self, message: str, level: str) -> str:
+        """Wrap a status *message* in a colour matching its *level*.
+
+        Args:
+            message: Notice text.
+            level: One of ``"success"`` (green), ``"warning"`` (amber), or
+                ``"error"`` (red); anything else renders unstyled.
+
+        Returns:
+            The styled, terminal-ready string.
+        """
+        color = {
+            "success": self._term.green,
+            "warning": self._term.yellow,
+            "error": self._term.red,
+        }.get(level, self._term.normal)
+        return f"{color}{message}{self._term.normal}"
+
     def draw_full(self, lines: list[str], input_line: str = "", info_line: str = "") -> None:
         """Fully repaint the screen.
 
@@ -75,32 +93,52 @@ class ScreenManager:
             return line
         return line[: self._term.width]
 
-    def draw_input_line(self, prompt: str = "> ", text: str = "") -> None:
+    def draw_input_line(self, prompt: str = "> ", text: str = "", notice: str = "") -> None:
         """Render the input line at the bottom row.
 
         Args:
             prompt: Prompt prefix.
             text: User-entered text.
+            notice: Pre-styled status notice, right-aligned on the same row.
         """
         row = max(self._term.height - 2, 0)
-        content = f"{prompt}{text}"[: self._term.width]
-        sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol + content)
+        out = self._term.move_xy(0, row) + self._term.clear_eol + self._with_notice(
+            f"{prompt}{text}", notice
+        )
+        sys.stdout.write(out)
         sys.stdout.flush()
 
     def draw_nav_hint(
         self,
         hint: str = "↑↓ to navigate  ·  Enter to select  ·  /search <name> to filter",
+        notice: str = "",
     ) -> None:
         """Replace the input line with a list-navigation hint.
 
         Args:
             hint: Hint text to display.
+            notice: Pre-styled status notice, right-aligned on the same row.
         """
         row = max(self._term.height - 2, 0)
         sys.stdout.write(
-            self._term.move_xy(0, row) + self._term.clear_eol + hint[: self._term.width]
+            self._term.move_xy(0, row) + self._term.clear_eol + self._with_notice(hint, notice)
         )
         sys.stdout.flush()
+
+    def _with_notice(self, left: str, notice: str) -> str:
+        """Append a right-aligned *notice* to *left*, fit to the terminal width.
+
+        Printable width is measured with ``Terminal.length`` so embedded escape
+        sequences are not clobbered. The notice is dropped when fewer than one
+        column of separation remains, keeping the left content intact.
+        """
+        left_len = self._term.length(left)
+        if not notice:
+            return left[: self._term.width]
+        gap = self._term.width - left_len - self._term.length(notice)
+        if gap < 1:
+            return left[: self._term.width]
+        return left[: self._term.width] + (" " * gap) + notice
 
     def draw_info_line(self, hints: str = "") -> None:
         """Render the command-hint information line at the bottom row.

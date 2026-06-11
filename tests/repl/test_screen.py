@@ -16,6 +16,9 @@ class _FakeTerminal:
     on_blue = ""
     bold = ""
     white = ""
+    green = ""
+    red = ""
+    yellow = ""
     home = ""
     clear = ""
 
@@ -26,6 +29,10 @@ class _FakeTerminal:
     def move_xy(self, _x: int, _y: int) -> str:
         """Return the (no-op) cursor-move sequence."""
         return ""
+
+    def length(self, text: str) -> int:
+        """Return the printable length (styling collapses to empty strings here)."""
+        return len(text)
 
 
 @pytest.mark.unit
@@ -59,3 +66,24 @@ def test_draw_info_line_keeps_short_hint_intact(capsys: pytest.CaptureFixture[st
     screen.draw_info_line("/home · /quit")
     out = capsys.readouterr().out
     assert out == "/home · /quit"
+
+
+@pytest.mark.unit
+def test_draw_input_line_right_aligns_notice(capsys: pytest.CaptureFixture[str]) -> None:
+    """A notice is padded to the right edge of the input row when there is room."""
+    screen = ScreenManager(_FakeTerminal(width=20), ContextManager())  # type: ignore[arg-type]
+    screen.draw_input_line(text="hi", notice=screen.style_notice("Saved", "success"))
+    out = capsys.readouterr().out
+    assert out.startswith("> hi")
+    assert out.endswith("Saved")
+    assert len(out) == 20
+
+
+@pytest.mark.unit
+def test_draw_input_line_drops_notice_without_room(capsys: pytest.CaptureFixture[str]) -> None:
+    """When the typed text leaves no gap, the notice is dropped and input preserved."""
+    screen = ScreenManager(_FakeTerminal(width=8), ContextManager())  # type: ignore[arg-type]
+    screen.draw_input_line(text="typing", notice=screen.style_notice("Saved", "success"))
+    out = capsys.readouterr().out
+    assert out == "> typing"
+    assert "Saved" not in out

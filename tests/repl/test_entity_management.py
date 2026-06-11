@@ -56,9 +56,9 @@ async def test_add_project_creates_project_via_picker(temp_env: Environment) -> 
     # The material picker is now active; filter to the seeded material and pick.
     assert dispatcher.picker_state is not None
     dispatcher.update_picker_query("caf")
-    result = await dispatcher.picker_select()
+    await dispatcher.picker_select()
 
-    assert any("Created project" in line for line in result)
+    assert dispatcher.take_notice() == ("Created project 'AlphaProject'.", "success")
     projects = await list_projects(env=temp_env)
     assert [project.name for project in projects] == ["AlphaProject"]
     assert projects[0].therapy_area is TA.ONCOLOGY
@@ -100,9 +100,9 @@ async def test_add_process_creates_manufacturing_process(temp_env: Environment) 
 
     await dispatcher.dispatch("/add process")
     await dispatcher.advance_prompt("1")
-    result = await dispatcher.advance_prompt("1")
+    await dispatcher.advance_prompt("1")
 
-    assert any("Created process 1.1" in line for line in result)
+    assert dispatcher.take_notice() == ("Created process 1.1.", "success")
     processes = await list_processes_for_project(UUID(str(project.id)), env=temp_env)
     assert len(processes) == 1
     assert (processes[0].route_number, processes[0].process_number) == (1, 1)
@@ -187,9 +187,9 @@ async def test_add_salt_links_counterion_to_component(temp_env: Environment) -> 
     # The picker hands off to a stoichiometry / is-fully-defined prompt.
     assert dispatcher.prompt_state is not None
     await dispatcher.advance_prompt("1.0")
-    result = await dispatcher.advance_prompt("true")
+    await dispatcher.advance_prompt("true")
 
-    assert any("Created salt record" in line for line in result)
+    assert dispatcher.take_notice() == ("Created salt record.", "success")
     salts = await list_salts_for_component(UUID(str(component.id)), env=temp_env)
     assert len(salts) == 1
     assert salts[0].counterion_id is not None

@@ -397,6 +397,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         self._prompt_callback: Callable[..., Any] | None = None
         self._list_navigator: ListNavigator | None = None
         self._picker_state: PickerState | None = None
+        self._notice: tuple[str, str] | None = None
 
     @property
     def prompt_state(self) -> PromptState | None:
@@ -646,6 +647,29 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             if process is None or project is None:
                 return ["Route not found."]
             return await self._open_route(project, process)
+        return await self.render_current()
+
+    def take_notice(self) -> tuple[str, str] | None:
+        """Return and clear the pending status notice, if any.
+
+        Returns:
+            A ``(message, level)`` pair where *level* is ``"success"``,
+            ``"warning"``, or ``"error"``; ``None`` when no notice is pending.
+        """
+        notice, self._notice = self._notice, None
+        return notice
+
+    async def _refresh_with_notice(self, message: str, level: str = "success") -> list[str]:
+        """Set a transient status notice and re-render the current screen.
+
+        Args:
+            message: Status text shown right-aligned on the input row.
+            level: Notice severity controlling its colour.
+
+        Returns:
+            The refreshed screen lines for the current navigation track.
+        """
+        self._notice = (message, level)
         return await self.render_current()
 
     async def render_current(  # pylint: disable=too-many-return-statements  # one render path per navigation track
@@ -1250,7 +1274,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                 StageCreate(process_id=UUID(str(process.id)), name=stage_name, number=number),
                 self.env,
             )
-            return [f"Created stage '{created.name}'."] if created else ["Failed to create stage."]
+            if created is None:
+                return await self._refresh_with_notice("Failed to create stage.", "error")
+            return await self._refresh_with_notice(f"Created stage '{created.name}'.")
         if subject == "component" and len(args) >= 2:
             material_name = " ".join(args[1:])
             return self.start_prompt(
@@ -1493,7 +1519,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             success = await delete_ncrm_library_entry(item_uuid, self.env)
         else:
             success = await delete_counterion(item_uuid, self.env)
-        return ["Deleted."] if success else ["Delete failed."]
+        if not success:
+            return await self._refresh_with_notice("Delete failed.", "error")
+        return await self._refresh_with_notice("Deleted.")
 
     async def _admin_import(self, args: list[str]) -> list[str]:
         import_type = args[0].lower()
@@ -1732,7 +1760,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             ),
             self.env,
         )
-        return ["Component created."] if created else ["Failed to create component."]
+        if created is None:
+            return await self._refresh_with_notice("Failed to create component.", "error")
+        return await self._refresh_with_notice("Component created.")
 
     async def _start_stage_component_picker(
         self,
@@ -1805,8 +1835,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             self.env,
         )
         if link is None:
-            return ["Failed to assign component to stage."]
-        return ["Component assigned to stage.", "", *await self._render_stage_focus()]
+            return await self._refresh_with_notice("Failed to assign component to stage.", "error")
+        return await self._refresh_with_notice("Component assigned to stage.")
 
     async def _create_stage_risk_from_prompt(
         self,
@@ -1825,7 +1855,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             ),
             self.env,
         )
-        return ["Stage risk created."] if risk else ["Failed to create stage risk."]
+        if risk is None:
+            return await self._refresh_with_notice("Failed to create stage risk.", "error")
+        return await self._refresh_with_notice("Stage risk created.")
 
     async def _create_process_risk_from_prompt(
         self,
@@ -1844,7 +1876,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             ),
             self.env,
         )
-        return ["Process risk created."] if risk else ["Failed to create process risk."]
+        if risk is None:
+            return await self._refresh_with_notice("Failed to create process risk.", "error")
+        return await self._refresh_with_notice("Process risk created.")
 
     async def _create_component_risk_from_prompt(
         self,
@@ -1863,7 +1897,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             ),
             self.env,
         )
-        return ["Component risk created."] if risk else ["Failed to create component risk."]
+        if risk is None:
+            return await self._refresh_with_notice("Failed to create component risk.", "error")
+        return await self._refresh_with_notice("Component risk created.")
 
     async def _start_stage_component_link_picker(
         self, process: ManufacturingProcess
@@ -1962,7 +1998,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             ),
             self.env,
         )
-        return ["Stage-NCRM link created."] if link else ["Failed to create stage-NCRM link."]
+        if link is None:
+            return await self._refresh_with_notice("Failed to create stage-NCRM link.", "error")
+        return await self._refresh_with_notice("Stage-NCRM link created.")
 
     async def _stage_items(self, process: ManufacturingProcess) -> list[ListItem]:
         """Build picker items for every stage in *process*, labelled by name.
@@ -1993,7 +2031,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             ),
             self.env,
         )
-        return ["Stage-NCRM link created."] if link else ["Failed to create stage-NCRM link."]
+        if link is None:
+            return await self._refresh_with_notice("Failed to create stage-NCRM link.", "error")
+        return await self._refresh_with_notice("Stage-NCRM link created.")
 
     async def _update_stage_from_prompt(
         self,
@@ -2009,10 +2049,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             self.env,
         )
         if updated is None:
-            return ["Failed to update stage."]
+            return await self._refresh_with_notice("Failed to update stage.", "error")
         self.ctx.current.stage_name = updated.name
         self.session.update_context(stage_id=str(updated.id))
-        return [f"Updated stage '{updated.name}'."]
+        return await self._refresh_with_notice(f"Updated stage '{updated.name}'.")
 
     async def _update_component_from_prompt(
         self,
@@ -2027,13 +2067,18 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             ),
             self.env,
         )
-        return ["Component updated."] if updated else ["Failed to update component."]
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update component.", "error")
+        return await self._refresh_with_notice("Component updated.")
 
     async def _delete_stage_with_confirmation(self, stage: Stage, args: list[str]) -> list[str]:
         if "--confirm" not in args:
             return ["Re-run with --confirm to delete the stage."]
         success = await delete_stage(UUID(str(stage.id)), self.env)
-        return ["Stage deleted."] if success else ["Stage delete failed."]
+        if not success:
+            return await self._refresh_with_notice("Stage delete failed.", "error")
+        self._pop_focus_to_parent()
+        return await self._refresh_with_notice("Stage deleted.")
 
     async def _delete_component_with_confirmation(
         self, component: Component, args: list[str]
@@ -2041,14 +2086,37 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         if "--confirm" not in args:
             return ["Re-run with --confirm to delete the component."]
         success = await delete_component(UUID(str(component.id)), self.env)
-        return ["Component deleted."] if success else ["Component delete failed."]
+        if not success:
+            return await self._refresh_with_notice("Component delete failed.", "error")
+        self._pop_focus_to_parent()
+        return await self._refresh_with_notice("Component deleted.")
+
+    def _pop_focus_to_parent(self) -> None:
+        """Leave a focused stage/component screen after its entity was deleted.
+
+        The current frame still references the now-deleted entity, so re-rendering
+        it would fail; pop back to the parent (route) screen and re-sync session
+        context before refreshing.
+        """
+        if self.ctx.current.track in {"stage_focus", "component_focus"}:
+            self.ctx.pop()
+            current = self.ctx.current
+            self.session.update_context(
+                track=current.track,
+                project_id=current.project_id,
+                process_id=current.process_id,
+                stage_id=current.stage_id,
+                component_id=current.component_id,
+            )
 
     async def _create_material_from_prompt(self, payload: dict[str, str | None]) -> list[str]:
         created = await create_material(
             MaterialCreate(name=payload.get("name") or "", smiles=payload.get("smiles") or None),
             self.env,
         )
-        return ["Material created."] if created else ["Failed to create material."]
+        if created is None:
+            return await self._refresh_with_notice("Failed to create material.", "error")
+        return await self._refresh_with_notice("Material created.")
 
     async def _create_ncrm_from_prompt(self, payload: dict[str, str | None]) -> list[str]:
         created = await create_ncrm_library_entry(
@@ -2060,14 +2128,18 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             ),
             self.env,
         )
-        return ["NCRM entry created."] if created else ["Failed to create NCRM entry."]
+        if created is None:
+            return await self._refresh_with_notice("Failed to create NCRM entry.", "error")
+        return await self._refresh_with_notice("NCRM entry created.")
 
     async def _create_counterion_from_prompt(self, payload: dict[str, str | None]) -> list[str]:
         created = await create_counterion(
             CounterionCreate(name=payload.get("name") or "", smiles=payload.get("smiles") or None),
             self.env,
         )
-        return ["Counterion created."] if created else ["Failed to create counterion."]
+        if created is None:
+            return await self._refresh_with_notice("Failed to create counterion.", "error")
+        return await self._refresh_with_notice("Counterion created.")
 
     async def _start_project_material_picker(self, payload: dict[str, str | None]) -> list[str]:
         materials = await list_materials(self.env)
@@ -2097,8 +2169,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             self.env,
         )
         if created is None:
-            return ["Failed to create project."]
-        return [f"Created project '{created.name}'.", "", *await self._render_home()]
+            return await self._refresh_with_notice("Failed to create project.", "error")
+        return await self._refresh_with_notice(f"Created project '{created.name}'.")
 
     async def _create_manufacturing_process_from_prompt(
         self,
@@ -2118,12 +2190,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             self.env,
         )
         if created is None:
-            return ["Failed to create process."]
-        return [
-            f"Created process {created.route_number}.{created.process_number}.",
-            "",
-            *await render_project_screen(project, self.env),
-        ]
+            return await self._refresh_with_notice("Failed to create process.", "error")
+        return await self._refresh_with_notice(
+            f"Created process {created.route_number}.{created.process_number}."
+        )
 
     async def _start_salt_picker(self, component: Component) -> list[str]:
         counterions = await list_counterions(self.env)
@@ -2172,8 +2242,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             self.env,
         )
         if created is None:
-            return ["Failed to create salt record."]
-        return ["Created salt record.", "", *await self._render_component_focus()]
+            return await self._refresh_with_notice("Failed to create salt record.", "error")
+        return await self._refresh_with_notice("Created salt record.")
 
     async def _update_material_entry(
         self, item_id: str, payload: dict[str, str | None]
@@ -2183,7 +2253,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             MaterialUpdate(name=payload.get("name"), smiles=payload.get("smiles") or None),
             self.env,
         )
-        return ["Material updated."] if updated else ["Failed to update material."]
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update material.", "error")
+        return await self._refresh_with_notice("Material updated.")
 
     async def _update_ncrm_entry(self, item_id: str, payload: dict[str, str | None]) -> list[str]:
         updated = await update_ncrm_library_entry(
@@ -2196,7 +2268,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             ),
             self.env,
         )
-        return ["NCRM updated."] if updated else ["Failed to update NCRM."]
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update NCRM.", "error")
+        return await self._refresh_with_notice("NCRM updated.")
 
     async def _update_counterion_entry(
         self, item_id: str, payload: dict[str, str | None]
@@ -2206,7 +2280,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             CounterionUpdate(name=payload.get("name"), smiles=payload.get("smiles") or None),
             self.env,
         )
-        return ["Counterion updated."] if updated else ["Failed to update counterion."]
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update counterion.", "error")
+        return await self._refresh_with_notice("Counterion updated.")
 
     async def _current_project(self) -> Project | None:
         project_id = self.ctx.current.project_id

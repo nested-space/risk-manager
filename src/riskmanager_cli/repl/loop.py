@@ -13,7 +13,6 @@ import blessed
 from ..config.settings import Environment
 from .commands import CommandDispatcher
 from .context import ContextManager
-from .escape_handler import EscapeHandler
 from .screen import ScreenManager
 from .session_state import SessionState
 
@@ -68,8 +67,18 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
     del env  # The environment is already captured by *dispatcher*.
 
     input_buffer = ""
-    escape_handler = EscapeHandler()
+    notice = ""
     current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
+
+    def consume_notice() -> None:
+        """Refresh the status notice from any just-completed dispatcher action.
+
+        Submitting an action either sets a fresh notice or clears the previous
+        one; plain typing and navigation leave the notice untouched.
+        """
+        nonlocal notice
+        pending = dispatcher.take_notice()
+        notice = screen.style_notice(*pending) if pending else ""
 
     def redraw() -> None:
         screen.draw_status_bar()
@@ -78,28 +87,56 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             screen.draw_input_line(prompt="filter: ", text=input_buffer)
         elif dispatcher.prompt_state is not None:
             if dispatcher.prompt_state.is_select_field:
-                screen.draw_nav_hint("↑↓ to move · Enter to select · Esc to cancel")
+                screen.draw_nav_hint("↑↓ to move · Enter to select · Ctrl-C to cancel")
             else:
                 prompt = f"{dispatcher.prompt_state.current_field.label}: "
                 screen.draw_input_line(prompt=prompt, text=input_buffer)
         elif _in_list_mode(ctx) and not input_buffer:
-            screen.draw_nav_hint()
+            screen.draw_nav_hint(notice=notice)
         else:
-            screen.draw_input_line(text=input_buffer)
+            screen.draw_input_line(text=input_buffer, notice=notice)
         screen.draw_info_line(dispatcher.command_hints())
+
+    def handle_interrupt() -> bool:
+        """Handle Ctrl-C: cancel a modal, move up a level, or quit at home.
+
+        Returns:
+            ``True`` when the app should exit (Ctrl-C at the home screen).
+        """
+        nonlocal input_buffer, current_output_lines, notice
+        if dispatcher.picker_state is not None:
+            current_output_lines = dispatcher.cancel_picker()
+        elif dispatcher.prompt_state is not None:
+            current_output_lines = dispatcher.cancel_prompt()
+        elif ctx.pop() is None:
+            return True
+        else:
+            current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
+            _sync_session_context(session, ctx)
+        input_buffer = ""
+        notice = ""
+        return False
 
     def handle_resize(_signum: int, _frame: FrameType | None) -> None:
         screen.draw_full(current_output_lines, input_buffer, dispatcher.command_hints())
         if _in_list_mode(ctx) and not input_buffer and dispatcher.prompt_state is None:
-            screen.draw_nav_hint()
+            screen.draw_nav_hint(notice=notice)
+        elif dispatcher.picker_state is None and dispatcher.prompt_state is None:
+            screen.draw_input_line(text=input_buffer, notice=notice)
 
     previous_handler = signal.getsignal(signal.SIGWINCH)
     signal.signal(signal.SIGWINCH, handle_resize)
     redraw()
 
-    try:  # pylint: disable=too-many-nested-blocks  # blessed inkey loop; escape/prompt/list branches require deep nesting
+    try:  # pylint: disable=too-many-nested-blocks  # blessed inkey loop; prompt/picker/list branches require deep nesting
         while True:
-            key = term.inkey()
+            try:
+                key = term.inkey()
+            except KeyboardInterrupt:
+                if handle_interrupt():
+                    break
+                redraw()
+                continue
             if not key:
                 continue
             key_name = key.name or str(key)
@@ -108,34 +145,10 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             if key_text == "\x04":
                 break
             if key_text == "\x03":
-                raise KeyboardInterrupt
-
-            if key_name == "KEY_ESCAPE":
-                in_modal = (
-                    dispatcher.prompt_state is not None or dispatcher.picker_state is not None
-                )
-                message = escape_handler.handle_esc(in_modal)
-                if message == "NAVIGATE_UP":
-                    if dispatcher.picker_state is not None:
-                        current_output_lines = dispatcher.cancel_picker()
-                    elif dispatcher.prompt_state is not None:
-                        current_output_lines = dispatcher.cancel_prompt()
-                    else:
-                        popped = ctx.pop()
-                        if popped is None:
-                            current_output_lines = ["Already at home."]
-                        else:
-                            current_output_lines = _coerce_lines(
-                                run_async(dispatcher.render_current())
-                            )
-                            _sync_session_context(session, ctx)
-                    input_buffer = ""
-                else:
-                    current_output_lines = [message]
+                if handle_interrupt():
+                    break
                 redraw()
                 continue
-
-            escape_handler.disarm()
 
             if dispatcher.prompt_state is not None:
                 if dispatcher.prompt_state.is_select_field:
@@ -144,6 +157,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                             run_async(dispatcher.submit_prompt_selection())
                         )
                         input_buffer = ""
+                        consume_notice()
                     elif key_name in {"KEY_UP", "KEY_DOWN"}:
                         direction = "up" if key_name == "KEY_UP" else "down"
                         current_output_lines = dispatcher.prompt_move(direction)
@@ -154,6 +168,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                         run_async(dispatcher.advance_prompt(input_buffer))
                     )
                     input_buffer = ""
+                    consume_notice()
                 elif _is_backspace(key_name, key_text):
                     input_buffer = input_buffer[:-1]
                 elif _is_text_input(key):
@@ -165,6 +180,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                 if _is_enter(key_name, key_text):
                     current_output_lines = _coerce_lines(run_async(dispatcher.picker_select()))
                     input_buffer = ""
+                    consume_notice()
                 elif key_name in {"KEY_UP", "KEY_DOWN"}:
                     direction = "up" if key_name == "KEY_UP" else "down"
                     current_output_lines = dispatcher.picker_move(direction)
@@ -184,6 +200,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                         run_async(dispatcher.activate_list_selection(selected))
                     )
                     _sync_session_context(session, ctx)
+                    consume_notice()
                     redraw()
                     continue
                 if key_name in {"KEY_UP", "KEY_DOWN"}:
@@ -198,6 +215,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                 current_output_lines = _coerce_lines(result)
                 input_buffer = ""
                 _sync_session_context(session, ctx)
+                consume_notice()
             elif _is_backspace(key_name, key_text):
                 input_buffer = input_buffer[:-1]
             elif _is_text_input(key):
