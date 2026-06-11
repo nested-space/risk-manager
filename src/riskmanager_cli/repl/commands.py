@@ -102,6 +102,7 @@ from ..repl.renderers.stage_renderer import (
     render_stage_screen,
     stage_targets,
 )
+from ..repl.renderers.tables import section_rule
 from ..schema.create import (
     ComponentCreate,
     ComponentRiskCreate,
@@ -1813,7 +1814,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             if str(project.id) not in recent_map
         ]
         navigator = self._rebuild_list_navigator(recents, all_items)
-        header = ["Projects", "", "↑↓ navigate · Enter open · / search · ? help", ""]
+        header = [section_rule("Projects", self.screen.width), ""]
         return [*header, *navigator.render_lines(self.screen.width)]
 
     async def _render_project(self, project: Project) -> list[str]:

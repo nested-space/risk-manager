@@ -70,6 +70,20 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
     notice = ""
     mode = "view"  # "view" (hotkeys) | "search" ("/" filter) | "command" (":" line)
     current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
+    scroll_offset = 0
+
+    def set_output(lines: list[str]) -> None:
+        """Replace the output pane content, resetting the scroll to the top.
+
+        Every content change other than a same-screen list re-render goes through
+        here so the new screen starts unscrolled.
+        """
+        nonlocal current_output_lines, scroll_offset
+        current_output_lines = lines
+        scroll_offset = 0
+
+    def _max_scroll() -> int:
+        return max(0, len(current_output_lines) - screen.output_height)
 
     def consume_notice() -> None:
         """Refresh the status notice from any just-completed dispatcher action.
@@ -92,8 +106,10 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
         return "  ·  ".join(parts)
 
     def redraw() -> None:
+        nonlocal scroll_offset
+        scroll_offset = max(0, min(scroll_offset, _max_scroll()))
         screen.draw_status_bar()
-        screen.draw_output(current_output_lines)
+        screen.draw_output(current_output_lines, scroll_offset)
         if dispatcher.picker_state is not None:
             screen.draw_input_line(prompt="filter: ", text=input_buffer)
         elif dispatcher.prompt_state is not None:
@@ -107,7 +123,11 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
         elif mode == "search":
             screen.draw_input_line(prompt="/", text=input_buffer)
         else:
-            screen.draw_nav_hint(view_hint(), notice=notice)
+            hint = view_hint()
+            indicator = screen.scroll_indicator(scroll_offset, len(current_output_lines))
+            if indicator:
+                hint = f"{hint}  ·  {indicator}"
+            screen.draw_nav_hint(hint, notice=notice)
         screen.draw_info_line(dispatcher.command_hints())
 
     def reset_to_view() -> None:
@@ -127,20 +147,20 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
         Returns:
             ``True`` only when *quit_at_home* and already at the home screen.
         """
-        nonlocal input_buffer, current_output_lines, notice, mode
+        nonlocal input_buffer, notice, mode
         cancelled = False
         if dispatcher.picker_state is not None:
-            current_output_lines = _coerce_lines(run_async(dispatcher.cancel_picker()))
+            set_output(_coerce_lines(run_async(dispatcher.cancel_picker())))
             cancelled = True
         elif dispatcher.prompt_state is not None:
-            current_output_lines = _coerce_lines(run_async(dispatcher.cancel_prompt()))
+            set_output(_coerce_lines(run_async(dispatcher.cancel_prompt())))
             cancelled = True
         elif mode in {"command", "search"}:
-            current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
+            set_output(_coerce_lines(run_async(dispatcher.render_current())))
         elif ctx.pop() is None:
             return quit_at_home
         else:
-            current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
+            set_output(_coerce_lines(run_async(dispatcher.render_current())))
             _sync_session_context(session, ctx)
         reset_to_view()
         if cancelled:
@@ -184,20 +204,18 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             if dispatcher.prompt_state is not None:
                 if dispatcher.prompt_state.is_select_field:
                     if _is_enter(key_name, key_text):
-                        current_output_lines = _coerce_lines(
-                            run_async(dispatcher.submit_prompt_selection())
+                        set_output(
+                            _coerce_lines(run_async(dispatcher.submit_prompt_selection()))
                         )
                         input_buffer = ""
                         consume_notice()
                     elif key_name in {"KEY_UP", "KEY_DOWN"}:
                         direction = "up" if key_name == "KEY_UP" else "down"
-                        current_output_lines = dispatcher.prompt_move(direction)
+                        set_output(dispatcher.prompt_move(direction))
                     redraw()
                     continue
                 if _is_enter(key_name, key_text):
-                    current_output_lines = _coerce_lines(
-                        run_async(dispatcher.advance_prompt(input_buffer))
-                    )
+                    set_output(_coerce_lines(run_async(dispatcher.advance_prompt(input_buffer))))
                     input_buffer = ""
                     consume_notice()
                 elif _is_backspace(key_name, key_text):
@@ -209,18 +227,18 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
 
             if dispatcher.picker_state is not None:
                 if _is_enter(key_name, key_text):
-                    current_output_lines = _coerce_lines(run_async(dispatcher.picker_select()))
+                    set_output(_coerce_lines(run_async(dispatcher.picker_select())))
                     input_buffer = ""
                     consume_notice()
                 elif key_name in {"KEY_UP", "KEY_DOWN"}:
                     direction = "up" if key_name == "KEY_UP" else "down"
-                    current_output_lines = dispatcher.picker_move(direction)
+                    set_output(dispatcher.picker_move(direction))
                 elif _is_backspace(key_name, key_text):
                     input_buffer = input_buffer[:-1]
-                    current_output_lines = dispatcher.update_picker_query(input_buffer)
+                    set_output(dispatcher.update_picker_query(input_buffer))
                 elif _is_text_input(key):
                     input_buffer += key_text
-                    current_output_lines = dispatcher.update_picker_query(input_buffer)
+                    set_output(dispatcher.update_picker_query(input_buffer))
                 redraw()
                 continue
 
@@ -229,7 +247,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                     result = run_async(dispatcher.dispatch(input_buffer))
                     if result == "__QUIT__":
                         break
-                    current_output_lines = _coerce_lines(result)
+                    set_output(_coerce_lines(result))
                     reset_to_view()
                     _sync_session_context(session, ctx)
                     consume_notice()
@@ -246,44 +264,68 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                     input_buffer = ""
                 elif _is_backspace(key_name, key_text):
                     input_buffer = input_buffer[:-1]
-                    current_output_lines = _coerce_lines(run_async(dispatcher.search(input_buffer)))
+                    set_output(_coerce_lines(run_async(dispatcher.search(input_buffer))))
                 elif _is_text_input(key):
                     input_buffer += key_text
-                    current_output_lines = _coerce_lines(run_async(dispatcher.search(input_buffer)))
+                    set_output(_coerce_lines(run_async(dispatcher.search(input_buffer))))
                 redraw()
+                continue
+
+            # View-mode content scrolling, available on every screen.
+            if _is_scroll_key(key_name, key_text):
+                page = max(screen.output_height - 1, 1)  # keep one line of overlap
+                if key_name == "KEY_PGUP":
+                    scroll_offset -= page
+                elif key_name == "KEY_PGDOWN":
+                    scroll_offset += page
+                elif key_name == "KEY_CTRL_UP" or key_text == "\x1b[1;5A":
+                    scroll_offset -= 1
+                else:  # KEY_CTRL_DOWN / "\x1b[1;5B"
+                    scroll_offset += 1
+                redraw()  # redraw() clamps scroll_offset
                 continue
 
             # View mode: arrow/Enter list navigation, then "/", ":", "?", and hotkeys.
             if _in_list_mode(ctx) and dispatcher.list_navigator is not None:
                 selected = dispatcher.list_navigator.handle_key(key_name)
                 if selected is not None:
-                    current_output_lines = _coerce_lines(
-                        run_async(dispatcher.activate_list_selection(selected))
+                    set_output(
+                        _coerce_lines(run_async(dispatcher.activate_list_selection(selected)))
                     )
                     _sync_session_context(session, ctx)
                     consume_notice()
                     redraw()
                     continue
                 if key_name in {"KEY_UP", "KEY_DOWN"} or key_text in {"j", "k"}:
+                    # Same-screen re-render: preserve scroll and keep the caret visible.
                     current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
+                    scroll_offset = _follow_selection(
+                        current_output_lines, scroll_offset, screen.output_height
+                    )
                     redraw()
                     continue
+
+            # Non-list screens: plain Up/Down scroll one line.
+            if key_name in {"KEY_UP", "KEY_DOWN"}:
+                scroll_offset += -1 if key_name == "KEY_UP" else 1
+                redraw()
+                continue
 
             if key_text == "/" and dispatcher.supports_search():
                 mode = "search"
                 input_buffer = ""
-                current_output_lines = _coerce_lines(run_async(dispatcher.search("")))
+                set_output(_coerce_lines(run_async(dispatcher.search(""))))
             elif key_text == ":":
                 mode = "command"
                 input_buffer = ""
             elif key_text == "?":
-                current_output_lines = dispatcher.help_legend()
+                set_output(dispatcher.help_legend())
             elif _is_hotkey(key, key_text):
                 hotkey_result = run_async(dispatcher.handle_hotkey(key_text))
                 if hotkey_result == "__QUIT__":
                     break
                 if hotkey_result is not None:
-                    current_output_lines = _coerce_lines(hotkey_result)
+                    set_output(_coerce_lines(hotkey_result))
                     _sync_session_context(session, ctx)
                     consume_notice()
             redraw()
@@ -293,6 +335,44 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
 
 def _in_list_mode(ctx: ContextManager) -> bool:
     return ctx.current.track in {"home", "project", "route_select", "stage_focus"}
+
+
+def _is_scroll_key(key_name: str, key_text: str) -> bool:
+    """Return ``True`` for a content-scroll key.
+
+    PgUp/PgDown page the view; Ctrl+Up/Ctrl+Down nudge it one line. blessed
+    resolves the Ctrl+arrow combos to ``KEY_CTRL_UP``/``KEY_CTRL_DOWN`` on most
+    terminals; the raw xterm sequences are matched as a fallback.
+    """
+    return key_name in {"KEY_PGUP", "KEY_PGDOWN", "KEY_CTRL_UP", "KEY_CTRL_DOWN"} or key_text in {
+        "\x1b[1;5A",
+        "\x1b[1;5B",
+    }
+
+
+def _selected_line_index(lines: list[str]) -> int | None:
+    """Return the index of the caret-marked line, if any.
+
+    Selection markers are line-leading by contract: ``"▶ "`` in the list
+    navigator and ``"> "`` in the stage renderer (non-selected rows use a
+    two-space indent), so a ``startswith`` check locates the selected row.
+    """
+    for index, line in enumerate(lines):
+        if line.startswith("▶ ") or line.startswith("> "):
+            return index
+    return None
+
+
+def _follow_selection(lines: list[str], offset: int, height: int) -> int:
+    """Adjust *offset* so the caret-marked line stays within the visible window."""
+    selected = _selected_line_index(lines)
+    if selected is None:
+        return offset
+    if selected < offset:
+        return selected
+    if selected >= offset + height:
+        return selected - height + 1
+    return offset
 
 
 def _is_enter(key_name: str, key_text: str) -> bool:

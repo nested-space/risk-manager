@@ -24,8 +24,12 @@ class ScreenManager:
 
     @property
     def output_height(self) -> int:
-        """Return the number of rows available in the output pane."""
-        return max(self._term.height - 4, 0)
+        """Return the number of rows available in the output pane.
+
+        Five rows are reserved as chrome: the header, the overline, the
+        underline, the input/nav row, and the info line.
+        """
+        return max(self._term.height - 5, 0)
 
     @property
     def width(self) -> int:
@@ -69,18 +73,55 @@ class ScreenManager:
         self.draw_info_line(info_line)
 
     def draw_status_bar(self) -> None:
-        """Render the two-line status bar."""
-        self._write_status_row(0, self._ctx.breadcrumb())
-        self._write_status_row(1, self._ctx.mode_label())
+        """Render the single-row header: breadcrumb left, mode right."""
+        self._write_header_row(self._ctx.breadcrumb(), self._ctx.mode_label())
         sys.stdout.flush()
 
-    def draw_output(self, lines: list[str]) -> None:
-        """Clear the output pane and write lines, truncating to fit."""
-        for row in range(2, max(self._term.height - 2, 2)):
+    def draw_output(self, lines: list[str], offset: int = 0) -> None:
+        """Frame and fill the output pane: overline, content window, underline.
+
+        The overline (row 1) and underline (row ``height - 3``) are fixed content
+        rules drawn with the default background so they read as content framing,
+        not header. The scrollable content sits between them on rows
+        ``2 … height - 4``.
+
+        Args:
+            lines: Full set of output lines (may exceed the pane height).
+            offset: Index of the first line to show; the pane displays
+                ``lines[offset : offset + output_height]``. Callers are
+                responsible for clamping *offset* to a valid range.
+        """
+        width = self._term.width
+        underline_row = max(self._term.height - 3, 2)
+        sys.stdout.write(self._term.move_xy(0, 1) + self._term.clear_eol + "‾" * width)
+        for row in range(2, underline_row):
             sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol)
-        for offset, line in enumerate(lines[: self.output_height], start=2):
-            sys.stdout.write(self._term.move_xy(0, offset) + self._fit_width(line))
+        window = lines[offset : offset + self.output_height]
+        for row, line in enumerate(window, start=2):
+            sys.stdout.write(self._term.move_xy(0, row) + self._fit_width(line))
+        sys.stdout.write(self._term.move_xy(0, underline_row) + self._term.clear_eol + "_" * width)
         sys.stdout.flush()
+
+    def scroll_indicator(self, offset: int, total: int) -> str:
+        """Return a dimmed scroll-position hint, or ``""`` when nothing overflows.
+
+        Args:
+            offset: Index of the first visible line.
+            total: Total number of output lines.
+
+        Returns:
+            A hint like ``"▲▼ scroll (12–34 of 80)"`` (arrows reflect whether
+            content lies above/below the window), styled dim; empty when the
+            content fits the pane.
+        """
+        height = self.output_height
+        if total <= height or height <= 0:
+            return ""
+        first = offset + 1
+        last = min(offset + height, total)
+        up = "▲" if offset > 0 else " "
+        down = "▼" if offset + height < total else " "
+        return self.dim(f"{up}{down} scroll ({first}–{last} of {total})")
 
     def _fit_width(self, line: str) -> str:
         """Truncate *line* to the terminal width by visible length.
@@ -165,13 +206,24 @@ class ScreenManager:
         sys.stdout.write(self._term.home + self._term.clear)
         sys.stdout.flush()
 
-    def _write_status_row(self, row: int, text: str) -> None:
+    def _write_header_row(self, left: str, right: str) -> None:
+        """Render row 0 with *left* aligned left and *right* aligned right.
+
+        The two labels share a single ``on_blue`` band spanning the full width.
+        When they cannot both fit, the right label is dropped and the breadcrumb
+        is padded to width on its own.
+        """
+        width = self._term.width
+        if len(left) + len(right) + 1 > width:
+            text = left[:width].ljust(width)
+        else:
+            text = left + " " * (width - len(left) - len(right)) + right
         styled = (
-            self._term.move_xy(0, row)
+            self._term.move_xy(0, 0)
             + self._term.on_blue
             + self._term.bold
             + self._term.white
-            + text[: self._term.width].ljust(self._term.width)
+            + text
             + self._term.normal
         )
         sys.stdout.write(styled)

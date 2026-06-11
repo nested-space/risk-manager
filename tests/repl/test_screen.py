@@ -37,9 +37,12 @@ class _FakeTerminal:
 
 @pytest.mark.unit
 def test_output_height_reserves_status_input_and_info_rows() -> None:
-    """The output pane is the terminal height minus the four reserved rows."""
+    """The output pane is the terminal height minus the five reserved rows.
+
+    Reserved chrome: header, overline, underline, input/nav row, and info line.
+    """
     screen = ScreenManager(_FakeTerminal(height=24), ContextManager())  # type: ignore[arg-type]
-    assert screen.output_height == 20
+    assert screen.output_height == 19
 
 
 @pytest.mark.unit
@@ -47,6 +50,19 @@ def test_output_height_clamps_to_zero_on_tiny_terminal() -> None:
     """A terminal too short for any output pane reports zero rows, not negative."""
     screen = ScreenManager(_FakeTerminal(height=2), ContextManager())  # type: ignore[arg-type]
     assert screen.output_height == 0
+
+
+@pytest.mark.unit
+def test_draw_status_bar_renders_single_row_with_right_aligned_mode(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The header is one row: breadcrumb left, ``MODE:`` label flush right."""
+    screen = ScreenManager(_FakeTerminal(width=40), ContextManager())  # type: ignore[arg-type]
+    screen.draw_status_bar()
+    out = capsys.readouterr().out
+    assert out.startswith("[ Home ]")
+    assert out.rstrip().endswith("MODE: home")
+    assert len(out) == 40
 
 
 @pytest.mark.unit
