@@ -516,11 +516,11 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self._coerce_lines(awaited)
         return self._coerce_lines(result)
 
-    def cancel_prompt(self) -> list[str]:
-        """Cancel the active guided prompt, if any."""
+    async def cancel_prompt(self) -> list[str]:
+        """Cancel the active guided prompt and restore the current screen."""
         self._prompt_state = None
         self._prompt_callback = None
-        return ["Guided prompt cancelled."]
+        return await self._refresh_with_notice("Cancelled.", "warning")
 
     def start_picker(
         self,
@@ -590,10 +590,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self._coerce_lines(await result)
         return self._coerce_lines(result)
 
-    def cancel_picker(self) -> list[str]:
-        """Cancel the active typeahead picker, if any."""
+    async def cancel_picker(self) -> list[str]:
+        """Cancel the active typeahead picker and restore the current screen."""
         self._picker_state = None
-        return ["Selection cancelled."]
+        return await self._refresh_with_notice("Cancelled.", "warning")
 
     async def dispatch(  # pylint: disable=too-many-return-statements,too-many-branches  # top-level command router
         self, command: str

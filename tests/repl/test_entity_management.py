@@ -193,3 +193,54 @@ async def test_add_salt_links_counterion_to_component(temp_env: Environment) -> 
     salts = await list_salts_for_component(UUID(str(component.id)), env=temp_env)
     assert len(salts) == 1
     assert salts[0].counterion_id is not None
+
+
+@pytest.mark.integration
+async def test_cancel_prompt_restores_current_screen_with_notice(temp_env: Environment) -> None:
+    """Cancelling a guided prompt clears it and re-renders the open screen."""
+    material = await create_material(MaterialCreate(name="Caffeine"), env=temp_env)
+    assert material is not None
+    project = await create_project(
+        ProjectCreate(
+            name="AlphaProject",
+            therapy_area=TA.ONCOLOGY,
+            material_id=UUID(str(material.id)),
+        ),
+        env=temp_env,
+    )
+    assert project is not None
+
+    dispatcher = _make_dispatcher(temp_env)
+    dispatcher.ctx.push(
+        ContextFrame(track="project", project_id=str(project.id), project_name=project.name)
+    )
+
+    await dispatcher.dispatch("/add process")
+    assert dispatcher.prompt_state is not None
+
+    lines = await dispatcher.cancel_prompt()
+
+    assert dispatcher.prompt_state is None
+    assert dispatcher.take_notice() == ("Cancelled.", "warning")
+    # The screen body is the current (project) view, not a bare cancel message.
+    assert lines == await dispatcher.render_current()
+
+
+@pytest.mark.integration
+async def test_cancel_picker_restores_current_screen_with_notice(temp_env: Environment) -> None:
+    """Cancelling the typeahead picker clears it and re-renders the open screen."""
+    await create_material(MaterialCreate(name="Caffeine"), env=temp_env)
+    dispatcher = _make_dispatcher(temp_env)
+
+    await dispatcher.dispatch("/add project")
+    await dispatcher.advance_prompt("AlphaProject")
+    await dispatcher.advance_prompt(TA.ONCOLOGY.value)
+    assert dispatcher.picker_state is not None
+
+    lines = await dispatcher.cancel_picker()
+
+    assert dispatcher.picker_state is None
+    assert dispatcher.take_notice() == ("Cancelled.", "warning")
+    assert lines == await dispatcher.render_current()
+    # Cancelling aborted creation: no project was persisted.
+    assert await list_projects(env=temp_env) == []

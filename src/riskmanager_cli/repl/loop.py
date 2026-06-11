@@ -128,10 +128,13 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             ``True`` only when *quit_at_home* and already at the home screen.
         """
         nonlocal input_buffer, current_output_lines, notice, mode
+        cancelled = False
         if dispatcher.picker_state is not None:
-            current_output_lines = dispatcher.cancel_picker()
+            current_output_lines = _coerce_lines(run_async(dispatcher.cancel_picker()))
+            cancelled = True
         elif dispatcher.prompt_state is not None:
-            current_output_lines = dispatcher.cancel_prompt()
+            current_output_lines = _coerce_lines(run_async(dispatcher.cancel_prompt()))
+            cancelled = True
         elif mode in {"command", "search"}:
             current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
         elif ctx.pop() is None:
@@ -140,6 +143,8 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
             _sync_session_context(session, ctx)
         reset_to_view()
+        if cancelled:
+            consume_notice()
         return False
 
     def handle_resize(_signum: int, _frame: FrameType | None) -> None:
