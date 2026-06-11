@@ -205,7 +205,7 @@ async def test_project_screen_lists_routes_and_opens_selection(temp_env: Environ
     )
 
     lines = await dispatcher.render_current()
-    assert "Routes / processes:" in lines
+    assert any("─ Routes " in line for line in lines)
     assert any("Route 1 Process 1" in line for line in lines)
     assert dispatcher.list_navigator is not None
 
