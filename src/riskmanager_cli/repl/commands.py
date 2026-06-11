@@ -78,6 +78,7 @@ from ..operations.stage_component_operations import (
 from ..operations.stage_ncrm_operations import (
     create_stage_ncrm,
     list_ncrms_for_stage,
+    update_stage_ncrm,
 )
 from ..operations.stage_operations import (
     create_stage,
@@ -86,12 +87,21 @@ from ..operations.stage_operations import (
     list_stages_for_process,
     update_stage,
 )
-from ..operations.stage_risk_operations import create_stage_risk, list_risks_for_stage
+from ..operations.stage_risk_operations import (
+    create_stage_risk,
+    list_risks_for_stage,
+    update_stage_risk,
+)
 from ..repl.renderers.admin_renderer import render_admin_screen
 from ..repl.renderers.library_renderer import render_library_screen
 from ..repl.renderers.project_renderer import render_project_screen
 from ..repl.renderers.risk_renderer import render_risk_table
 from ..repl.renderers.route_renderer import render_route_screen
+from ..repl.renderers.stage_renderer import (
+    gather_stage_sections,
+    render_stage_screen,
+    stage_targets,
+)
 from ..schema.create import (
     ComponentCreate,
     ComponentRiskCreate,
@@ -112,6 +122,8 @@ from ..schema.update import (
     CounterionUpdate,
     MaterialUpdate,
     NcrmLibraryUpdate,
+    StageNcrmUpdate,
+    StageRiskUpdate,
     StageUpdate,
 )
 from .context import ContextFrame, ContextManager
@@ -674,6 +686,25 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             if process is None or project is None:
                 return ["Route not found."]
             return await self._open_route(project, process)
+        if self.ctx.current.track == "stage_focus":
+            return await self._activate_stage_row(item.item_id)
+        return await self.render_current()
+
+    async def _activate_stage_row(self, item_id: str) -> list[str]:
+        """Open the caret-selected stage row by its ``"{kind}:{uuid}"`` id.
+
+        Components push the component-focus screen onto the stage frame, so
+        leaving them (Esc/Ctrl-C) returns to the stage rather than the route.
+        NCRMs and risks open an inline edit form that re-renders the stage on
+        completion, so they too keep the user on the stage.
+        """
+        kind, _, raw_id = item_id.partition(":")
+        if kind == "component":
+            return await self._open_component_by_id(raw_id)
+        if kind == "ncrm":
+            return await self._start_stage_ncrm_edit_form(raw_id)
+        if kind == "risk":
+            return await self._start_stage_risk_edit_form(raw_id)
         return await self.render_current()
 
     def take_notice(self) -> tuple[str, str] | None:
@@ -1371,6 +1402,72 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             lambda **payload: self._update_stage_from_prompt(stage, payload),
         )
 
+    async def _start_stage_ncrm_edit_form(self, link_id: str) -> list[str]:
+        """Open a role-edit form for the stage-NCRM link with id *link_id*."""
+        stage = await self._current_stage()
+        if stage is None:
+            return ["Stage not found."]
+        link = next(
+            (
+                candidate
+                for candidate in await list_ncrms_for_stage(UUID(str(stage.id)), self.env)
+                if str(candidate.id) == link_id
+            ),
+            None,
+        )
+        if link is None:
+            return ["NCRM link not found."]
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "role",
+                    field_type="select",
+                    options=_enum_options(NcrmRole),
+                    default=link.role.value,
+                )
+            ],
+            lambda **payload: self._update_stage_ncrm_from_prompt(link_id, payload),
+        )
+
+    async def _start_stage_risk_edit_form(self, risk_id: str) -> list[str]:
+        """Open an edit form for the stage risk with id *risk_id*."""
+        stage = await self._current_stage()
+        if stage is None:
+            return ["Stage not found."]
+        risk = next(
+            (
+                candidate
+                for candidate in await list_risks_for_stage(UUID(str(stage.id)), self.env)
+                if str(candidate.id) == risk_id
+            ),
+            None,
+        )
+        if risk is None:
+            return ["Risk not found."]
+        return self.start_prompt(
+            [
+                FieldSpec("risk_type", default=risk.risk_type),
+                FieldSpec("name", default=risk.name),
+                FieldSpec("description", required=False, default=risk.description),
+                FieldSpec(
+                    "current_level",
+                    field_type="int",
+                    required=False,
+                    default=_default_text(risk.current_level),
+                ),
+                FieldSpec(
+                    "proposed_mitigation", required=False, default=risk.proposed_mitigation
+                ),
+                FieldSpec(
+                    "mitigated_level",
+                    field_type="int",
+                    required=False,
+                    default=_default_text(risk.mitigated_level),
+                ),
+            ],
+            lambda **payload: self._update_stage_risk_from_prompt(risk_id, payload),
+        )
+
     async def _start_component_edit_form_by_id(self, component_id: str) -> list[str]:
         component = await get_component_by_id(UUID(component_id), self.env)
         if component is None:
@@ -1796,16 +1893,12 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         stage = await self._current_stage()
         if stage is None:
             return ["Stage not found."]
-        risks = await list_risks_for_stage(UUID(str(stage.id)), self.env)
-        links = await list_stage_components(UUID(str(stage.id)), self.env)
-        ncrms = await list_ncrms_for_stage(UUID(str(stage.id)), self.env)
-        return [
-            f"Stage {stage.number}: {stage.name}",
-            "",
-            f"Risks: {len(risks)}",
-            f"Components: {len(links)}",
-            f"NCRM links: {len(ncrms)}",
-        ]
+        sections = await gather_stage_sections(stage, self.env)
+        navigator = self._rebuild_list_navigator([], stage_targets(sections))
+        selected_id = navigator.selected.item_id if navigator.selected is not None else None
+        return render_stage_screen(
+            stage, sections, width=self.screen.width, selected_id=selected_id
+        )
 
     async def _render_component_focus(self) -> list[str]:
         component = await self._current_component()
@@ -2765,6 +2858,41 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         self.ctx.current.stage_name = updated.name
         self.session.update_context(stage_id=str(updated.id))
         return await self._refresh_with_notice(f"Updated stage '{updated.name}'.")
+
+    async def _update_stage_ncrm_from_prompt(
+        self,
+        link_id: str,
+        payload: dict[str, str | None],
+    ) -> list[str]:
+        updated = await update_stage_ncrm(
+            UUID(link_id),
+            StageNcrmUpdate(role=NcrmRole(payload.get("role") or NcrmRole.REAGENT.value)),
+            self.env,
+        )
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update NCRM role.", "error")
+        return await self._refresh_with_notice("NCRM role updated.")
+
+    async def _update_stage_risk_from_prompt(
+        self,
+        risk_id: str,
+        payload: dict[str, str | None],
+    ) -> list[str]:
+        updated = await update_stage_risk(
+            UUID(risk_id),
+            StageRiskUpdate(
+                risk_type=payload.get("risk_type") or None,
+                name=payload.get("name") or None,
+                description=payload.get("description"),
+                current_level=_optional_int(payload.get("current_level")),
+                proposed_mitigation=payload.get("proposed_mitigation"),
+                mitigated_level=_optional_int(payload.get("mitigated_level")),
+            ),
+            self.env,
+        )
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update risk.", "error")
+        return await self._refresh_with_notice(f"Updated risk '{updated.name}'.")
 
     async def _update_component_from_prompt(
         self,
