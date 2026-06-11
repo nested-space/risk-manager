@@ -17,7 +17,7 @@ from ...model.tables import Project
 from ...operations.manufacturing_process_operations import list_processes_for_project
 from ...operations.manufacturing_process_risk_operations import list_risks_for_process
 from ...operations.material_operations import get_material_by_id
-from .tables import Column, render_table, section_rule
+from .tables import Column, render_table, section_rule, section_width
 
 _BODY_INDENT = "  "
 
@@ -36,6 +36,7 @@ async def render_project_screen(
     project: Project,
     env: Environment,
     route_lines: list[str] | None = None,
+    width: int = 80,
 ) -> list[str]:
     """Return display lines for the Project Screen.
 
@@ -44,6 +45,7 @@ async def render_project_screen(
         env: Active database environment.
         route_lines: Pre-rendered lines for the navigable routes pick-list. When
             ``None`` (e.g. a non-interactive render) a plain route count is shown.
+        width: Terminal width; section rules use the shared standard width.
 
     Returns:
         Renderable output lines: ``Project Details``, ``Routes``, and ``Risks``
@@ -79,13 +81,11 @@ async def render_project_screen(
     )
     routes_block = route_lines if route_lines is not None else [f"{len(processes)} total"]
 
-    # Section rules span the indented body, sized to the wider of the two tables.
-    width = max(len(detail_table[0]), len(risk_table[0])) + len(_BODY_INDENT)
-
+    rule_width = section_width(width)
     return [
-        *_section("Project Details", detail_table, width),
+        *_section("Project Details", detail_table, rule_width),
         "",
-        *_section("Routes", routes_block, width),
+        *_section("Routes", routes_block, rule_width),
         "",
-        *_section("Risks", risk_table, width),
+        *_section("Risks", risk_table, rule_width),
     ]

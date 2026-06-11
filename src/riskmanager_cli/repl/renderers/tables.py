@@ -12,6 +12,28 @@ from typing import Literal
 
 Align = Literal["left", "center", "right"]
 
+# Every screen sizes its section headings through ``section_width`` so they read
+# as one consistent length: a fixed column count, capped so it never dominates a
+# narrow terminal.
+_SECTION_WIDTH = 40
+_SECTION_TERMINAL_FRACTION = 0.75
+
+
+def section_width(term_width: int) -> int:
+    """Return the standard section-rule width for a *term_width*-column terminal.
+
+    The width is a fixed :data:`_SECTION_WIDTH` columns, capped at
+    :data:`_SECTION_TERMINAL_FRACTION` of *term_width* so headings stay
+    proportional on a narrow terminal. Always at least one column.
+
+    Args:
+        term_width: Current terminal width in columns.
+
+    Returns:
+        The shared section-heading width every screen should use.
+    """
+    return max(min(_SECTION_WIDTH, int(term_width * _SECTION_TERMINAL_FRACTION)), 1)
+
 
 def section_rule(title: str, width: int) -> str:
     """Return a section-title rule: ``─ {title} `` padded with ``─`` to *width*.

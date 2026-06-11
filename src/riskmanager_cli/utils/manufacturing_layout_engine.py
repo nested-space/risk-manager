@@ -184,7 +184,9 @@ def _risk_context(risk: RiskDict) -> str:
     return ""
 
 
-def render_risk_summary(risks: list[RiskDict], max_rows: int = 5) -> list[str]:
+def render_risk_summary(
+    risks: list[RiskDict], max_rows: int = 5, *, include_header: bool = True
+) -> list[str]:
     """Render a compact risk dashboard for the route view output pane.
 
     Shows the top *max_rows* risks by current level (descending), formatted as::
@@ -197,6 +199,9 @@ def render_risk_summary(risks: list[RiskDict], max_rows: int = 5) -> list[str]:
         risks: List of risk dicts with keys: ``name``, ``current_level``,
             ``risk_type``, and optionally ``stage_name`` or ``component_name``.
         max_rows: Maximum number of risks to display. Defaults to 5.
+        include_header: When ``True`` (default) prepend the ``⚠ Risk Dashboard``
+            header line; callers that supply their own section heading pass
+            ``False`` to omit it.
 
     Returns:
         A list of strings ready for display in the output pane.
@@ -205,7 +210,7 @@ def render_risk_summary(risks: list[RiskDict], max_rows: int = 5) -> list[str]:
         return ["  (no risks recorded)"]
 
     sorted_risks = sorted(risks, key=_risk_level, reverse=True)[:max_rows]
-    lines = ["⚠ Risk Dashboard"]
+    lines = ["⚠ Risk Dashboard"] if include_header else []
     for r in sorted_risks:
         level = _risk_level(r)
         label = _LEVEL_LABELS.get(level, "INFO")

@@ -78,12 +78,17 @@ class ScreenManager:
         sys.stdout.flush()
 
     def draw_output(self, lines: list[str], offset: int = 0) -> None:
-        """Frame and fill the output pane: overline, content window, underline.
+        """Frame and fill the output pane: top spacer, content window, underline.
 
-        The overline (row 1) and underline (row ``height - 3``) are fixed content
-        rules drawn with the default background so they read as content framing,
-        not header. The scrollable content sits between them on rows
+        Row 1 is a blank spacer in the default background — one line of breathing
+        room below the header band. The underline (row ``height - 3``) is a fixed
+        content rule. The scrollable content sits between them on rows
         ``2 … height - 4``.
+
+        Content is inset by one blank column on each side: every line is drawn
+        starting at column 1, and clipped so its last column stays blank. This
+        mirrors the top/bottom breathing room created by the chrome, giving the
+        centre panel matching horizontal margins.
 
         Args:
             lines: Full set of output lines (may exceed the pane height).
@@ -93,12 +98,12 @@ class ScreenManager:
         """
         width = self._term.width
         underline_row = max(self._term.height - 3, 2)
-        sys.stdout.write(self._term.move_xy(0, 1) + self._term.clear_eol + "‾" * width)
+        sys.stdout.write(self._term.move_xy(0, 1) + self._term.clear_eol)
         for row in range(2, underline_row):
             sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol)
         window = lines[offset : offset + self.output_height]
         for row, line in enumerate(window, start=2):
-            sys.stdout.write(self._term.move_xy(0, row) + self._fit_width(line))
+            sys.stdout.write(self._term.move_xy(1, row) + self._fit_width(line))
         sys.stdout.write(self._term.move_xy(0, underline_row) + self._term.clear_eol + "_" * width)
         sys.stdout.flush()
 
@@ -124,15 +129,20 @@ class ScreenManager:
         return self.dim(f"{up}{down} scroll ({first}–{last} of {total})")
 
     def _fit_width(self, line: str) -> str:
-        """Truncate *line* to the terminal width by visible length.
+        """Truncate *line* to the inset content width by visible length.
+
+        Content is drawn from column 1 with the final column held blank, so the
+        usable width is two columns short of the terminal width — one reserved
+        margin on each side.
 
         Plain slicing would corrupt lines containing escape sequences (e.g.
         dimmed text), so only clip when the *printable* length overruns; blessed
         ``Terminal.length`` ignores escape codes.
         """
-        if self._term.length(line) <= self._term.width:
+        content_width = max(self._term.width - 2, 0)
+        if self._term.length(line) <= content_width:
             return line
-        return line[: self._term.width]
+        return line[:content_width]
 
     def draw_input_line(self, prompt: str = "> ", text: str = "", notice: str = "") -> None:
         """Render the input line at the bottom row.

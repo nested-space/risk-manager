@@ -25,7 +25,7 @@ from ...operations.stage_component_operations import list_stage_components
 from ...operations.stage_ncrm_operations import list_ncrms_for_stage
 from ...operations.stage_risk_operations import list_risks_for_stage
 from ..list_navigator import ListItem
-from .tables import Column, render_table, section_rule
+from .tables import Column, render_table, section_rule, section_width
 
 _BODY_INDENT = "  "
 _CARET = "> "
@@ -92,7 +92,7 @@ def render_stage_screen(
     Args:
         stage: Stage being rendered.
         sections: Pre-fetched section rows (see :func:`gather_stage_sections`).
-        width: Terminal width; section rules span the body, capped to this.
+        width: Terminal width; section rules use the shared standard width.
         selected_id: ``item_id`` of the caret-selected row, if any.
 
     Returns:
@@ -102,7 +102,7 @@ def render_stage_screen(
     title = f"Stage {stage.number}"
     lines = [title, "─" * len(title)]
 
-    body_width = _body_width(sections, width)
+    body_width = section_width(width)
     body: list[tuple[str, str | None]] = []
     body += _section_body(
         "Components", _COMPONENT_COLUMNS, sections.components, body_width, "(none)"
@@ -148,20 +148,6 @@ def _section_body(
         is_data = data_start <= index < data_start + len(rows)
         out.append((line, rows[index - data_start].item_id if is_data else None))
     return out
-
-
-def _body_width(sections: StageSections, width: int) -> int:
-    """Return the section-rule width: the widest table, capped to *width* - 2."""
-    table_widths = [
-        len(render_table(columns, [row.cells for row in rows])[0])
-        for columns, rows in (
-            (_COMPONENT_COLUMNS, sections.components),
-            (_NCRM_COLUMNS, sections.ncrms),
-            (_RISK_COLUMNS, sections.risks),
-        )
-        if rows
-    ]
-    return min(max(table_widths, default=0), max(width - len(_BODY_INDENT), 1))
 
 
 async def _component_rows(stage: Stage, env: Environment) -> list[StageRow]:
