@@ -14,12 +14,15 @@ from ...operations.material_operations import get_material_by_id
 async def render_project_screen(
     project: Project,
     env: Environment,
+    route_lines: list[str] | None = None,
 ) -> list[str]:
     """Return display lines for the Project Screen.
 
     Args:
         project: Project to render.
         env: Active database environment.
+        route_lines: Pre-rendered lines for the navigable routes pick-list. When
+            ``None`` (e.g. a non-interactive render) a plain route count is shown.
 
     Returns:
         Renderable output lines.
@@ -40,12 +43,15 @@ async def render_project_screen(
             else:
                 summary["Low"] += 1
 
+    routes_block = route_lines if route_lines is not None else [f"{len(processes)} total"]
     return [
         project.name,
         "",
         f"Therapy area: {project.therapy_area.value}",
         f"Material SMILES: {material.smiles if material and material.smiles else '-'}",
-        f"Routes / processes: {len(processes)}",
+        "Routes / processes:",
+        "",
+        *routes_block,
         "",
         "Risk summary",
         "  Critical  High  Medium  Low",

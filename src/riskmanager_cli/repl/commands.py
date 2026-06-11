@@ -646,7 +646,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._dispatch_risk_mode(verb, args)
         return [f"Unknown command: {verb}. Type /help for commands."]
 
-    async def activate_list_selection(self, item: ListItem) -> list[str]:
+    async def activate_list_selection(  # pylint: disable=too-many-return-statements  # one return per list-driven track
+        self, item: ListItem
+    ) -> list[str]:
         """Open the currently selected list item for list-driven screens.
 
         Args:
@@ -660,6 +662,12 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             if project is None:
                 return ["Project not found."]
             return await self._open_project(project)
+        if self.ctx.current.track == "project":
+            process = await self._process_from_id(item.item_id)
+            project = await self._current_project()
+            if process is None or project is None:
+                return ["Route not found."]
+            return await self._open_route(project, process)
         if self.ctx.current.track == "route_select":
             process = await self._process_from_id(item.item_id)
             project = await self._current_project()
@@ -702,7 +710,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             project = await self._current_project()
             if project is None:
                 return ["Project not found."]
-            return await render_project_screen(project, self.env)
+            return await self._render_project(project)
         if track == "route_select":
             return await self._render_route_select()
         if track == "route":
@@ -1711,6 +1719,40 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         header = ["Projects", "", "↑↓ navigate · Enter open · / search · ? help", ""]
         return [*header, *navigator.render_lines(self.screen.width)]
 
+    async def _render_project(self, project: Project) -> list[str]:
+        """Render the project screen with a navigable routes pick-list.
+
+        The project's manufacturing processes are shown as a :class:`ListNavigator`
+        so routes can be opened inline with the arrow keys and Enter, the same way
+        projects are opened from the home screen.
+
+        Args:
+            project: The project whose screen to render.
+
+        Returns:
+            The composed project-screen lines, including the routes pick-list.
+        """
+        processes = await list_processes_for_project(UUID(str(project.id)), self.env)
+        recent_ids = self.session.recent_routes.get(str(project.id), [])
+
+        def label(process: ManufacturingProcess) -> str:
+            return f"Route {process.route_number} Process {process.process_number}"
+
+        recent_lookup = {
+            str(process.id): ListItem(label=label(process), item_id=str(process.id))
+            for process in processes
+            if str(process.id) in recent_ids
+        }
+        recents = [recent_lookup[route_id] for route_id in recent_ids if route_id in recent_lookup]
+        all_items = [
+            ListItem(label=label(process), item_id=str(process.id))
+            for process in processes
+            if str(process.id) not in recent_lookup
+        ]
+        navigator = self._rebuild_list_navigator(recents, all_items)
+        route_lines = navigator.render_lines(self.screen.width)
+        return await render_project_screen(project, self.env, route_lines=route_lines)
+
     async def _render_route_select(self, query: str | None = None) -> list[str]:
         project = await self._current_project()
         if project is None:
@@ -2355,7 +2397,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             stage_id=None,
             component_id=None,
         )
-        return await render_project_screen(project, self.env)
+        return await self._render_project(project)
 
     async def _open_route(self, project: Project, process: ManufacturingProcess) -> list[str]:
         label = f"{process.route_number}.{process.process_number}"

@@ -287,7 +287,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
 
 
 def _in_list_mode(ctx: ContextManager) -> bool:
-    return ctx.current.track in {"home", "route_select"}
+    return ctx.current.track in {"home", "project", "route_select"}
 
 
 def _is_enter(key_name: str, key_text: str) -> bool:

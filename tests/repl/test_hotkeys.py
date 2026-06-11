@@ -180,6 +180,42 @@ async def test_stage_delete_hotkey_confirms_then_deletes(temp_env: Environment) 
 
 
 @pytest.mark.integration
+async def test_project_screen_lists_routes_and_opens_selection(temp_env: Environment) -> None:
+    """The project screen renders a navigable routes pick-list; Enter opens one."""
+    material = await create_material(MaterialCreate(name="Caffeine"), env=temp_env)
+    assert material is not None
+    project = await create_project(
+        ProjectCreate(name="Alpha", therapy_area=TA.ONCOLOGY, material_id=UUID(str(material.id))),
+        env=temp_env,
+    )
+    assert project is not None
+    for route_number, process_number in [(1, 1), (1, 2)]:
+        await create_manufacturing_process(
+            ManufacturingProcessCreate(
+                project_id=UUID(str(project.id)),
+                route_number=route_number,
+                process_number=process_number,
+            ),
+            env=temp_env,
+        )
+
+    dispatcher = _make_dispatcher(temp_env)
+    dispatcher.ctx.push(
+        ContextFrame(track="project", project_id=str(project.id), project_name="Alpha")
+    )
+
+    lines = await dispatcher.render_current()
+    assert "Routes / processes:" in lines
+    assert any("Route 1 Process 1" in line for line in lines)
+    assert dispatcher.list_navigator is not None
+
+    selected = dispatcher.list_navigator.selected
+    assert selected is not None
+    await dispatcher.activate_list_selection(selected)
+    assert dispatcher.ctx.current.track == "route"
+
+
+@pytest.mark.integration
 async def test_no_arg_hotkey_reuses_slash_handler(temp_env: Environment) -> None:
     """Ctrl-R on a route opens the same risk view as `/risks` (risk_mode track)."""
     project_id, process_id = await _seed_route(temp_env)
