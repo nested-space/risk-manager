@@ -154,6 +154,25 @@ COMPONENT_TYPE_OPTIONS: list[tuple[str, str]] = [
     ("product", "product"),
 ]
 
+#: No/Yes options for confirmation prompts, defaulting to the safe "No" choice.
+CONFIRM_OPTIONS: list[tuple[str, str]] = [("No", "no"), ("Yes", "yes")]
+
+# Control-character hotkeys (``str(key)`` for Ctrl-<letter> in the blessed loop).
+# Terminal-reserved combos are avoided: Ctrl-C/D (interrupt/EOF, handled in the
+# loop), Ctrl-S/Q (flow control), Ctrl-Z (suspend), Ctrl-H/I/J/M (backspace, tab,
+# newline, carriage return), and Ctrl-[ (escape).
+CTRL_A = "\x01"  # add
+CTRL_B = "\x02"  # library
+CTRL_E = "\x05"  # edit
+CTRL_F = "\x06"  # focus / filter
+CTRL_G = "\x07"  # go home
+CTRL_L = "\x0c"  # list
+CTRL_N = "\x0e"  # admin
+CTRL_O = "\x0f"  # open / show
+CTRL_R = "\x12"  # risks
+CTRL_T = "\x14"  # routes
+CTRL_X = "\x18"  # delete
+
 
 def _enum_options(enum_cls: type[Enum]) -> list[tuple[str, str]]:
     """Return ``(label, value)`` select options for a string enum.
@@ -371,7 +390,7 @@ class PickerState:
         return self.navigator.selected
 
 
-class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prompt, picker, and list-navigator modes each need their own state
+class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-many-public-methods  # modal state + hotkey/search/dispatch entry points
     """Parse slash commands, update REPL state, and call operations."""
 
     def __init__(
@@ -906,13 +925,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         if verb == "/list" and args:
             return await self._handle_stage_list(stage, args[0].lower())
         if verb == "/edit":
-            return self.start_prompt(
-                [
-                    FieldSpec("name", default=stage.name),
-                    FieldSpec("number", field_type="int", default=str(stage.number)),
-                ],
-                lambda **payload: self._update_stage_from_prompt(stage, payload),
-            )
+            return self._start_stage_edit_form(stage)
         if verb == "/delete":
             return await self._delete_stage_with_confirmation(stage, args)
         return [f"Unknown command: {verb}. Type /help for commands."]
@@ -924,22 +937,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         if verb == "/add" and args and args[0].lower() == "salt":
             return await self._start_salt_picker(component)
         if verb == "/edit":
-            return self.start_prompt(
-                [
-                    FieldSpec(
-                        "control_strategy_role",
-                        required=False,
-                        default=component.control_strategy_role,
-                    ),
-                    FieldSpec(
-                        "is_isolated",
-                        field_type="select",
-                        options=BOOL_OPTIONS,
-                        default="true" if component.is_isolated else "false",
-                    ),
-                ],
-                lambda **payload: self._update_component_from_prompt(component, payload),
-            )
+            return self._start_component_edit_form(component)
         if verb == "/delete":
             return await self._delete_component_with_confirmation(component, args)
         if verb == "/risks":
@@ -994,6 +992,678 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             return await self._render_risk_mode()
         return [f"Unknown command: {verb}. Type /help for commands."]
 
+    # ------------------------------------------------------------------ #
+    # Hotkey dispatch
+    #
+    # Commands are driven by Ctrl-<letter> hotkeys instead of typed slash
+    # commands. ``handle_hotkey`` is the keystroke entry point, mirroring the
+    # ``_dispatch_<track>`` router structure: no-argument actions reuse the
+    # existing ``_dispatch_*`` handlers, while argument-bearing actions open a
+    # chooser/form/picker chain that ends in the same leaf handlers the slash
+    # commands use. Slash commands remain available through the ``:`` command
+    # line, so ``dispatch`` is untouched.
+    # ------------------------------------------------------------------ #
+
+    async def handle_hotkey(self, key_text: str) -> list[str] | str | None:
+        """Route a control-character hotkey for the current track.
+
+        Args:
+            key_text: The raw keystroke (a control character).
+
+        Returns:
+            Rendered lines, the ``"__QUIT__"`` sentinel, or ``None`` when the
+            key is not a hotkey on the current screen (so the loop ignores it).
+        """
+        track = self.ctx.current.track
+        if key_text == CTRL_G and track != "home":
+            return await self._dispatch_global("/home", [])
+        handler = {
+            "home": self._hotkey_home,
+            "project": self._hotkey_project,
+            "route_select": self._hotkey_route_select,
+            "route": self._hotkey_route,
+            "stage_focus": self._hotkey_stage_focus,
+            "component_focus": self._hotkey_component_focus,
+            "library": self._hotkey_library,
+            "admin": self._hotkey_admin,
+            "risk_mode": self._hotkey_risk_mode,
+        }.get(track)
+        if handler is None:
+            return None
+        return await handler(key_text)
+
+    async def _hotkey_home(self, key: str) -> list[str] | str | None:
+        if key == CTRL_A:
+            return await self._dispatch_home("/add", ["project"])
+        if key == CTRL_B:
+            return self._start_library_chooser()
+        if key == CTRL_N:
+            return await self._dispatch_global("/admin", [])
+        return None
+
+    async def _hotkey_project(self, key: str) -> list[str] | None:
+        if key == CTRL_T:
+            return await self._dispatch_project("/route", [])
+        if key == CTRL_R:
+            return await self._dispatch_project("/risks", [])
+        if key == CTRL_A:
+            return await self._dispatch_project("/add", ["process"])
+        return None
+
+    async def _hotkey_route_select(self, key: str) -> list[str] | None:
+        del key  # Routes are opened by list navigation or "/" search only.
+        return None
+
+    async def _hotkey_route(  # pylint: disable=too-many-return-statements  # one return per route hotkey
+        self, key: str
+    ) -> list[str] | None:
+        process = await self._current_process()
+        if process is None:
+            return ["Route not found."]
+        if key == CTRL_A:
+            return self._start_route_add_chooser(process)
+        if key == CTRL_F:
+            return self._start_route_focus_chooser(process)
+        if key == CTRL_E:
+            return self._start_route_edit_chooser(process)
+        if key == CTRL_X:
+            return self._start_route_delete_chooser(process)
+        if key == CTRL_L:
+            return self._start_route_list_chooser(process)
+        if key == CTRL_R:
+            return await self._dispatch_route("/risks", [])
+        return None
+
+    async def _hotkey_stage_focus(self, key: str) -> list[str] | None:
+        stage = await self._current_stage()
+        process = await self._current_process()
+        if stage is None or process is None:
+            return ["Stage not found."]
+        if key == CTRL_A:
+            return self._start_stage_add_chooser(stage, process)
+        if key == CTRL_L:
+            return self._start_stage_list_chooser(stage)
+        if key == CTRL_E:
+            return self._start_stage_edit_form(stage)
+        if key == CTRL_X:
+            return self._start_confirm(
+                f"Delete stage '{stage.name}'",
+                lambda: self._delete_stage_with_confirmation(stage, ["--confirm"]),
+            )
+        return None
+
+    async def _hotkey_component_focus(self, key: str) -> list[str] | None:
+        component = await self._current_component()
+        if component is None:
+            return ["Component not found."]
+        if key == CTRL_A:
+            return await self._start_salt_picker(component)
+        if key == CTRL_E:
+            return self._start_component_edit_form(component)
+        if key == CTRL_X:
+            return self._start_confirm(
+                "Delete component",
+                lambda: self._delete_component_with_confirmation(component, ["--confirm"]),
+            )
+        if key == CTRL_R:
+            return await self._dispatch_component_focus("/risks", [])
+        return None
+
+    async def _hotkey_library(  # pylint: disable=too-many-return-statements  # one return per library hotkey
+        self, key: str
+    ) -> list[str] | None:
+        sub_mode = self.ctx.current.library_sub or "select"
+        if key == CTRL_A:
+            return self._start_library_add_prompt(sub_mode)
+        if key == CTRL_E:
+            return await self._start_library_edit_picker(sub_mode)
+        if key == CTRL_X:
+            return await self._start_library_delete_picker(sub_mode)
+        if key == CTRL_O:
+            return await self._start_library_show_picker(sub_mode)
+        if key == CTRL_F:
+            return self._start_library_filter_chooser(sub_mode)
+        if key == CTRL_L:
+            return await self._render_library(sub_mode)
+        return None
+
+    async def _hotkey_admin(self, key: str) -> list[str] | None:
+        if key == CTRL_A:
+            return self._start_admin_action_chooser()
+        return None
+
+    async def _hotkey_risk_mode(self, key: str) -> list[str] | None:
+        if key == CTRL_L:
+            return await self._dispatch_risk_mode("/list", ["risks"])
+        return None
+
+    # ------------------------------------------------------------------ #
+    # Chooser, picker, and confirmation chains
+    # ------------------------------------------------------------------ #
+
+    def _start_confirm(self, label: str, on_yes: Callable[[], Any]) -> list[str]:
+        """Open a No/Yes confirmation prompt that runs *on_yes* when confirmed.
+
+        Args:
+            label: Prompt label (e.g. ``"Delete stage 'Coupling'"``).
+            on_yes: Zero-argument callable run on confirmation; may be async.
+
+        Returns:
+            Initial prompt-render lines.
+        """
+        return self.start_prompt(
+            [FieldSpec(label, field_type="select", options=CONFIRM_OPTIONS, default="no")],
+            lambda **payload: self._resolve_confirm(payload[_field_key(label)], on_yes),
+        )
+
+    async def _resolve_confirm(self, answer: str | None, on_yes: Callable[[], Any]) -> list[str]:
+        if answer != "yes":
+            return await self._refresh_with_notice("Cancelled.", "warning")
+        result = on_yes()
+        if inspect.isawaitable(result):
+            return self._coerce_lines(await result)
+        return self._coerce_lines(result)
+
+    def _start_library_chooser(self) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "library",
+                    field_type="select",
+                    options=[
+                        ("materials", "materials"),
+                        ("ncrm", "ncrm"),
+                        ("counterions", "counterions"),
+                    ],
+                )
+            ],
+            lambda **payload: self._dispatch_global("/library", [payload["library"]]),
+        )
+
+    def _start_route_add_chooser(self, process: ManufacturingProcess) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "add",
+                    field_type="select",
+                    options=[
+                        ("stage", "stage"),
+                        ("component", "component"),
+                        ("risk", "risk"),
+                        ("component link to stage", "stage-component"),
+                        ("NCRM link to stage", "stage-ncrm"),
+                    ],
+                )
+            ],
+            lambda **payload: self._route_add_dispatch(process, payload["add"]),
+        )
+
+    async def _route_add_dispatch(self, process: ManufacturingProcess, kind: str) -> list[str]:
+        if kind == "stage":
+            return self.start_prompt(
+                [FieldSpec("name"), FieldSpec("number", field_type="int")],
+                lambda **payload: self._create_stage_from_prompt(process, payload),
+            )
+        if kind == "component":
+            return await self._start_component_add_picker(process)
+        if kind == "risk":
+            return self.start_prompt(
+                self._risk_fields(),
+                lambda **payload: self._create_process_risk_from_prompt(process, payload),
+            )
+        if kind == "stage-component":
+            return await self._start_stage_component_link_picker(process)
+        if kind == "stage-ncrm":
+            return await self._start_stage_ncrm_link_picker(process)
+        return ["Unknown add option."]
+
+    async def _create_stage_from_prompt(
+        self, process: ManufacturingProcess, payload: dict[str, str | None]
+    ) -> list[str]:
+        created = await create_stage(
+            StageCreate(
+                process_id=UUID(str(process.id)),
+                name=payload.get("name") or "",
+                number=_optional_int(payload.get("number")) or 0,
+            ),
+            self.env,
+        )
+        if created is None:
+            return await self._refresh_with_notice("Failed to create stage.", "error")
+        return await self._refresh_with_notice(f"Created stage '{created.name}'.")
+
+    async def _start_component_add_picker(self, process: ManufacturingProcess) -> list[str]:
+        materials = await list_materials(self.env)
+        if not materials:
+            return ["Add a material first via the library."]
+        items = [ListItem(label=material.name, item_id=str(material.id)) for material in materials]
+        return self.start_picker(
+            "Select material for component",
+            items,
+            lambda item: self._start_component_details_prompt(process, item),
+        )
+
+    def _start_component_details_prompt(
+        self, process: ManufacturingProcess, material_item: ListItem
+    ) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec("control_strategy_role", required=False),
+                FieldSpec("is_isolated", field_type="select", options=BOOL_OPTIONS, default="true"),
+            ],
+            lambda **payload: self._create_component_with_material(
+                process, material_item.item_id, payload
+            ),
+        )
+
+    async def _create_component_with_material(
+        self, process: ManufacturingProcess, material_id: str, payload: dict[str, str | None]
+    ) -> list[str]:
+        created = await create_component(
+            ComponentCreate(
+                process_id=UUID(str(process.id)),
+                material_id=UUID(material_id),
+                control_strategy_role=payload.get("control_strategy_role"),
+                is_isolated=_as_bool(payload.get("is_isolated")),
+            ),
+            self.env,
+        )
+        if created is None:
+            return await self._refresh_with_notice("Failed to create component.", "error")
+        return await self._refresh_with_notice("Component created.")
+
+    def _start_route_focus_chooser(self, process: ManufacturingProcess) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "focus",
+                    field_type="select",
+                    options=[("stage", "stage"), ("component", "component")],
+                )
+            ],
+            lambda **payload: self._route_focus_dispatch(process, payload["focus"]),
+        )
+
+    async def _route_focus_dispatch(self, process: ManufacturingProcess, scope: str) -> list[str]:
+        if scope == "stage":
+            items = await self._stage_items(process)
+            if not items:
+                return ["No stages yet."]
+            return self.start_picker(
+                "Focus stage",
+                items,
+                lambda item: self._open_stage_by_id(process, item.item_id),
+            )
+        items = await self._process_component_items(process)
+        if not items:
+            return ["No components yet."]
+        return self.start_picker(
+            "Focus component",
+            items,
+            lambda item: self._open_component_by_id(item.item_id),
+        )
+
+    async def _open_stage_by_id(self, process: ManufacturingProcess, stage_id: str) -> list[str]:
+        for stage in await list_stages_for_process(UUID(str(process.id)), self.env):
+            if str(stage.id) == stage_id:
+                return await self._open_stage(stage)
+        return ["Stage not found."]
+
+    async def _open_component_by_id(self, component_id: str) -> list[str]:
+        component = await get_component_by_id(UUID(component_id), self.env)
+        if component is None:
+            return ["Component not found."]
+        return await self._open_component(component)
+
+    def _start_route_edit_chooser(self, process: ManufacturingProcess) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "edit",
+                    field_type="select",
+                    options=[("stage", "stage"), ("component", "component")],
+                )
+            ],
+            lambda **payload: self._route_edit_dispatch(process, payload["edit"]),
+        )
+
+    async def _route_edit_dispatch(self, process: ManufacturingProcess, scope: str) -> list[str]:
+        if scope == "stage":
+            items = await self._stage_items(process)
+            if not items:
+                return ["No stages yet."]
+            return self.start_picker(
+                "Edit stage",
+                items,
+                lambda item: self._start_stage_edit_form_by_id(process, item.item_id),
+            )
+        items = await self._process_component_items(process)
+        if not items:
+            return ["No components yet."]
+        return self.start_picker(
+            "Edit component",
+            items,
+            lambda item: self._start_component_edit_form_by_id(item.item_id),
+        )
+
+    async def _start_stage_edit_form_by_id(
+        self, process: ManufacturingProcess, stage_id: str
+    ) -> list[str]:
+        for stage in await list_stages_for_process(UUID(str(process.id)), self.env):
+            if str(stage.id) == stage_id:
+                return self._start_stage_edit_form(stage)
+        return ["Stage not found."]
+
+    def _start_stage_edit_form(self, stage: Stage) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec("name", default=stage.name),
+                FieldSpec("number", field_type="int", default=str(stage.number)),
+            ],
+            lambda **payload: self._update_stage_from_prompt(stage, payload),
+        )
+
+    async def _start_component_edit_form_by_id(self, component_id: str) -> list[str]:
+        component = await get_component_by_id(UUID(component_id), self.env)
+        if component is None:
+            return ["Component not found."]
+        return self._start_component_edit_form(component)
+
+    def _start_component_edit_form(self, component: Component) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "control_strategy_role",
+                    required=False,
+                    default=component.control_strategy_role,
+                ),
+                FieldSpec(
+                    "is_isolated",
+                    field_type="select",
+                    options=BOOL_OPTIONS,
+                    default="true" if component.is_isolated else "false",
+                ),
+            ],
+            lambda **payload: self._update_component_from_prompt(component, payload),
+        )
+
+    def _start_route_delete_chooser(self, process: ManufacturingProcess) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "delete",
+                    field_type="select",
+                    options=[("stage", "stage"), ("component", "component")],
+                )
+            ],
+            lambda **payload: self._route_delete_dispatch(process, payload["delete"]),
+        )
+
+    async def _route_delete_dispatch(self, process: ManufacturingProcess, scope: str) -> list[str]:
+        if scope == "stage":
+            items = await self._stage_items(process)
+            if not items:
+                return ["No stages yet."]
+            return self.start_picker(
+                "Delete stage",
+                items,
+                lambda item: self._confirm_delete_stage_by_id(process, item.item_id),
+            )
+        items = await self._process_component_items(process)
+        if not items:
+            return ["No components yet."]
+        return self.start_picker(
+            "Delete component",
+            items,
+            lambda item: self._confirm_delete_component_by_id(item.item_id),
+        )
+
+    async def _confirm_delete_stage_by_id(
+        self, process: ManufacturingProcess, stage_id: str
+    ) -> list[str]:
+        for stage in await list_stages_for_process(UUID(str(process.id)), self.env):
+            if str(stage.id) == stage_id:
+                return self._start_confirm(
+                    f"Delete stage '{stage.name}'",
+                    lambda: self._delete_stage_with_confirmation(stage, ["--confirm"]),
+                )
+        return ["Stage not found."]
+
+    async def _confirm_delete_component_by_id(self, component_id: str) -> list[str]:
+        component = await get_component_by_id(UUID(component_id), self.env)
+        if component is None:
+            return ["Component not found."]
+        return self._start_confirm(
+            "Delete component",
+            lambda: self._delete_component_with_confirmation(component, ["--confirm"]),
+        )
+
+    def _start_route_list_chooser(self, process: ManufacturingProcess) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "list",
+                    field_type="select",
+                    options=[
+                        ("stages", "stages"),
+                        ("components", "components"),
+                        ("risks", "risks"),
+                        ("ncrm", "ncrm"),
+                    ],
+                )
+            ],
+            lambda **payload: self._handle_route_list(process, payload["list"]),
+        )
+
+    def _start_stage_add_chooser(self, stage: Stage, process: ManufacturingProcess) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "add",
+                    field_type="select",
+                    options=[("risk", "risk"), ("NCRM", "ncrm"), ("component", "component")],
+                )
+            ],
+            lambda **payload: self._stage_add_dispatch(stage, process, payload["add"]),
+        )
+
+    async def _stage_add_dispatch(
+        self, stage: Stage, process: ManufacturingProcess, kind: str
+    ) -> list[str]:
+        if kind == "risk":
+            return self.start_prompt(
+                self._risk_fields(),
+                lambda **payload: self._create_stage_risk_from_prompt(stage, payload),
+            )
+        if kind == "ncrm":
+            return await self._start_stage_ncrm_ncrm_picker(str(stage.id))
+        return await self._start_stage_component_picker(stage, process)
+
+    def _start_stage_list_chooser(self, stage: Stage) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "list",
+                    field_type="select",
+                    options=[
+                        ("risks", "risks"),
+                        ("components", "components"),
+                        ("ncrm", "ncrm"),
+                    ],
+                )
+            ],
+            lambda **payload: self._handle_stage_list(stage, payload["list"]),
+        )
+
+    async def _library_item_picker_items(self, sub_mode: str) -> list[ListItem]:
+        names = [
+            str(item.get("name") or item.get("display_name") or "")
+            for item in await self._library_items(sub_mode)
+        ]
+        return [ListItem(label=name, item_id=name) for name in names if name]
+
+    async def _start_library_edit_picker(self, sub_mode: str) -> list[str]:
+        items = await self._library_item_picker_items(sub_mode)
+        if not items:
+            return [f"No {sub_mode} items to edit."]
+        return self.start_picker(
+            f"Edit {sub_mode} item",
+            items,
+            lambda item: self._start_library_edit_prompt(sub_mode, item.item_id),
+        )
+
+    async def _start_library_delete_picker(self, sub_mode: str) -> list[str]:
+        items = await self._library_item_picker_items(sub_mode)
+        if not items:
+            return [f"No {sub_mode} items to delete."]
+        return self.start_picker(
+            f"Delete {sub_mode} item",
+            items,
+            lambda item: self._start_confirm(
+                f"Delete '{item.item_id}'",
+                lambda: self._delete_library_item(sub_mode, item.item_id),
+            ),
+        )
+
+    async def _start_library_show_picker(self, sub_mode: str) -> list[str]:
+        items = await self._library_item_picker_items(sub_mode)
+        if not items:
+            return [f"No {sub_mode} items to show."]
+        return self.start_picker(
+            f"Show {sub_mode} item",
+            items,
+            lambda item: self._show_library_item(sub_mode, item.item_id),
+        )
+
+    def _start_library_filter_chooser(self, sub_mode: str) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "filter",
+                    field_type="select",
+                    options=[
+                        ("all", ""),
+                        ("has SMILES", "has-smiles"),
+                        ("no SMILES", "no-smiles"),
+                    ],
+                )
+            ],
+            lambda **payload: self._render_library(sub_mode, filter_mode=payload["filter"] or None),
+        )
+
+    def _start_admin_action_chooser(self) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec(
+                    "action",
+                    field_type="select",
+                    options=[
+                        ("import CSV", "import"),
+                        ("analyze database", "analyze"),
+                        ("canonicalize SMILES", "canonicalize"),
+                    ],
+                )
+            ],
+            lambda **payload: self._admin_action_dispatch(payload["action"]),
+        )
+
+    async def _admin_action_dispatch(self, action: str) -> list[str]:
+        if action == "import":
+            return self.start_prompt(
+                [
+                    FieldSpec(
+                        "type",
+                        field_type="select",
+                        options=[
+                            ("materials", "materials"),
+                            ("ncrm", "ncrm"),
+                            ("counterions", "counterions"),
+                        ],
+                    ),
+                    FieldSpec("file"),
+                    FieldSpec(
+                        "dry_run", field_type="select", options=BOOL_OPTIONS, default="false"
+                    ),
+                    FieldSpec(
+                        "skip_errors", field_type="select", options=BOOL_OPTIONS, default="false"
+                    ),
+                ],
+                lambda **payload: self._admin_import_from_prompt(payload),
+            )
+        scope_field = FieldSpec(
+            "scope", field_type="select", options=[("all", "all"), ("ncrm only", "ncrm")]
+        )
+        if action == "analyze":
+            return self.start_prompt(
+                [scope_field],
+                lambda **payload: self._admin_db(
+                    ["analyze", *(["--ncrm"] if payload["scope"] == "ncrm" else [])]
+                ),
+            )
+        return self.start_prompt(
+            [
+                scope_field,
+                FieldSpec("dry_run", field_type="select", options=BOOL_OPTIONS, default="false"),
+            ],
+            lambda **payload: self._admin_db(
+                [
+                    "canonicalize",
+                    *(["--ncrm"] if payload["scope"] == "ncrm" else []),
+                    *(["--dry-run"] if _as_bool(payload["dry_run"]) else []),
+                ]
+            ),
+        )
+
+    async def _admin_import_from_prompt(self, payload: dict[str, str | None]) -> list[str]:
+        args = [payload.get("type") or "", payload.get("file") or ""]
+        if _as_bool(payload.get("dry_run")):
+            args.append("--dry-run")
+        if _as_bool(payload.get("skip_errors")):
+            args.append("--skip-errors")
+        return await self._admin_import(args)
+
+    # ------------------------------------------------------------------ #
+    # Search and help legend
+    # ------------------------------------------------------------------ #
+
+    def supports_search(self) -> bool:
+        """Return ``True`` when the current track has an incremental "/" search."""
+        return self.ctx.current.track in {"home", "route_select", "route", "library"}
+
+    async def search(  # pylint: disable=too-many-return-statements  # one return per searchable track
+        self, query: str
+    ) -> list[str]:
+        """Re-render the current screen filtered by *query* for "/" search mode.
+
+        Args:
+            query: Raw filter text; an empty/blank query shows the full screen.
+
+        Returns:
+            The filtered screen lines for the current track.
+        """
+        track = self.ctx.current.track
+        cleaned = query.strip() or None
+        if track == "home":
+            return await self._render_home(cleaned)
+        if track == "route_select":
+            return await self._render_route_select(cleaned)
+        if track == "library":
+            sub_mode = self.ctx.current.library_sub or "select"
+            return await self._render_library(sub_mode, query=cleaned)
+        if track == "route":
+            if cleaned is None:
+                return await self.render_current()
+            process = await self._current_process()
+            if process is None:
+                return ["Route not found."]
+            return await self._search_route(process, cleaned)
+        return await self.render_current()
+
+    def help_legend(self) -> list[str]:
+        """Return the hotkey legend lines for the current track."""
+        track = self.ctx.current.track
+        return [f"Hotkeys · {track}", "", *HELP_TOPICS.get(track, ["? help", "Ctrl-C back"])]
+
     def _rebuild_list_navigator(
         self, recents: list[ListItem], all_items: list[ListItem]
     ) -> ListNavigator:
@@ -1038,7 +1708,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             if str(project.id) not in recent_map
         ]
         navigator = self._rebuild_list_navigator(recents, all_items)
-        header = ["Projects", "", "Use arrows to navigate or /select <name>.", ""]
+        header = ["Projects", "", "↑↓ navigate · Enter open · / search · ? help", ""]
         return [*header, *navigator.render_lines(self.screen.width)]
 
     async def _render_route_select(self, query: str | None = None) -> list[str]:
@@ -1075,7 +1745,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         return [
             f"Routes for {project.name}",
             "",
-            "Use arrows to navigate or /route <R.P>.",
+            "↑↓ navigate · Enter open · / search · ? help",
             "",
             *navigator.render_lines(self.screen.width),
         ]
@@ -2418,7 +3088,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
                     [
                         "",
                         f"Select {current.label}:",
-                        "↑↓ to move · Enter to select · Esc to cancel",
+                        "↑↓ to move · Enter to select · Esc/Ctrl-C to cancel",
                     ]
                 )
                 navigator = self._prompt_state.select_navigator()
@@ -2433,7 +3103,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
             return []
         return [
             self._picker_state.label,
-            "Type to filter · arrows to move · Enter to select · Esc to cancel",
+            "Type to filter · arrows to move · Enter to select · Esc/Ctrl-C to cancel",
             "",
             *self._picker_state.navigator.render_lines(self.screen.width),
         ]
@@ -2455,7 +3125,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         independent of any modal or list-navigation state.
         """
         track = self.ctx.current.track
-        return " · ".join(HELP_TOPICS.get(track, ["/help", "/home", "/quit"]))
+        keys = [*HELP_TOPICS.get(track, ["? help", "^C back"]), ": command"]
+        return " · ".join(keys)
 
     def _help_lines(self, topic: str | None) -> list[str]:
         if topic is not None:
@@ -2480,35 +3151,28 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes  # prom
         return [str(result)]
 
 
+# Per-track hotkey legend shown on the bottom info line. Keys are Ctrl-<letter>
+# combinations (rendered ``^X``) plus the always-available "/" search, "?" help,
+# and ":" command line. ``handle_hotkey`` is the source of truth these describe.
 HELP_TOPICS: dict[str, list[str]] = {
-    "home": ["/select <name>", "/add project", "/library [submode]", "/admin", "/quit"],
-    "project": ["/route [R.P]", "/add process", "/risks", "/home"],
-    "route_select": ["/route <R.P>", "/search <query>", "/home"],
+    "home": ["^A add project", "^B library", "^N admin", "/ search", "? help", "^D quit"],
+    "project": ["^T routes", "^R risks", "^A add process", "^C back"],
+    "route_select": ["↑↓ Enter open", "/ search", "^C back"],
     "route": [
-        "/list stages|components|risks|ncrm",
-        "/focus stage <name>",
-        "/focus component <name>",
-        "/add stage <name> --number N",
-        "/add component <name>",
-        "/add risk [stage <name>|component <name>|process]",
+        "^A add",
+        "^F focus",
+        "^E edit",
+        "^X delete",
+        "^L list",
+        "^R risks",
+        "/ search",
+        "^C back",
     ],
-    "stage_focus": [
-        "/add risk",
-        "/add ncrm <name>",
-        "/assign component",
-        "/list <type>",
-        "/edit",
-        "/delete",
-        "/home",
-    ],
-    "component_focus": ["/add salt", "/edit", "/delete", "/risks", "/home"],
-    "library": ["/list", "/search <query>", "/add", "/edit <name>", "/delete <name>"],
-    "admin": [
-        "/admin import <type> <file.csv> [--dry-run] [--skip-errors]",
-        "/admin db analyze [--ncrm]",
-        "/admin db canonicalize [--dry-run] [--ncrm]",
-    ],
-    "risk_mode": ["/list risks", "/home"],
+    "stage_focus": ["^A add", "^L list", "^E edit", "^X delete", "^C back"],
+    "component_focus": ["^A add salt", "^E edit", "^X delete", "^R risks", "^C back"],
+    "library": ["^A add", "^E edit", "^X delete", "^O show", "^F filter", "/ search", "^C back"],
+    "admin": ["^A action", "^C back"],
+    "risk_mode": ["^L refresh", "^C back"],
 }
 
 

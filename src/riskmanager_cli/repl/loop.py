@@ -68,6 +68,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
 
     input_buffer = ""
     notice = ""
+    mode = "view"  # "view" (hotkeys) | "search" ("/" filter) | "command" (":" line)
     current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
 
     def consume_notice() -> None:
@@ -80,6 +81,16 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
         pending = dispatcher.take_notice()
         notice = screen.style_notice(*pending) if pending else ""
 
+    def view_hint() -> str:
+        """Build the input-row reminder for the current view-mode screen."""
+        parts = []
+        if _in_list_mode(ctx):
+            parts.append("↑↓ navigate · Enter select")
+        if dispatcher.supports_search():
+            parts.append("/ search")
+        parts.extend([": command", "? help"])
+        return "  ·  ".join(parts)
+
     def redraw() -> None:
         screen.draw_status_bar()
         screen.draw_output(current_output_lines)
@@ -87,42 +98,53 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             screen.draw_input_line(prompt="filter: ", text=input_buffer)
         elif dispatcher.prompt_state is not None:
             if dispatcher.prompt_state.is_select_field:
-                screen.draw_nav_hint("↑↓ to move · Enter to select · Ctrl-C to cancel")
+                screen.draw_nav_hint("↑↓ to move · Enter to select · Esc/Ctrl-C to cancel")
             else:
                 prompt = f"{dispatcher.prompt_state.current_field.label}: "
                 screen.draw_input_line(prompt=prompt, text=input_buffer)
-        elif _in_list_mode(ctx) and not input_buffer:
-            screen.draw_nav_hint(notice=notice)
+        elif mode == "command":
+            screen.draw_input_line(prompt=":", text=input_buffer)
+        elif mode == "search":
+            screen.draw_input_line(prompt="/", text=input_buffer)
         else:
-            screen.draw_input_line(text=input_buffer, notice=notice)
+            screen.draw_nav_hint(view_hint(), notice=notice)
         screen.draw_info_line(dispatcher.command_hints())
 
-    def handle_interrupt() -> bool:
-        """Handle Ctrl-C: cancel a modal, move up a level, or quit at home.
+    def reset_to_view() -> None:
+        nonlocal input_buffer, notice, mode
+        input_buffer = ""
+        notice = ""
+        mode = "view"
+
+    def handle_back(*, quit_at_home: bool) -> bool:
+        """Leave the innermost context: cancel a modal, exit the "/" or ":" line,
+        or pop a navigation level.
+
+        Args:
+            quit_at_home: When ``True`` (Ctrl-C), signal quit if there is nothing
+                left to leave; when ``False`` (Esc), the home screen stays put.
 
         Returns:
-            ``True`` when the app should exit (Ctrl-C at the home screen).
+            ``True`` only when *quit_at_home* and already at the home screen.
         """
-        nonlocal input_buffer, current_output_lines, notice
+        nonlocal input_buffer, current_output_lines, notice, mode
         if dispatcher.picker_state is not None:
             current_output_lines = dispatcher.cancel_picker()
         elif dispatcher.prompt_state is not None:
             current_output_lines = dispatcher.cancel_prompt()
+        elif mode in {"command", "search"}:
+            current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
         elif ctx.pop() is None:
-            return True
+            return quit_at_home
         else:
             current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
             _sync_session_context(session, ctx)
-        input_buffer = ""
-        notice = ""
+        reset_to_view()
         return False
 
     def handle_resize(_signum: int, _frame: FrameType | None) -> None:
-        screen.draw_full(current_output_lines, input_buffer, dispatcher.command_hints())
-        if _in_list_mode(ctx) and not input_buffer and dispatcher.prompt_state is None:
-            screen.draw_nav_hint(notice=notice)
-        elif dispatcher.picker_state is None and dispatcher.prompt_state is None:
-            screen.draw_input_line(text=input_buffer, notice=notice)
+        screen.clear_screen()
+        redraw()
 
     previous_handler = signal.getsignal(signal.SIGWINCH)
     signal.signal(signal.SIGWINCH, handle_resize)
@@ -133,7 +155,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             try:
                 key = term.inkey()
             except KeyboardInterrupt:
-                if handle_interrupt():
+                if handle_back(quit_at_home=True):
                     break
                 redraw()
                 continue
@@ -145,8 +167,12 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             if key_text == "\x04":
                 break
             if key_text == "\x03":
-                if handle_interrupt():
+                if handle_back(quit_at_home=True):
                     break
+                redraw()
+                continue
+            if key_name == "KEY_ESCAPE":
+                handle_back(quit_at_home=False)
                 redraw()
                 continue
 
@@ -193,7 +219,37 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                 redraw()
                 continue
 
-            if _in_list_mode(ctx) and not input_buffer and dispatcher.list_navigator is not None:
+            if mode == "command":
+                if _is_enter(key_name, key_text):
+                    result = run_async(dispatcher.dispatch(input_buffer))
+                    if result == "__QUIT__":
+                        break
+                    current_output_lines = _coerce_lines(result)
+                    reset_to_view()
+                    _sync_session_context(session, ctx)
+                    consume_notice()
+                elif _is_backspace(key_name, key_text):
+                    input_buffer = input_buffer[:-1]
+                elif _is_text_input(key):
+                    input_buffer += key_text
+                redraw()
+                continue
+
+            if mode == "search":
+                if _is_enter(key_name, key_text):
+                    mode = "view"
+                    input_buffer = ""
+                elif _is_backspace(key_name, key_text):
+                    input_buffer = input_buffer[:-1]
+                    current_output_lines = _coerce_lines(run_async(dispatcher.search(input_buffer)))
+                elif _is_text_input(key):
+                    input_buffer += key_text
+                    current_output_lines = _coerce_lines(run_async(dispatcher.search(input_buffer)))
+                redraw()
+                continue
+
+            # View mode: arrow/Enter list navigation, then "/", ":", "?", and hotkeys.
+            if _in_list_mode(ctx) and dispatcher.list_navigator is not None:
                 selected = dispatcher.list_navigator.handle_key(key_name)
                 if selected is not None:
                     current_output_lines = _coerce_lines(
@@ -203,23 +259,28 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                     consume_notice()
                     redraw()
                     continue
-                if key_name in {"KEY_UP", "KEY_DOWN"}:
+                if key_name in {"KEY_UP", "KEY_DOWN"} or key_text in {"j", "k"}:
                     current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
                     redraw()
                     continue
 
-            if _is_enter(key_name, key_text):
-                result = run_async(dispatcher.dispatch(input_buffer))
-                if result == "__QUIT__":
-                    break
-                current_output_lines = _coerce_lines(result)
+            if key_text == "/" and dispatcher.supports_search():
+                mode = "search"
                 input_buffer = ""
-                _sync_session_context(session, ctx)
-                consume_notice()
-            elif _is_backspace(key_name, key_text):
-                input_buffer = input_buffer[:-1]
-            elif _is_text_input(key):
-                input_buffer += key_text
+                current_output_lines = _coerce_lines(run_async(dispatcher.search("")))
+            elif key_text == ":":
+                mode = "command"
+                input_buffer = ""
+            elif key_text == "?":
+                current_output_lines = dispatcher.help_legend()
+            elif _is_hotkey(key, key_text):
+                hotkey_result = run_async(dispatcher.handle_hotkey(key_text))
+                if hotkey_result == "__QUIT__":
+                    break
+                if hotkey_result is not None:
+                    current_output_lines = _coerce_lines(hotkey_result)
+                    _sync_session_context(session, ctx)
+                    consume_notice()
             redraw()
     finally:
         signal.signal(signal.SIGWINCH, previous_handler)
@@ -240,6 +301,16 @@ def _is_backspace(key_name: str, key_text: str) -> bool:
 def _is_text_input(key: blessed.keyboard.Keystroke) -> bool:
     text = str(key)
     return bool(text) and not key.is_sequence and text.isprintable()
+
+
+def _is_hotkey(key: blessed.keyboard.Keystroke, key_text: str) -> bool:
+    """Return ``True`` for a Ctrl-<letter> hotkey keystroke.
+
+    Control characters arrive as a single byte below ``0x20`` and are not part
+    of an escape sequence (arrow keys are). Ctrl-C/D, Enter, Tab, and Backspace
+    are handled earlier, so they never reach this check.
+    """
+    return not key.is_sequence and len(key_text) == 1 and ord(key_text) < 0x20
 
 
 def _sync_session_context(session: SessionState, ctx: ContextManager) -> None:
