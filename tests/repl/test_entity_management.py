@@ -33,9 +33,25 @@ from riskmanager_cli.schema.create import (
 
 
 class _StubScreen:
-    """Minimal screen stand-in exposing only the ``width`` used by rendering."""
+    """Minimal screen stand-in exposing the ``width`` and styling used by rendering."""
 
     width = 80
+
+    @staticmethod
+    def dim(text: str) -> str:
+        """Return *text* unchanged (no terminal styling under test)."""
+        return text
+
+    @staticmethod
+    def bold(text: str) -> str:
+        """Return *text* unchanged (no terminal styling under test)."""
+        return text
+
+    @staticmethod
+    def style_notice(message: str, level: str) -> str:
+        """Return *message* unchanged (no terminal styling under test)."""
+        del level
+        return message
 
 
 def _make_dispatcher(env: Environment) -> CommandDispatcher:

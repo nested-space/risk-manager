@@ -69,17 +69,26 @@ class ListNavigator:
                 self._selected_index = index
                 return
 
-    def render_lines(self, width: int) -> list[str]:
-        """Render section headers and items for display.
+    def render_lines(self, width: int, *, show_sections: bool = True) -> list[str]:
+        """Render items for display, optionally grouped under section headers.
 
         Args:
             width: Maximum terminal width in characters.
+            show_sections: When ``True`` (the full-screen lists), prefix the
+                ``Recent``/``All`` group headers. When ``False`` (modal choosers
+                and pickers, which never carry recents), render a bare list.
 
         Returns:
             Renderable output lines.
         """
         if not self._items:
             return ["No items available."]
+
+        if not show_sections:
+            return [
+                self._render_item(item, index == self._selected_index, width)
+                for index, item in enumerate(self._items)
+            ]
 
         lines: list[str] = []
         offset = 0

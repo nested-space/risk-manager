@@ -93,6 +93,7 @@ from ..operations.stage_risk_operations import (
     update_stage_risk,
 )
 from ..repl.renderers.admin_renderer import render_admin_screen
+from ..repl.renderers.box import render_box
 from ..repl.renderers.library_renderer import render_library_screen
 from ..repl.renderers.project_renderer import render_project_screen
 from ..repl.renderers.risk_renderer import render_risk_table
@@ -233,6 +234,7 @@ class PromptState:
     fields: list[FieldSpec]
     collected: list[str | None]
     current_index: int = 0
+    title: str | None = None
     _select_navigator: ListNavigator | None = field(default=None, init=False, repr=False)
 
     @property
@@ -446,19 +448,28 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """Return the active typeahead picker state, if any."""
         return self._picker_state
 
-    def start_prompt(self, fields: list[FieldSpec], on_complete: Callable[..., Any]) -> list[str]:
+    def start_prompt(
+        self,
+        fields: list[FieldSpec],
+        on_complete: Callable[..., Any],
+        *,
+        title: str | None = None,
+    ) -> list[str]:
         """Enter guided prompt mode.
 
         Args:
             fields: Prompt field definitions.
             on_complete: Callback invoked once all values are collected.
+            title: Optional form heading shown above multi-field forms.
 
         Returns:
             Initial prompt-render lines.
         """
-        self._prompt_state = PromptState(fields=fields, collected=[None] * len(fields))
+        self._prompt_state = PromptState(
+            fields=fields, collected=[None] * len(fields), title=title
+        )
         self._prompt_callback = on_complete
-        return self._render_prompt_lines("Guided prompt started.")
+        return self._render_prompt_lines()
 
     async def advance_prompt(self, value: str) -> list[str]:
         """Submit a value to the active guided prompt.
@@ -819,6 +830,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     ),
                 ],
                 lambda **payload: self._start_project_material_picker(payload),
+                title="Add project",
             )
         return [f"Unknown command: {verb}. Type /help for commands."]
 
@@ -861,6 +873,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     FieldSpec("process_number", field_type="int"),
                 ],
                 lambda **payload: self._create_manufacturing_process_from_prompt(project, payload),
+                title="Add process",
             )
         return [f"Unknown command: {verb}. Type /help for commands."]
 
@@ -938,6 +951,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 return self.start_prompt(
                     self._risk_fields(),
                     lambda **payload: self._create_stage_risk_from_prompt(stage, payload),
+                    title="Add risk",
                 )
             if args[0].lower() == "ncrm" and len(args) >= 2:
                 ncrm_name = " ".join(args[1:])
@@ -1243,6 +1257,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 [FieldSpec("name"), FieldSpec("number", field_type="int")],
                 lambda **payload: self._create_stage_from_prompt(process, payload),
+                title="Add stage",
             )
         if kind == "component":
             return await self._start_component_add_picker(process)
@@ -1250,6 +1265,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 self._risk_fields(),
                 lambda **payload: self._create_process_risk_from_prompt(process, payload),
+                title="Add risk",
             )
         if kind == "stage-component":
             return await self._start_stage_component_link_picker(process)
@@ -1294,6 +1310,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             lambda **payload: self._create_component_with_material(
                 process, material_item.item_id, payload
             ),
+            title="Add component",
         )
 
     async def _create_component_with_material(
@@ -1401,6 +1418,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 FieldSpec("number", field_type="int", default=str(stage.number)),
             ],
             lambda **payload: self._update_stage_from_prompt(stage, payload),
+            title="Edit stage",
         )
 
     async def _start_stage_ncrm_edit_form(self, link_id: str) -> list[str]:
@@ -1467,6 +1485,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 ),
             ],
             lambda **payload: self._update_stage_risk_from_prompt(risk_id, payload),
+            title="Edit risk",
         )
 
     async def _start_component_edit_form_by_id(self, component_id: str) -> list[str]:
@@ -1491,6 +1510,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 ),
             ],
             lambda **payload: self._update_component_from_prompt(component, payload),
+            title="Edit component",
         )
 
     def _start_route_delete_chooser(self, process: ManufacturingProcess) -> list[str]:
@@ -1580,6 +1600,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 self._risk_fields(),
                 lambda **payload: self._create_stage_risk_from_prompt(stage, payload),
+                title="Add risk",
             )
         if kind == "ncrm":
             return await self._start_stage_ncrm_ncrm_picker(str(stage.id))
@@ -1695,6 +1716,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     ),
                 ],
                 lambda **payload: self._admin_import_from_prompt(payload),
+                title="Import CSV",
             )
         scope_field = FieldSpec(
             "scope", field_type="select", options=[("all", "all"), ("ncrm only", "ncrm")]
@@ -2100,6 +2122,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 lambda **payload: self._create_component_from_prompt(
                     process, material_name, payload
                 ),
+                title="Add component",
             )
         if subject == "risk":
             return await self._start_route_risk_prompt(process, args[1:])
@@ -2118,6 +2141,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 self._risk_fields(),
                 lambda **payload: self._create_process_risk_from_prompt(process, payload),
+                title="Add risk",
             )
         if args[0].lower() == "stage" and len(args) >= 2:
             stage_name = " ".join(args[1:])
@@ -2127,6 +2151,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 self._risk_fields(),
                 lambda **payload: self._create_stage_risk_from_prompt(stage, payload),
+                title="Add risk",
             )
         if args[0].lower() == "component" and len(args) >= 2:
             component_name = " ".join(args[1:])
@@ -2136,6 +2161,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 self._risk_fields(),
                 lambda **payload: self._create_component_risk_from_prompt(component, payload),
+                title="Add risk",
             )
         return ["Usage: /add risk [stage <name>|component <name>|process]"]
 
@@ -2154,6 +2180,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     FieldSpec("number", field_type="int", default=str(stage.number)),
                 ],
                 lambda **payload: self._update_stage_from_prompt(stage, payload),
+                title="Edit stage",
             )
         if scope == "component":
             component = await self._find_component(process, name)
@@ -2174,6 +2201,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     ),
                 ],
                 lambda **payload: self._update_component_from_prompt(component, payload),
+                title="Edit component",
             )
         return ["Usage: /edit [stage <name>|component <name>]"]
 
@@ -2258,6 +2286,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 [FieldSpec("name"), FieldSpec("smiles", required=False)],
                 lambda **payload: self._create_material_from_prompt(payload),
+                title="Add material",
             )
         if sub_mode == "ncrm":
             return self.start_prompt(
@@ -2273,11 +2302,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     FieldSpec("smiles", required=False),
                 ],
                 lambda **payload: self._create_ncrm_from_prompt(payload),
+                title="Add NCRM",
             )
         if sub_mode == "counterions":
             return self.start_prompt(
                 [FieldSpec("name"), FieldSpec("smiles", required=False)],
                 lambda **payload: self._create_counterion_from_prompt(payload),
+                title="Add counterion",
             )
         return ["Choose a library subsection first."]
 
@@ -2292,6 +2323,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     FieldSpec("smiles", required=False, default=_default_text(item.get("smiles"))),
                 ],
                 lambda **payload: self._update_material_entry(str(item["id"]), payload),
+                title="Edit material",
             )
         if sub_mode == "ncrm":
             return self.start_prompt(
@@ -2307,6 +2339,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     FieldSpec("smiles", required=False, default=_default_text(item.get("smiles"))),
                 ],
                 lambda **payload: self._update_ncrm_entry(str(item["id"]), payload),
+                title="Edit NCRM",
             )
         return self.start_prompt(
             [
@@ -2314,6 +2347,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 FieldSpec("smiles", required=False, default=_default_text(item.get("smiles"))),
             ],
             lambda **payload: self._update_counterion_entry(str(item["id"]), payload),
+            title="Edit counterion",
         )
 
     async def _delete_library_item(self, sub_mode: str, name: str) -> list[str]:
@@ -3067,6 +3101,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             lambda **payload: self._create_component_salt_from_prompt(
                 component, counterion.item_id, payload
             ),
+            title="Add salt",
         )
 
     async def _create_component_salt_from_prompt(
@@ -3243,43 +3278,86 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return items
 
     def _render_prompt_lines(self, message: str | None = None) -> list[str]:
+        """Frame the active guided prompt in a box matching the app aesthetic.
+
+        Single-field choosers show just a ``Select {label}`` heading and the
+        option list; multi-field forms show a labelled overview of every field
+        (active marked ``▶``, completed showing values, pending dim). Live text
+        input is typed on the bottom row, and the navigation hint is drawn there
+        by the loop — neither is duplicated inside the box. A validation
+        *message* is surfaced as a styled line above the box.
+        """
         if self._prompt_state is None:
             return [message] if message else []
-        lines = ["Guided prompt", ""]
+        state = self._prompt_state
+        body = (
+            self._single_field_body(state)
+            if len(state.fields) == 1
+            else self._multi_field_body(state)
+        )
+        boxed = render_box(body, max(self.screen.width - 2, 0), align="left", pad_x=2, pad_y=1)
         if message:
-            lines.append(message)
-            lines.append("")
-        for index, field_spec in enumerate(self._prompt_state.fields):
-            value = self._prompt_state.collected[index]
-            display = value if value is not None else "…"
-            prefix = "→" if index == self._prompt_state.current_index else " "
-            lines.append(f"{prefix} {field_spec.label}: {display}")
-        if not self._prompt_state.is_complete():
-            current = self._prompt_state.current_field
-            if self._prompt_state.is_select_field:
-                lines.extend(
-                    [
-                        "",
-                        f"Select {current.label}:",
-                        "↑↓ to move · Enter to select · Esc/Ctrl-C to cancel",
-                    ]
-                )
-                navigator = self._prompt_state.select_navigator()
-                if navigator is not None:
-                    lines.extend(navigator.render_lines(self.screen.width))
+            return [self.screen.style_notice(message, "error"), "", *boxed]
+        return boxed
+
+    @property
+    def _prompt_interior_width(self) -> int:
+        """Return the printable width inside the prompt box (borders + padding)."""
+        return max(self.screen.width - 2 - 2 * 2, 0)
+
+    def _single_field_body(self, state: PromptState) -> list[str]:
+        """Render a single-field chooser/prompt: a heading plus options or input."""
+        current = state.current_field
+        if state.is_select_field:
+            navigator = state.select_navigator()
+            options = (
+                navigator.render_lines(self._prompt_interior_width, show_sections=False)
+                if navigator
+                else []
+            )
+            return [f"Select {current.label}", "", *options]
+        return [f"Enter {current.label}"]
+
+    def _multi_field_body(self, state: PromptState) -> list[str]:
+        """Render a multi-field form as a labelled overview of every field."""
+        lines: list[str] = []
+        if state.title:
+            lines.extend([self.screen.bold(state.title), ""])
+        label_width = max(len(field_spec.label) for field_spec in state.fields)
+        for index, field_spec in enumerate(state.fields):
+            active = index == state.current_index
+            marker = "▶" if active else " "
+            value = state.collected[index]
+            if value is not None:
+                cell = value
+            elif active and not state.is_select_field:
+                cell = self.screen.dim("▏")
             else:
-                lines.extend(["", f"Enter {current.label}:"])
+                cell = self.screen.dim("—")
+            lines.append(f"{marker} {field_spec.label.ljust(label_width)}  {cell}")
+        if state.is_select_field:
+            navigator = state.select_navigator()
+            if navigator is not None:
+                lines.extend(
+                    ["", *navigator.render_lines(self._prompt_interior_width, show_sections=False)]
+                )
         return lines
 
     def _render_picker_lines(self) -> list[str]:
         if self._picker_state is None:
             return []
-        return [
+        # The filter query types on the bottom input row, so the hint lives
+        # inside the box (it does not duplicate the bottom row, unlike prompts).
+        body = [
             self._picker_state.label,
-            "Type to filter · arrows to move · Enter to select · Esc/Ctrl-C to cancel",
             "",
-            *self._picker_state.navigator.render_lines(self.screen.width),
+            *self._picker_state.navigator.render_lines(
+                self._prompt_interior_width, show_sections=False
+            ),
+            "",
+            self.screen.dim("Type to filter · Enter select · Esc cancel"),
         ]
+        return render_box(body, max(self.screen.width - 2, 0), align="left", pad_x=2, pad_y=1)
 
     def _risk_fields(self) -> list[FieldSpec]:
         return [

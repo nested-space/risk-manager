@@ -40,6 +40,10 @@ class ScreenManager:
         """Wrap *text* in the terminal's dim (greyed) styling."""
         return f"{self._term.dim}{text}{self._term.normal}"
 
+    def bold(self, text: str) -> str:
+        """Wrap *text* in the terminal's bold styling."""
+        return f"{self._term.bold}{text}{self._term.normal}"
+
     def style_notice(self, message: str, level: str) -> str:
         """Wrap a status *message* in a colour matching its *level*.
 
