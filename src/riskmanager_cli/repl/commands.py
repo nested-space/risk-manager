@@ -30,10 +30,7 @@ from ..operations.component_risks_operations import (
     list_risks_for_component,
     update_component_risk,
 )
-from ..operations.component_salt_operations import (
-    create_component_salt,
-    list_salts_for_component,
-)
+from ..operations.component_salt_operations import create_component_salt
 from ..operations.counterion_operations import (
     create_counterion,
     delete_counterion,
@@ -99,6 +96,11 @@ from ..operations.stage_risk_operations import (
 )
 from ..repl.renderers.admin_renderer import render_admin_screen
 from ..repl.renderers.box import render_box
+from ..repl.renderers.component_renderer import (
+    component_targets,
+    gather_component_sections,
+    render_component_screen,
+)
 from ..repl.renderers.library_renderer import render_library_screen
 from ..repl.renderers.project_renderer import render_project_screen
 from ..repl.renderers.risk_renderer import render_risk_table
@@ -722,6 +724,19 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._open_route(project, process)
         if self.ctx.current.track == "stage_focus":
             return await self._activate_stage_row(item.item_id)
+        if self.ctx.current.track == "component_focus":
+            return await self._activate_component_row(item.item_id)
+        return await self.render_current()
+
+    async def _activate_component_row(self, item_id: str) -> list[str]:
+        """Open the caret-selected component row by its ``"{kind}:{uuid}"`` id.
+
+        Only risk rows are selectable; Enter opens an inline edit form that
+        re-renders the component screen on completion.
+        """
+        kind, _, raw_id = item_id.partition(":")
+        if kind == "risk":
+            return await self._start_component_risk_edit_form(raw_id)
         return await self.render_current()
 
     async def _activate_stage_row(self, item_id: str) -> list[str]:
@@ -2116,16 +2131,12 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if component is None:
             return ["Component not found."]
         material = await get_material_by_id(UUID(str(component.material_id)), self.env)
-        risks = await list_risks_for_component(UUID(str(component.id)), self.env)
-        salts = await list_salts_for_component(UUID(str(component.id)), self.env)
-        return [
-            f"Component: {material.name if material else component.id}",
-            "",
-            f"Control role: {component.control_strategy_role or '-'}",
-            f"Isolated: {'yes' if component.is_isolated else 'no'}",
-            f"Risks: {len(risks)}",
-            f"Salts: {len(salts)}",
-        ]
+        sections = await gather_component_sections(component, material, self.env)
+        navigator = self._rebuild_list_navigator([], component_targets(sections))
+        selected_id = navigator.selected.item_id if navigator.selected is not None else None
+        return render_component_screen(
+            component, material, sections, width=self.screen.width, selected_id=selected_id
+        )
 
     async def _render_library(
         self,
