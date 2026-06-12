@@ -6,12 +6,12 @@ Renders a single component in the same style as the Stage Focus screen (see
 box-drawn table (see ``renderers/tables.py``). The whole body is indented two
 columns so a ``>`` caret can occupy the left gutter.
 
-``Details`` and ``Salts`` rows are display-only; only ``Risks`` rows are
-selectable (Enter opens the component-risk edit form), so the single unified
-selection walks the risk rows. ``gather_component_sections`` fetches the rows
-once; ``component_targets`` flattens the selectable ones into :class:`ListItem`s
-for the navigator; ``render_component_screen`` draws the page for a given
-selected row id.
+``Details`` rows are display-only; ``Salts`` and ``Risks`` rows are selectable so
+the caret can walk them (Enter opens the component-risk edit form for a risk and
+is a no-op for a salt; ``^U`` unassigns either). ``gather_component_sections``
+fetches the rows once; ``component_targets`` flattens the selectable ones into
+:class:`ListItem`s for the navigator; ``render_component_screen`` draws the page
+for a given selected row id.
 """
 
 from __future__ import annotations
@@ -83,13 +83,22 @@ async def gather_component_sections(
 def component_targets(sections: ComponentSections) -> list[ListItem]:
     """Flatten the selectable rows into list items in render order.
 
-    Only risk rows are selectable; details and salts are display-only.
+    Salt and risk rows are selectable (so they can be unassigned with ``^U``);
+    detail rows stay display-only. Salts precede risks to match render order. The
+    label is the row's name column — the counterion for salts, the risk name for
+    risks.
     """
-    return [
+    salts = [
+        ListItem(label=row.cells[0], item_id=row.item_id)
+        for row in sections.salts
+        if row.item_id is not None
+    ]
+    risks = [
         ListItem(label=row.cells[1], item_id=row.item_id)
         for row in sections.risks
         if row.item_id is not None
     ]
+    return [*salts, *risks]
 
 
 def render_component_screen(
@@ -176,7 +185,7 @@ def _detail_rows(component: Component, material: Material | None) -> list[Compon
 
 
 async def _salt_rows(component: Component, env: Environment) -> list[ComponentRow]:
-    """Return display-only salt rows (counterion, stoichiometry, defined)."""
+    """Return selectable salt rows (counterion, stoichiometry, defined)."""
     salts = await list_salts_for_component(UUID(str(component.id)), env)
     rows: list[ComponentRow] = []
     for salt in salts:
@@ -189,7 +198,7 @@ async def _salt_rows(component: Component, env: Environment) -> list[ComponentRo
             defined = "-"
         else:
             defined = "yes" if salt.is_fully_defined else "no"
-        rows.append(ComponentRow(None, [name, stoichiometry, defined]))
+        rows.append(ComponentRow(f"salt:{salt.id}", [name, stoichiometry, defined]))
     return rows
 
 

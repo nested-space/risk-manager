@@ -355,7 +355,13 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
 
 
 def _in_list_mode(ctx: ContextManager) -> bool:
-    return ctx.current.track in {"home", "project", "route_select", "stage_focus"}
+    return ctx.current.track in {
+        "home",
+        "project",
+        "route_select",
+        "stage_focus",
+        "component_focus",
+    }
 
 
 def _is_scroll_key(key_name: str, key_text: str) -> bool:

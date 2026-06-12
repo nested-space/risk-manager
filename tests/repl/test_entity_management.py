@@ -12,7 +12,14 @@ import pytest
 from riskmanager_cli.config.settings import Environment
 from riskmanager_cli.model.enums import TA
 from riskmanager_cli.operations.component_operations import create_component
-from riskmanager_cli.operations.component_salt_operations import list_salts_for_component
+from riskmanager_cli.operations.component_risks_operations import (
+    create_component_risk,
+    list_risks_for_component,
+)
+from riskmanager_cli.operations.component_salt_operations import (
+    create_component_salt,
+    list_salts_for_component,
+)
 from riskmanager_cli.operations.counterion_operations import create_counterion
 from riskmanager_cli.operations.manufacturing_process_operations import (
     create_manufacturing_process,
@@ -20,11 +27,13 @@ from riskmanager_cli.operations.manufacturing_process_operations import (
 )
 from riskmanager_cli.operations.material_operations import create_material
 from riskmanager_cli.operations.project_operations import create_project, list_projects
-from riskmanager_cli.repl.commands import CommandDispatcher
+from riskmanager_cli.repl.commands import CTRL_U, CommandDispatcher
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
 from riskmanager_cli.repl.session_state import SessionState
 from riskmanager_cli.schema.create import (
     ComponentCreate,
+    ComponentRiskCreate,
+    ComponentSaltCreate,
     CounterionCreate,
     ManufacturingProcessCreate,
     MaterialCreate,
@@ -260,3 +269,98 @@ async def test_cancel_picker_restores_current_screen_with_notice(temp_env: Envir
     assert lines == await dispatcher.render_current()
     # Cancelling aborted creation: no project was persisted.
     assert await list_projects(env=temp_env) == []
+
+
+async def _seed_component_focus(
+    temp_env: Environment,
+) -> tuple[CommandDispatcher, str]:
+    """Park a dispatcher on a component-focus screen with one salt and one risk."""
+    material = await create_material(MaterialCreate(name="Caffeine"), env=temp_env)
+    assert material is not None
+    project = await create_project(
+        ProjectCreate(name="Proj", therapy_area=TA.ONCOLOGY, material_id=UUID(str(material.id))),
+        env=temp_env,
+    )
+    assert project is not None
+    process = await create_manufacturing_process(
+        ManufacturingProcessCreate(
+            project_id=UUID(str(project.id)), route_number=1, process_number=1
+        ),
+        env=temp_env,
+    )
+    assert process is not None
+    component = await create_component(
+        ComponentCreate(process_id=UUID(str(process.id)), material_id=UUID(str(material.id))),
+        env=temp_env,
+    )
+    assert component is not None
+    counterion = await create_counterion(CounterionCreate(name="Chloride"), env=temp_env)
+    assert counterion is not None
+    salt = await create_component_salt(
+        ComponentSaltCreate(
+            component_id=UUID(str(component.id)),
+            counterion_id=UUID(str(counterion.id)),
+            stoichiometry=1.0,
+            is_fully_defined=True,
+        ),
+        env=temp_env,
+    )
+    assert salt is not None
+    risk = await create_component_risk(
+        ComponentRiskCreate(
+            component_id=UUID(str(component.id)),
+            risk_type="purity",
+            name="Residual solvent",
+            current_level=4,
+            mitigated_level=2,
+        ),
+        env=temp_env,
+    )
+    assert risk is not None
+
+    dispatcher = _make_dispatcher(temp_env)
+    dispatcher.ctx.push(
+        ContextFrame(
+            track="component_focus",
+            project_id=str(project.id),
+            process_id=str(process.id),
+            component_id=str(component.id),
+            component_name="Caffeine",
+        )
+    )
+    return dispatcher, str(component.id)
+
+
+@pytest.mark.integration
+async def test_component_unassign_hotkey_removes_salt(temp_env: Environment) -> None:
+    """Ctrl-U on a selected salt row confirms, then unassigns the salt."""
+    dispatcher, component_id = await _seed_component_focus(temp_env)
+    await dispatcher.render_current()  # build the navigator
+    assert dispatcher.list_navigator is not None
+    salt = (await list_salts_for_component(UUID(component_id), env=temp_env))[0]
+    dispatcher.list_navigator.select_item_id(f"salt:{salt.id}")
+
+    await dispatcher.handle_hotkey(CTRL_U)
+    assert dispatcher.prompt_state is not None  # confirmation prompt
+    await dispatcher.advance_prompt("yes")
+
+    assert dispatcher.take_notice() == ("Salt unassigned.", "success")
+    assert await list_salts_for_component(UUID(component_id), env=temp_env) == []
+    assert dispatcher.ctx.current.track == "component_focus"  # stays on the component
+
+
+@pytest.mark.integration
+async def test_component_unassign_hotkey_deletes_risk(temp_env: Environment) -> None:
+    """Ctrl-U on a selected risk row confirms, then deletes the component risk."""
+    dispatcher, component_id = await _seed_component_focus(temp_env)
+    await dispatcher.render_current()
+    assert dispatcher.list_navigator is not None
+    risk = (await list_risks_for_component(UUID(component_id), env=temp_env))[0]
+    dispatcher.list_navigator.select_item_id(f"risk:{risk.id}")
+
+    await dispatcher.handle_hotkey(CTRL_U)
+    assert dispatcher.prompt_state is not None
+    await dispatcher.advance_prompt("yes")
+
+    assert dispatcher.take_notice() == ("Risk deleted.", "success")
+    assert await list_risks_for_component(UUID(component_id), env=temp_env) == []

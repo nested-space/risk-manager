@@ -6,7 +6,7 @@ from __future__ import annotations
 import csv
 import inspect
 import shlex
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from io import StringIO
@@ -27,10 +27,14 @@ from ..operations.component_operations import (
 )
 from ..operations.component_risks_operations import (
     create_component_risk,
+    delete_component_risk,
     list_risks_for_component,
     update_component_risk,
 )
-from ..operations.component_salt_operations import create_component_salt
+from ..operations.component_salt_operations import (
+    create_component_salt,
+    delete_component_salt,
+)
 from ..operations.counterion_operations import (
     create_counterion,
     delete_counterion,
@@ -75,10 +79,12 @@ from ..operations.project_operations import (
 from ..operations.smiles_operations import canonicalize_smiles
 from ..operations.stage_component_operations import (
     create_stage_component,
+    delete_stage_component,
     list_stage_components,
 )
 from ..operations.stage_ncrm_operations import (
     create_stage_ncrm,
+    delete_stage_ncrm,
     list_ncrms_for_stage,
     update_stage_ncrm,
 )
@@ -91,6 +97,7 @@ from ..operations.stage_operations import (
 )
 from ..operations.stage_risk_operations import (
     create_stage_risk,
+    delete_stage_risk,
     list_risks_for_stage,
     update_stage_risk,
 )
@@ -196,6 +203,7 @@ CTRL_N = "\x0e"  # admin
 CTRL_O = "\x0f"  # open / show
 CTRL_R = "\x12"  # risks
 CTRL_T = "\x14"  # routes
+CTRL_U = "\x15"  # unassign
 CTRL_X = "\x18"  # delete
 
 
@@ -737,6 +745,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         kind, _, raw_id = item_id.partition(":")
         if kind == "risk":
             return await self._start_component_risk_edit_form(raw_id)
+        # Salt rows are selectable only so they can be unassigned (^U); Enter is a
+        # no-op because there is no salt edit form.
         return await self.render_current()
 
     async def _activate_stage_row(self, item_id: str) -> list[str]:
@@ -1200,6 +1210,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self._start_stage_edit_form(stage)
         if key == CTRL_R:
             return await self._dispatch_stage_focus("/risks", [])
+        if key == CTRL_U:
+            return await self._start_stage_row_unassign(stage)
         if key == CTRL_X:
             return self._start_confirm(
                 f"Delete stage '{stage.name}'",
@@ -1207,7 +1219,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             )
         return None
 
-    async def _hotkey_component_focus(self, key: str) -> list[str] | None:
+    async def _hotkey_component_focus(  # pylint: disable=too-many-return-statements  # one return per component hotkey
+        self, key: str
+    ) -> list[str] | None:
         component = await self._current_component()
         if component is None:
             return ["Component not found."]
@@ -1215,6 +1229,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._start_salt_picker(component)
         if key == CTRL_E:
             return self._start_component_edit_form(component)
+        if key == CTRL_U:
+            return await self._start_component_row_unassign(component)
         if key == CTRL_X:
             return self._start_confirm(
                 "Delete component",
@@ -3248,6 +3264,88 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         self._pop_focus_to_parent()
         return await self._refresh_with_notice("Component deleted.")
 
+    async def _start_stage_row_unassign(self, stage: Stage) -> list[str]:
+        """Confirm-and-unassign the caret-selected component/NCRM/risk row.
+
+        Unlike ``^X`` (which deletes the whole stage), this removes a single
+        section row and keeps the user on the stage. Component rows carry the
+        component id (for Enter-navigation), so the stage-component *link* id is
+        resolved from the stage's links here.
+        """
+        navigator = self.list_navigator
+        selected = navigator.selected if navigator is not None else None
+        if selected is None:
+            return await self._refresh_with_notice("Nothing selected.", "warning")
+        kind, _, raw_id = selected.item_id.partition(":")
+        if kind == "component":
+            link_id = await self._stage_component_link_id(stage, raw_id)
+            if link_id is None:
+                return await self._refresh_with_notice("Component not found.", "error")
+            return self._start_confirm(
+                f"Unassign {selected.label}",
+                lambda: self._unassign_with_notice(
+                    delete_stage_component(link_id, self.env), "Component unassigned."
+                ),
+            )
+        if kind == "ncrm":
+            return self._start_confirm(
+                f"Unassign {selected.label}",
+                lambda: self._unassign_with_notice(
+                    delete_stage_ncrm(UUID(raw_id), self.env), "NCRM unassigned."
+                ),
+            )
+        if kind == "risk":
+            return self._start_confirm(
+                f"Delete risk '{selected.label}'",
+                lambda: self._unassign_with_notice(
+                    delete_stage_risk(UUID(raw_id), self.env), "Risk deleted."
+                ),
+            )
+        return await self._refresh_with_notice("Nothing to unassign.", "warning")
+
+    async def _start_component_row_unassign(self, component: Component) -> list[str]:
+        """Confirm-and-delete the caret-selected salt or risk row.
+
+        Mirrors :meth:`_start_stage_row_unassign` for the component-focus page;
+        ``^X`` deletes the component itself, this removes a single row.
+        """
+        del component  # The selected row carries the id; component scopes the screen.
+        navigator = self.list_navigator
+        selected = navigator.selected if navigator is not None else None
+        if selected is None:
+            return await self._refresh_with_notice("Nothing selected.", "warning")
+        kind, _, raw_id = selected.item_id.partition(":")
+        if kind == "salt":
+            return self._start_confirm(
+                f"Unassign salt {selected.label}",
+                lambda: self._unassign_with_notice(
+                    delete_component_salt(UUID(raw_id), self.env), "Salt unassigned."
+                ),
+            )
+        if kind == "risk":
+            return self._start_confirm(
+                f"Delete risk '{selected.label}'",
+                lambda: self._unassign_with_notice(
+                    delete_component_risk(UUID(raw_id), self.env), "Risk deleted."
+                ),
+            )
+        return await self._refresh_with_notice("Nothing to unassign.", "warning")
+
+    async def _stage_component_link_id(self, stage: Stage, component_id: str) -> UUID | None:
+        """Resolve the stage-component link id for a component row's component id."""
+        links = await list_stage_components(UUID(str(stage.id)), self.env)
+        for link in links:
+            if str(link.component_id) == component_id:
+                return UUID(str(link.id))
+        return None
+
+    async def _unassign_with_notice(self, delete_coro: Awaitable[bool], success: str) -> list[str]:
+        """Await a delete operation, then refresh the screen with a status notice."""
+        ok = await delete_coro
+        if not ok:
+            return await self._refresh_with_notice("Unassign failed.", "error")
+        return await self._refresh_with_notice(success)
+
     def _pop_focus_to_parent(self) -> None:
         """Leave a focused stage/component screen after its entity was deleted.
 
@@ -3725,8 +3823,23 @@ HELP_TOPICS: dict[str, list[str]] = {
         "/ search",
         "^C back",
     ],
-    "stage_focus": ["^A add", "^L list", "^E edit", "^R risks", "^X delete", "^C back"],
-    "component_focus": ["^A assign salt", "^E edit", "^X delete", "^R risks", "^C back"],
+    "stage_focus": [
+        "^A add",
+        "^L list",
+        "^E edit",
+        "^R risks",
+        "^U unassign",
+        "^X delete",
+        "^C back",
+    ],
+    "component_focus": [
+        "^A assign salt",
+        "^E edit",
+        "^U unassign",
+        "^X delete",
+        "^R risks",
+        "^C back",
+    ],
     "library": ["^A add", "^E edit", "^X delete", "^O show", "^F filter", "/ search", "^C back"],
     "admin": ["^A action", "^C back"],
     "risk_mode": ["^A add", "^E edit", "^L refresh", "^C back"],

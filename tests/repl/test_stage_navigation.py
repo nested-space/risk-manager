@@ -21,17 +21,23 @@ from riskmanager_cli.operations.manufacturing_process_operations import (
 from riskmanager_cli.operations.material_operations import create_material
 from riskmanager_cli.operations.ncrm_library_operations import create_ncrm_library_entry
 from riskmanager_cli.operations.project_operations import create_project
-from riskmanager_cli.operations.stage_component_operations import create_stage_component
+from riskmanager_cli.operations.stage_component_operations import (
+    create_stage_component,
+    delete_stage_component,
+    list_stage_components,
+)
 from riskmanager_cli.operations.stage_ncrm_operations import (
     create_stage_ncrm,
+    delete_stage_ncrm,
     list_ncrms_for_stage,
 )
 from riskmanager_cli.operations.stage_operations import create_stage
 from riskmanager_cli.operations.stage_risk_operations import (
     create_stage_risk,
+    delete_stage_risk,
     list_risks_for_stage,
 )
-from riskmanager_cli.repl.commands import CommandDispatcher
+from riskmanager_cli.repl.commands import CTRL_U, CommandDispatcher
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
 from riskmanager_cli.repl.list_navigator import ListItem
 from riskmanager_cli.repl.session_state import SessionState
@@ -226,3 +232,74 @@ async def test_selecting_ncrm_opens_role_form_and_persists(temp_env: Environment
     links = await list_ncrms_for_stage(UUID(str(seed.stage.id)), temp_env)
     assert len(links) == 1
     assert links[0].role is NcrmRole.CATALYST
+
+
+@pytest.mark.integration
+async def test_stage_unassign_hotkey_removes_component(temp_env: Environment) -> None:
+    """Ctrl-U on a selected component row confirms, then unassigns the link."""
+    seed = await _seed(temp_env)
+    dispatcher = _dispatcher_at_stage(temp_env, seed)
+    await dispatcher.render_current()  # build the navigator
+    assert dispatcher.list_navigator is not None
+    dispatcher.list_navigator.select_item_id(f"component:{seed.component_id}")
+
+    await dispatcher.handle_hotkey(CTRL_U)
+    assert dispatcher.prompt_state is not None  # confirmation prompt
+    await dispatcher.advance_prompt("yes")
+
+    assert dispatcher.take_notice() == ("Component unassigned.", "success")
+    assert await list_stage_components(UUID(str(seed.stage.id)), temp_env) == []
+    assert dispatcher.ctx.current.track == "stage_focus"  # stays on the stage
+
+
+@pytest.mark.integration
+async def test_stage_unassign_hotkey_removes_ncrm(temp_env: Environment) -> None:
+    """Ctrl-U on a selected NCRM row confirms, then unassigns the link."""
+    seed = await _seed(temp_env)
+    dispatcher = _dispatcher_at_stage(temp_env, seed)
+    await dispatcher.render_current()
+    assert dispatcher.list_navigator is not None
+    dispatcher.list_navigator.select_item_id(f"ncrm:{seed.ncrm_link_id}")
+
+    await dispatcher.handle_hotkey(CTRL_U)
+    assert dispatcher.prompt_state is not None
+    await dispatcher.advance_prompt("yes")
+
+    assert dispatcher.take_notice() == ("NCRM unassigned.", "success")
+    assert await list_ncrms_for_stage(UUID(str(seed.stage.id)), temp_env) == []
+
+
+@pytest.mark.integration
+async def test_stage_unassign_hotkey_deletes_risk(temp_env: Environment) -> None:
+    """Ctrl-U on a selected risk row confirms, then deletes the risk."""
+    seed = await _seed(temp_env)
+    dispatcher = _dispatcher_at_stage(temp_env, seed)
+    await dispatcher.render_current()
+    assert dispatcher.list_navigator is not None
+    dispatcher.list_navigator.select_item_id(f"risk:{seed.risk_id}")
+
+    await dispatcher.handle_hotkey(CTRL_U)
+    assert dispatcher.prompt_state is not None
+    await dispatcher.advance_prompt("yes")
+
+    assert dispatcher.take_notice() == ("Risk deleted.", "success")
+    assert await list_risks_for_stage(UUID(str(seed.stage.id)), temp_env) == []
+
+
+@pytest.mark.integration
+async def test_stage_unassign_hotkey_warns_when_nothing_selected(temp_env: Environment) -> None:
+    """Ctrl-U on a stage with no rows warns instead of opening a confirm prompt."""
+    seed = await _seed(temp_env)
+    # Remove every row so the navigator has nothing to select.
+    for link in await list_stage_components(UUID(str(seed.stage.id)), temp_env):
+        await delete_stage_component(UUID(str(link.id)), temp_env)
+    for link in await list_ncrms_for_stage(UUID(str(seed.stage.id)), temp_env):
+        await delete_stage_ncrm(UUID(str(link.id)), temp_env)
+    await delete_stage_risk(UUID(seed.risk_id), temp_env)
+
+    dispatcher = _dispatcher_at_stage(temp_env, seed)
+    await dispatcher.render_current()
+
+    await dispatcher.handle_hotkey(CTRL_U)
+    assert dispatcher.prompt_state is None
+    assert dispatcher.take_notice() == ("Nothing selected.", "warning")

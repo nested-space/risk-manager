@@ -135,22 +135,22 @@ async def test_render_component_screen_sections_and_tables_are_populated(
 
 
 @pytest.mark.integration
-async def test_component_targets_select_only_risk_rows(temp_env: Environment) -> None:
-    """Only risk rows are selectable; details and salts carry no caret target."""
+async def test_component_targets_select_salt_and_risk_rows(temp_env: Environment) -> None:
+    """Salt and risk rows are selectable (salts first); details carry no target."""
     component, material = await _seed_component(temp_env, with_salt=True, with_risk=True)
     sections = await gather_component_sections(component, material, temp_env)
 
     targets = component_targets(sections)
-    assert len(targets) == 1
-    chosen = targets[0]
-    assert chosen.item_id is not None and chosen.item_id.startswith("risk:")
+    assert [str(t.item_id).split(":", 1)[0] for t in targets] == ["salt", "risk"]
+    salt_target, risk_target = targets
+    assert salt_target.label == "Chloride"
 
     lines = render_component_screen(
-        component, material, sections, width=120, selected_id=chosen.item_id
+        component, material, sections, width=120, selected_id=salt_target.item_id
     )
     caret_lines = [line for line in lines if line.startswith("> ")]
     assert len(caret_lines) == 1
-    assert chosen.label in caret_lines[0]
+    assert salt_target.label in caret_lines[0]
 
 
 @pytest.mark.integration
