@@ -6,7 +6,7 @@ from __future__ import annotations
 import csv
 import inspect
 import shlex
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from io import StringIO
@@ -27,6 +27,7 @@ from ..operations.component_operations import (
 from ..operations.component_risks_operations import (
     create_component_risk,
     list_risks_for_component,
+    update_component_risk,
 )
 from ..operations.component_salt_operations import (
     create_component_salt,
@@ -43,10 +44,12 @@ from ..operations.manufacturing_process_operations import (
     get_process_by_id,
     get_process_by_route,
     list_processes_for_project,
+    update_manufacturing_process,
 )
 from ..operations.manufacturing_process_risk_operations import (
     create_manufacturing_process_risk,
     list_risks_for_process,
+    update_manufacturing_process_risk,
 )
 from ..operations.material_operations import (
     bulk_import_materials,
@@ -69,6 +72,7 @@ from ..operations.project_operations import (
     get_project_by_id,
     list_projects,
     search_projects,
+    update_project,
 )
 from ..operations.smiles_operations import canonicalize_smiles
 from ..operations.stage_component_operations import (
@@ -120,10 +124,14 @@ from ..schema.create import (
     StageRiskCreate,
 )
 from ..schema.update import (
+    ComponentRiskUpdate,
     ComponentUpdate,
     CounterionUpdate,
+    ManufacturingProcessRiskUpdate,
+    ManufacturingProcessUpdate,
     MaterialUpdate,
     NcrmLibraryUpdate,
+    ProjectUpdate,
     StageNcrmUpdate,
     StageRiskUpdate,
     StageUpdate,
@@ -437,6 +445,19 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     def prompt_state(self) -> PromptState | None:
         """Return the active guided prompt state, if any."""
         return self._prompt_state
+
+    def prompt_prefill(self) -> str:
+        """Return the editable initial text for the active prompt field.
+
+        Edit forms pass the entity's current value as each field's ``default``.
+        For text and numeric fields the loop seeds its input buffer with this so
+        the existing value is visible and editable; ``select`` fields pre-fill via
+        their navigator instead, and pending/complete prompts contribute nothing.
+        """
+        state = self._prompt_state
+        if state is None or state.is_complete() or state.is_select_field:
+            return ""
+        return state.current_field.default or ""
 
     @property
     def list_navigator(self) -> ListNavigator | None:
@@ -946,6 +967,21 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         process = await self._current_process()
         if stage is None or process is None:
             return ["Stage not found."]
+        if verb == "/risks":
+            self.ctx.push(
+                ContextFrame(
+                    track="risk_mode",
+                    project_id=self.ctx.current.project_id,
+                    project_name=self.ctx.current.project_name,
+                    process_id=self.ctx.current.process_id,
+                    route_label=self.ctx.current.route_label,
+                    stage_id=str(stage.id),
+                    stage_name=self.ctx.current.stage_name,
+                    risk_scope="stage",
+                )
+            )
+            self.session.update_context(track="risk_mode", stage_id=str(stage.id))
+            return await self._render_stage_risks(stage)
         if verb == "/add" and args:
             if args[0].lower() == "risk":
                 return self.start_prompt(
@@ -1102,6 +1138,11 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._dispatch_project("/risks", [])
         if key == CTRL_A:
             return await self._dispatch_project("/add", ["process"])
+        if key == CTRL_E:
+            project = await self._current_project()
+            if project is None:
+                return ["Project not found."]
+            return self._start_project_edit_form(project)
         return None
 
     async def _hotkey_route_select(self, key: str) -> list[str] | None:
@@ -1128,7 +1169,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._dispatch_route("/risks", [])
         return None
 
-    async def _hotkey_stage_focus(self, key: str) -> list[str] | None:
+    async def _hotkey_stage_focus(  # pylint: disable=too-many-return-statements  # one return per stage hotkey
+        self, key: str
+    ) -> list[str] | None:
         stage = await self._current_stage()
         process = await self._current_process()
         if stage is None or process is None:
@@ -1139,6 +1182,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self._start_stage_list_chooser(stage)
         if key == CTRL_E:
             return self._start_stage_edit_form(stage)
+        if key == CTRL_R:
+            return await self._dispatch_stage_focus("/risks", [])
         if key == CTRL_X:
             return self._start_confirm(
                 f"Delete stage '{stage.name}'",
@@ -1189,7 +1234,93 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     async def _hotkey_risk_mode(self, key: str) -> list[str] | None:
         if key == CTRL_L:
             return await self._dispatch_risk_mode("/list", ["risks"])
+        if key == CTRL_A:
+            return await self._start_risk_mode_add()
+        if key == CTRL_E:
+            return await self._start_risk_mode_edit()
         return None
+
+    async def _start_risk_mode_add(  # pylint: disable=too-many-return-statements  # one return per risk scope
+        self,
+    ) -> list[str] | None:
+        """Open the add-risk form for the entity in the current risk scope.
+
+        The project scope aggregates risks across every route, so it has no single
+        target entity and ignores ``^A``; the process/stage/component scopes each
+        attach the new risk to their focused entity.
+        """
+        scope = self.ctx.current.risk_scope
+        if scope == "process":
+            process = await self._current_process()
+            if process is None:
+                return ["Route not found."]
+            return self.start_prompt(
+                self._risk_fields(),
+                lambda **payload: self._create_process_risk_from_prompt(process, payload),
+                title="Add risk",
+            )
+        if scope == "stage":
+            stage = await self._current_stage()
+            if stage is None:
+                return ["Stage not found."]
+            return self.start_prompt(
+                self._risk_fields(),
+                lambda **payload: self._create_stage_risk_from_prompt(stage, payload),
+                title="Add risk",
+            )
+        if scope == "component":
+            component = await self._current_component()
+            if component is None:
+                return ["Component not found."]
+            return self.start_prompt(
+                self._risk_fields(),
+                lambda **payload: self._create_component_risk_from_prompt(component, payload),
+                title="Add risk",
+            )
+        return None
+
+    async def _start_risk_mode_edit(  # pylint: disable=too-many-return-statements  # one return per risk scope
+        self,
+    ) -> list[str] | None:
+        """Pick a risk in the current scope and open its pre-filled edit form."""
+        scope = self.ctx.current.risk_scope
+        if scope == "process":
+            process = await self._current_process()
+            if process is None:
+                return ["Route not found."]
+            process_risks = await list_risks_for_process(UUID(str(process.id)), self.env)
+            return self._start_risk_edit_picker(
+                process_risks, self._start_process_risk_edit_form
+            )
+        if scope == "stage":
+            stage = await self._current_stage()
+            if stage is None:
+                return ["Stage not found."]
+            stage_risks = await list_risks_for_stage(UUID(str(stage.id)), self.env)
+            return self._start_risk_edit_picker(stage_risks, self._start_stage_risk_edit_form)
+        if scope == "component":
+            component = await self._current_component()
+            if component is None:
+                return ["Component not found."]
+            component_risks = await list_risks_for_component(UUID(str(component.id)), self.env)
+            return self._start_risk_edit_picker(
+                component_risks, self._start_component_risk_edit_form
+            )
+        return None
+
+    def _start_risk_edit_picker(
+        self,
+        risks: Sequence[Any],
+        open_edit: Callable[[str], Any],
+    ) -> list[str]:
+        """Show a picker over *risks* that opens *open_edit* for the chosen id."""
+        if not risks:
+            return ["No risks yet."]
+        items = [
+            ListItem(label=f"{risk.risk_type} · {risk.name}", item_id=str(risk.id))
+            for risk in risks
+        ]
+        return self.start_picker("Edit risk", items, lambda item: open_edit(item.item_id))
 
     # ------------------------------------------------------------------ #
     # Chooser, picker, and confirmation chains
@@ -1372,19 +1503,50 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return ["Component not found."]
         return await self._open_component(component)
 
+    def _start_project_edit_form(self, project: Project) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec("name", default=project.name),
+                FieldSpec(
+                    "therapy_area",
+                    field_type="select",
+                    options=_enum_options(TA),
+                    default=project.therapy_area.value,
+                ),
+            ],
+            lambda **payload: self._update_project_from_prompt(project, payload),
+            title="Edit project",
+        )
+
     def _start_route_edit_chooser(self, process: ManufacturingProcess) -> list[str]:
         return self.start_prompt(
             [
                 FieldSpec(
                     "edit",
                     field_type="select",
-                    options=[("stage", "stage"), ("component", "component")],
+                    options=[
+                        ("route", "route"),
+                        ("stage", "stage"),
+                        ("component", "component"),
+                    ],
                 )
             ],
             lambda **payload: self._route_edit_dispatch(process, payload["edit"]),
         )
 
+    def _start_process_edit_form(self, process: ManufacturingProcess) -> list[str]:
+        return self.start_prompt(
+            [
+                FieldSpec("route_number", field_type="int", default=str(process.route_number)),
+                FieldSpec("process_number", field_type="int", default=str(process.process_number)),
+            ],
+            lambda **payload: self._update_process_from_prompt(process, payload),
+            title="Edit route",
+        )
+
     async def _route_edit_dispatch(self, process: ManufacturingProcess, scope: str) -> list[str]:
+        if scope == "route":
+            return self._start_process_edit_form(process)
         if scope == "stage":
             items = await self._stage_items(process)
             if not items:
@@ -1464,27 +1626,50 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if risk is None:
             return ["Risk not found."]
         return self.start_prompt(
-            [
-                FieldSpec("risk_type", default=risk.risk_type),
-                FieldSpec("name", default=risk.name),
-                FieldSpec("description", required=False, default=risk.description),
-                FieldSpec(
-                    "current_level",
-                    field_type="int",
-                    required=False,
-                    default=_default_text(risk.current_level),
-                ),
-                FieldSpec(
-                    "proposed_mitigation", required=False, default=risk.proposed_mitigation
-                ),
-                FieldSpec(
-                    "mitigated_level",
-                    field_type="int",
-                    required=False,
-                    default=_default_text(risk.mitigated_level),
-                ),
-            ],
+            self._risk_edit_fields(risk),
             lambda **payload: self._update_stage_risk_from_prompt(risk_id, payload),
+            title="Edit risk",
+        )
+
+    async def _start_process_risk_edit_form(self, risk_id: str) -> list[str]:
+        """Open an edit form for the process risk with id *risk_id*."""
+        process = await self._current_process()
+        if process is None:
+            return ["Route not found."]
+        risk = next(
+            (
+                candidate
+                for candidate in await list_risks_for_process(UUID(str(process.id)), self.env)
+                if str(candidate.id) == risk_id
+            ),
+            None,
+        )
+        if risk is None:
+            return ["Risk not found."]
+        return self.start_prompt(
+            self._risk_edit_fields(risk),
+            lambda **payload: self._update_process_risk_from_prompt(risk_id, payload),
+            title="Edit risk",
+        )
+
+    async def _start_component_risk_edit_form(self, risk_id: str) -> list[str]:
+        """Open an edit form for the component risk with id *risk_id*."""
+        component = await self._current_component()
+        if component is None:
+            return ["Component not found."]
+        risk = next(
+            (
+                candidate
+                for candidate in await list_risks_for_component(UUID(str(component.id)), self.env)
+                if str(candidate.id) == risk_id
+            ),
+            None,
+        )
+        if risk is None:
+            return ["Risk not found."]
+        return self.start_prompt(
+            self._risk_edit_fields(risk),
+            lambda **payload: self._update_component_risk_from_prompt(risk_id, payload),
             title="Edit risk",
         )
 
@@ -2877,6 +3062,47 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._refresh_with_notice("Failed to create stage-NCRM link.", "error")
         return await self._refresh_with_notice("Stage-NCRM link created.")
 
+    async def _update_project_from_prompt(
+        self,
+        project: Project,
+        payload: dict[str, str | None],
+    ) -> list[str]:
+        therapy_area = payload.get("therapy_area")
+        updated = await update_project(
+            UUID(str(project.id)),
+            ProjectUpdate(
+                name=payload.get("name") or None,
+                therapy_area=TA(therapy_area) if therapy_area else None,
+            ),
+            self.env,
+        )
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update project.", "error")
+        self.ctx.current.project_name = updated.name
+        self.session.update_context(project_id=str(updated.id))
+        return await self._refresh_with_notice(f"Updated project '{updated.name}'.")
+
+    async def _update_process_from_prompt(
+        self,
+        process: ManufacturingProcess,
+        payload: dict[str, str | None],
+    ) -> list[str]:
+        updated = await update_manufacturing_process(
+            UUID(str(process.id)),
+            ManufacturingProcessUpdate(
+                route_number=_optional_int(payload.get("route_number")),
+                process_number=_optional_int(payload.get("process_number")),
+            ),
+            self.env,
+        )
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update route.", "error")
+        self.ctx.current.route_label = f"{updated.route_number}.{updated.process_number}"
+        self.session.update_context(process_id=str(updated.id))
+        return await self._refresh_with_notice(
+            f"Updated route '{updated.route_number}.{updated.process_number}'."
+        )
+
     async def _update_stage_from_prompt(
         self,
         stage: Stage,
@@ -2918,6 +3144,48 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         updated = await update_stage_risk(
             UUID(risk_id),
             StageRiskUpdate(
+                risk_type=payload.get("risk_type") or None,
+                name=payload.get("name") or None,
+                description=payload.get("description"),
+                current_level=_optional_int(payload.get("current_level")),
+                proposed_mitigation=payload.get("proposed_mitigation"),
+                mitigated_level=_optional_int(payload.get("mitigated_level")),
+            ),
+            self.env,
+        )
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update risk.", "error")
+        return await self._refresh_with_notice(f"Updated risk '{updated.name}'.")
+
+    async def _update_process_risk_from_prompt(
+        self,
+        risk_id: str,
+        payload: dict[str, str | None],
+    ) -> list[str]:
+        updated = await update_manufacturing_process_risk(
+            UUID(risk_id),
+            ManufacturingProcessRiskUpdate(
+                risk_type=payload.get("risk_type") or None,
+                name=payload.get("name") or None,
+                description=payload.get("description"),
+                current_level=_optional_int(payload.get("current_level")),
+                proposed_mitigation=payload.get("proposed_mitigation"),
+                mitigated_level=_optional_int(payload.get("mitigated_level")),
+            ),
+            self.env,
+        )
+        if updated is None:
+            return await self._refresh_with_notice("Failed to update risk.", "error")
+        return await self._refresh_with_notice(f"Updated risk '{updated.name}'.")
+
+    async def _update_component_risk_from_prompt(
+        self,
+        risk_id: str,
+        payload: dict[str, str | None],
+    ) -> list[str]:
+        updated = await update_component_risk(
+            UUID(risk_id),
+            ComponentRiskUpdate(
                 risk_type=payload.get("risk_type") or None,
                 name=payload.get("name") or None,
                 description=payload.get("description"),
@@ -3369,6 +3637,31 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             FieldSpec("mitigated_level", field_type="int", required=False),
         ]
 
+    def _risk_edit_fields(self, risk: Any) -> list[FieldSpec]:
+        """Return the risk fields pre-filled from *risk* for an edit form.
+
+        Stage, process, and component risks share the same editable columns, so
+        one helper serves every scope.
+        """
+        return [
+            FieldSpec("risk_type", default=risk.risk_type),
+            FieldSpec("name", default=risk.name),
+            FieldSpec("description", required=False, default=risk.description),
+            FieldSpec(
+                "current_level",
+                field_type="int",
+                required=False,
+                default=_default_text(risk.current_level),
+            ),
+            FieldSpec("proposed_mitigation", required=False, default=risk.proposed_mitigation),
+            FieldSpec(
+                "mitigated_level",
+                field_type="int",
+                required=False,
+                default=_default_text(risk.mitigated_level),
+            ),
+        ]
+
     def command_hints(self) -> str:
         """Return a single-line command hint for the current screen.
 
@@ -3407,7 +3700,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 # and ":" command line. ``handle_hotkey`` is the source of truth these describe.
 HELP_TOPICS: dict[str, list[str]] = {
     "home": ["^A add project", "^B library", "^N admin", "/ search", "? help", "^D quit"],
-    "project": ["^T routes", "^R risks", "^A add process", "^C back"],
+    "project": ["^T routes", "^R risks", "^A add process", "^E edit", "^C back"],
     "route_select": ["↑↓ Enter open", "/ search", "^C back"],
     "route": [
         "^A add",
@@ -3419,11 +3712,11 @@ HELP_TOPICS: dict[str, list[str]] = {
         "/ search",
         "^C back",
     ],
-    "stage_focus": ["^A add", "^L list", "^E edit", "^X delete", "^C back"],
+    "stage_focus": ["^A add", "^L list", "^E edit", "^R risks", "^X delete", "^C back"],
     "component_focus": ["^A add salt", "^E edit", "^X delete", "^R risks", "^C back"],
     "library": ["^A add", "^E edit", "^X delete", "^O show", "^F filter", "/ search", "^C back"],
     "admin": ["^A action", "^C back"],
-    "risk_mode": ["^L refresh", "^C back"],
+    "risk_mode": ["^A add", "^E edit", "^L refresh", "^C back"],
 }
 
 

@@ -67,6 +67,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
     del env  # The environment is already captured by *dispatcher*.
 
     input_buffer = ""
+    last_field_key: tuple[int, int] | None = None
     notice = ""
     mode = "view"  # "view" (hotkeys) | "search" ("/" filter) | "command" (":" line)
     current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
@@ -105,8 +106,28 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
         parts.extend([": command", "? help"])
         return "  ·  ".join(parts)
 
+    def sync_prompt_prefill() -> None:
+        """Seed the input buffer with the active prompt field's current value.
+
+        Edit forms supply each field's existing value as its ``default``. The
+        first time a text/numeric field becomes active we copy that into the
+        live buffer so it shows and can be edited; subsequent keystrokes on the
+        same field leave the buffer alone. Select fields and completed/absent
+        prompts contribute nothing (``prompt_prefill`` returns ``""``).
+        """
+        nonlocal input_buffer, last_field_key
+        state = dispatcher.prompt_state
+        if state is None or state.is_complete():
+            last_field_key = None
+            return
+        key = (id(state), state.current_index)
+        if key != last_field_key:
+            last_field_key = key
+            input_buffer = dispatcher.prompt_prefill()
+
     def redraw() -> None:
         nonlocal scroll_offset
+        sync_prompt_prefill()
         scroll_offset = max(0, min(scroll_offset, _max_scroll()))
         screen.draw_status_bar()
         screen.draw_output(current_output_lines, scroll_offset)

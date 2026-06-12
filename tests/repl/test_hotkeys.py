@@ -15,12 +15,25 @@ from riskmanager_cli.config.settings import Environment
 from riskmanager_cli.model.enums import TA
 from riskmanager_cli.operations.manufacturing_process_operations import (
     create_manufacturing_process,
+    get_process_by_id,
+)
+from riskmanager_cli.operations.manufacturing_process_risk_operations import (
+    list_risks_for_process,
 )
 from riskmanager_cli.operations.material_operations import create_material
-from riskmanager_cli.operations.project_operations import create_project, list_projects
+from riskmanager_cli.operations.project_operations import (
+    create_project,
+    get_project_by_id,
+    list_projects,
+)
 from riskmanager_cli.operations.stage_operations import create_stage, list_stages_for_process
+from riskmanager_cli.operations.stage_risk_operations import (
+    create_stage_risk,
+    list_risks_for_stage,
+)
 from riskmanager_cli.repl.commands import (
     CTRL_A,
+    CTRL_E,
     CTRL_F,
     CTRL_R,
     CTRL_X,
@@ -33,6 +46,7 @@ from riskmanager_cli.schema.create import (
     MaterialCreate,
     ProjectCreate,
     StageCreate,
+    StageRiskCreate,
 )
 
 
@@ -235,3 +249,198 @@ async def test_no_arg_hotkey_reuses_slash_handler(temp_env: Environment) -> None
 
     await dispatcher.handle_hotkey(CTRL_R)
     assert dispatcher.ctx.current.track == "risk_mode"
+
+
+def _push_stage_focus(
+    dispatcher: CommandDispatcher, project_id: str, process_id: str, stage_id: str
+) -> None:
+    dispatcher.ctx.push(
+        ContextFrame(
+            track="stage_focus",
+            project_id=project_id,
+            process_id=process_id,
+            route_label="1.1",
+            stage_id=stage_id,
+            stage_name="Coupling",
+        )
+    )
+
+
+def _push_risk_mode(
+    dispatcher: CommandDispatcher,
+    scope: str,
+    *,
+    project_id: str,
+    process_id: str | None = None,
+    stage_id: str | None = None,
+) -> None:
+    dispatcher.ctx.push(
+        ContextFrame(
+            track="risk_mode",
+            project_id=project_id,
+            process_id=process_id,
+            route_label="1.1",
+            stage_id=stage_id,
+            risk_scope=scope,
+        )
+    )
+
+
+@pytest.mark.integration
+async def test_edit_form_prefills_text_then_blanks_select(temp_env: Environment) -> None:
+    """An edit form exposes the entity's current value per field via prompt_prefill.
+
+    Text fields surface their current value (so the loop can seed the editable
+    buffer); select fields contribute nothing because their navigator pre-fills.
+    """
+    project_id, _ = await _seed_route(temp_env)
+    dispatcher = _make_dispatcher(temp_env)
+    dispatcher.ctx.push(
+        ContextFrame(track="project", project_id=project_id, project_name="Alpha")
+    )
+
+    await dispatcher.handle_hotkey(CTRL_E)
+    assert dispatcher.prompt_state is not None
+    assert dispatcher.prompt_prefill() == "Alpha"  # name text field
+
+    await dispatcher.advance_prompt("Renamed")
+    assert dispatcher.prompt_prefill() == ""  # therapy_area is a select field
+
+    await dispatcher.advance_prompt(TA.CVRM.value)
+    updated = await get_project_by_id(UUID(project_id), env=temp_env)
+    assert updated is not None
+    assert updated.name == "Renamed"
+    assert updated.therapy_area == TA.CVRM
+
+
+@pytest.mark.integration
+async def test_risk_mode_add_hotkey_creates_stage_risk(temp_env: Environment) -> None:
+    """Ctrl-A in stage-scoped risk_mode opens the add-risk form and persists it."""
+    project_id, process_id = await _seed_route(temp_env)
+    stage = await create_stage(
+        StageCreate(process_id=UUID(process_id), name="Coupling", number=1), env=temp_env
+    )
+    assert stage is not None
+    dispatcher = _make_dispatcher(temp_env)
+    _push_risk_mode(
+        dispatcher, "stage", project_id=project_id, process_id=process_id, stage_id=str(stage.id)
+    )
+
+    await dispatcher.handle_hotkey(CTRL_A)
+    assert dispatcher.prompt_state is not None
+    await dispatcher.advance_prompt("Safety")
+    await dispatcher.advance_prompt("Exotherm")
+    await dispatcher.advance_prompt("")  # description (optional)
+    await dispatcher.advance_prompt("")  # current_level (optional)
+    await dispatcher.advance_prompt("")  # proposed_mitigation (optional)
+    await dispatcher.advance_prompt("")  # mitigated_level (optional)
+
+    risks = await list_risks_for_stage(UUID(str(stage.id)), env=temp_env)
+    assert [risk.name for risk in risks] == ["Exotherm"]
+
+
+@pytest.mark.integration
+async def test_risk_mode_add_hotkey_creates_process_risk(temp_env: Environment) -> None:
+    """Ctrl-A in process-scoped risk_mode persists a manufacturing-process risk."""
+    project_id, process_id = await _seed_route(temp_env)
+    dispatcher = _make_dispatcher(temp_env)
+    _push_risk_mode(dispatcher, "process", project_id=project_id, process_id=process_id)
+
+    await dispatcher.handle_hotkey(CTRL_A)
+    assert dispatcher.prompt_state is not None
+    await dispatcher.advance_prompt("Quality")
+    await dispatcher.advance_prompt("Impurity carryover")
+    for _ in range(4):
+        await dispatcher.advance_prompt("")
+
+    risks = await list_risks_for_process(UUID(process_id), env=temp_env)
+    assert [risk.name for risk in risks] == ["Impurity carryover"]
+
+
+@pytest.mark.integration
+async def test_risk_mode_add_hotkey_noop_for_project_scope(temp_env: Environment) -> None:
+    """Ctrl-A is ignored in the project aggregate view (no single target entity)."""
+    project_id, _ = await _seed_route(temp_env)
+    dispatcher = _make_dispatcher(temp_env)
+    _push_risk_mode(dispatcher, "project", project_id=project_id)
+
+    result = await dispatcher.handle_hotkey(CTRL_A)
+    assert result is None
+    assert dispatcher.prompt_state is None
+
+
+@pytest.mark.integration
+async def test_risk_mode_edit_hotkey_prefills_and_updates_risk(temp_env: Environment) -> None:
+    """Ctrl-E in risk_mode picks a risk, opens a pre-filled form, and saves edits."""
+    project_id, process_id = await _seed_route(temp_env)
+    stage = await create_stage(
+        StageCreate(process_id=UUID(process_id), name="Coupling", number=1), env=temp_env
+    )
+    assert stage is not None
+    risk = await create_stage_risk(
+        StageRiskCreate(
+            stage_id=UUID(str(stage.id)), risk_type="Safety", name="Exotherm", current_level=5
+        ),
+        env=temp_env,
+    )
+    assert risk is not None
+    dispatcher = _make_dispatcher(temp_env)
+    _push_risk_mode(
+        dispatcher, "stage", project_id=project_id, process_id=process_id, stage_id=str(stage.id)
+    )
+
+    await dispatcher.handle_hotkey(CTRL_E)
+    assert dispatcher.picker_state is not None
+    await dispatcher.picker_select()
+
+    assert dispatcher.prompt_state is not None
+    assert dispatcher.prompt_prefill() == "Safety"  # risk_type pre-filled
+    await dispatcher.advance_prompt("Hazard")  # change risk_type
+    assert dispatcher.prompt_prefill() == "Exotherm"  # name pre-filled
+    await dispatcher.advance_prompt("Runaway exotherm")  # change name
+    for _ in range(4):
+        await dispatcher.advance_prompt("")  # keep remaining defaults
+
+    risks = await list_risks_for_stage(UUID(str(stage.id)), env=temp_env)
+    assert len(risks) == 1
+    assert risks[0].risk_type == "Hazard"
+    assert risks[0].name == "Runaway exotherm"
+    assert risks[0].current_level == 5  # unchanged default preserved
+
+
+@pytest.mark.integration
+async def test_stage_risks_hotkey_enters_stage_risk_mode(temp_env: Environment) -> None:
+    """Ctrl-R on a focused stage opens the stage-scoped risk_mode view."""
+    project_id, process_id = await _seed_route(temp_env)
+    stage = await create_stage(
+        StageCreate(process_id=UUID(process_id), name="Coupling", number=1), env=temp_env
+    )
+    assert stage is not None
+    dispatcher = _make_dispatcher(temp_env)
+    _push_stage_focus(dispatcher, project_id, process_id, str(stage.id))
+
+    await dispatcher.handle_hotkey(CTRL_R)
+    assert dispatcher.ctx.current.track == "risk_mode"
+    assert dispatcher.ctx.current.risk_scope == "stage"
+
+
+@pytest.mark.integration
+async def test_route_edit_chooser_updates_route_numbers(temp_env: Environment) -> None:
+    """Ctrl-E → choose "route" → a pre-filled form updates route/process numbers."""
+    project_id, process_id = await _seed_route(temp_env)
+    dispatcher = _make_dispatcher(temp_env)
+    _push_route(dispatcher, project_id, process_id)
+
+    await dispatcher.handle_hotkey(CTRL_E)
+    assert dispatcher.prompt_state is not None  # edit chooser
+    await dispatcher.advance_prompt("route")
+
+    assert dispatcher.prompt_state is not None  # route/process number form
+    assert dispatcher.prompt_prefill() == "1"  # route_number pre-filled
+    await dispatcher.advance_prompt("2")
+    assert dispatcher.prompt_prefill() == "1"  # process_number pre-filled
+    await dispatcher.advance_prompt("3")
+
+    updated = await get_process_by_id(UUID(process_id), env=temp_env)
+    assert updated is not None
+    assert (updated.route_number, updated.process_number) == (2, 3)
