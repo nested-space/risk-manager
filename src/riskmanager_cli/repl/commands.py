@@ -37,6 +37,7 @@ from ..operations.component_salt_operations import (
     delete_component_salt,
 )
 from ..operations.counterion_operations import (
+    add_counterion_alias,
     create_counterion,
     delete_counterion,
     list_counterions,
@@ -64,6 +65,7 @@ from ..operations.material_operations import (
     update_material,
 )
 from ..operations.ncrm_library_operations import (
+    add_ncrm_alias,
     create_ncrm_library_entry,
     delete_ncrm_library_entry,
     get_ncrm_by_display_name,
@@ -123,10 +125,12 @@ from ..schema.create import (
     ComponentCreate,
     ComponentRiskCreate,
     ComponentSaltCreate,
+    CounterionAliasCreate,
     CounterionCreate,
     ManufacturingProcessCreate,
     ManufacturingProcessRiskCreate,
     MaterialCreate,
+    NcrmLibraryAliasCreate,
     NcrmLibraryCreate,
     ProjectCreate,
     StageComponentCreate,
@@ -147,6 +151,7 @@ from ..schema.update import (
     StageRiskUpdate,
     StageUpdate,
 )
+from ..utils.parsing import split_aliases
 from .context import ContextFrame, ContextManager
 from .list_navigator import ListItem, ListNavigator
 from .screen import ScreenManager
@@ -2612,54 +2617,71 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         dry_run: bool,
         skip_errors: bool,
     ) -> list[str]:
-        reader = csv.DictReader(StringIO(content))
+        importers = {
+            "ncrm": self._import_ncrm_row,
+            "counterions": self._import_counterion_row,
+        }
+        importer = importers.get(import_type)
+        if importer is None:
+            return ["Supported admin imports: materials, ncrm, counterions"]
+
         created = 0
         errors = 0
-        for row in reader:
+        for row in csv.DictReader(StringIO(content)):
+            if dry_run:
+                created += 1
+                continue
             try:
-                operation_succeeded = False
-                if import_type == "ncrm":
-                    if dry_run:
-                        created += 1
-                        continue
-                    ncrm_result = await create_ncrm_library_entry(
-                        NcrmLibraryCreate(
-                            display_name=(row.get("display_name") or "").strip(),
-                            common_name=(row.get("common_name") or "").strip(),
-                            interpret_chemically=(
-                                (row.get("interpret_chemically") or "false").strip().lower()
-                                == "true"
-                            ),
-                            smiles=(row.get("smiles") or "").strip() or None,
-                        ),
-                        self.env,
-                    )
-                    operation_succeeded = ncrm_result is not None
-                elif import_type == "counterions":
-                    if dry_run:
-                        created += 1
-                        continue
-                    counterion_result = await create_counterion(
-                        CounterionCreate(
-                            name=(row.get("name") or "").strip(),
-                            smiles=(row.get("smiles") or "").strip() or None,
-                        ),
-                        self.env,
-                    )
-                    operation_succeeded = counterion_result is not None
-                else:
-                    return ["Supported admin imports: materials, ncrm, counterions"]
-                if not operation_succeeded:
-                    errors += 1
-                    if not skip_errors:
-                        break
-                else:
-                    created += 1
-            except Exception:  # pylint: disable=broad-exception-caught  # import loop must not abort on single-row error
+                succeeded = await importer(row)
+            except Exception:  # pylint: disable=broad-exception-caught  # one bad row must not abort the import
+                succeeded = False
+            if succeeded:
+                created += 1
+            else:
                 errors += 1
                 if not skip_errors:
                     break
         return [f"{import_type} import: created={created} errors={errors} dry_run={dry_run}"]
+
+    async def _import_ncrm_row(self, row: dict[str, str]) -> bool:
+        """Create one NCRM entry plus its ``;``-separated aliases; ``False`` on failure."""
+        result = await create_ncrm_library_entry(
+            NcrmLibraryCreate(
+                display_name=(row.get("display_name") or "").strip(),
+                common_name=(row.get("common_name") or "").strip(),
+                interpret_chemically=(
+                    (row.get("interpret_chemically") or "false").strip().lower() == "true"
+                ),
+                smiles=(row.get("smiles") or "").strip() or None,
+            ),
+            self.env,
+        )
+        if result is None:
+            return False
+        for alias in split_aliases((row.get("aliases") or "").strip()):
+            await add_ncrm_alias(
+                NcrmLibraryAliasCreate(ncrm_library_id=UUID(str(result.id)), alias=alias),
+                self.env,
+            )
+        return True
+
+    async def _import_counterion_row(self, row: dict[str, str]) -> bool:
+        """Create one counterion plus its ``;``-separated aliases; ``False`` on failure."""
+        result = await create_counterion(
+            CounterionCreate(
+                name=(row.get("name") or "").strip(),
+                smiles=(row.get("smiles") or "").strip() or None,
+            ),
+            self.env,
+        )
+        if result is None:
+            return False
+        for alias in split_aliases((row.get("aliases") or "").strip()):
+            await add_counterion_alias(
+                CounterionAliasCreate(counterion_id=UUID(str(result.id)), alias=alias),
+                self.env,
+            )
+        return True
 
     async def _admin_db(self, args: list[str]) -> list[str]:
         action = args[0].lower()
