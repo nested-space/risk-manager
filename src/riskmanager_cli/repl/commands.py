@@ -37,11 +37,13 @@ from ..operations.component_salt_operations import (
     delete_component_salt,
 )
 from ..operations.counterion_operations import (
+    add_counterion_alias,
     create_counterion,
     delete_counterion,
     list_counterions,
     update_counterion,
 )
+from ..operations.dmta_operations import ResolveResult, augment_name
 from ..operations.manufacturing_process_operations import (
     create_manufacturing_process,
     get_process_by_id,
@@ -55,6 +57,7 @@ from ..operations.manufacturing_process_risk_operations import (
     update_manufacturing_process_risk,
 )
 from ..operations.material_operations import (
+    add_material_alias,
     bulk_import_materials,
     create_material,
     delete_material,
@@ -64,6 +67,7 @@ from ..operations.material_operations import (
     update_material,
 )
 from ..operations.ncrm_library_operations import (
+    add_ncrm_alias,
     create_ncrm_library_entry,
     delete_ncrm_library_entry,
     get_ncrm_by_display_name,
@@ -123,10 +127,13 @@ from ..schema.create import (
     ComponentCreate,
     ComponentRiskCreate,
     ComponentSaltCreate,
+    CounterionAliasCreate,
     CounterionCreate,
     ManufacturingProcessCreate,
     ManufacturingProcessRiskCreate,
+    MaterialAliasCreate,
     MaterialCreate,
+    NcrmLibraryAliasCreate,
     NcrmLibraryCreate,
     ProjectCreate,
     StageComponentCreate,
@@ -147,6 +154,7 @@ from ..schema.update import (
     StageRiskUpdate,
     StageUpdate,
 )
+from ..utils.parsing import split_aliases
 from .context import ContextFrame, ContextManager
 from .list_navigator import ListItem, ListNavigator
 from .screen import ScreenManager
@@ -2498,33 +2506,120 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return [f"No {sub_mode} item matched '{name}'."]
 
     def _start_library_add_prompt(self, sub_mode: str) -> list[str]:
+        # Each add flow is a three-step chain: collect the lead name, offer to
+        # auto-resolve SMILES/aliases, then collect the remaining fields with the
+        # resolved SMILES pre-filled (see _offer_augment / _finish_library_add).
         if sub_mode == "materials":
             return self.start_prompt(
-                [FieldSpec("name"), FieldSpec("smiles", required=False)],
-                lambda **payload: self._create_material_from_prompt(payload),
+                [FieldSpec("name")],
+                lambda **payload: self._offer_augment("materials", payload.get("name") or ""),
                 title="Add material",
+            )
+        if sub_mode == "ncrm":
+            return self.start_prompt(
+                [FieldSpec("common_name")],
+                lambda **payload: self._offer_augment("ncrm", payload.get("common_name") or ""),
+                title="Add NCRM",
+            )
+        if sub_mode == "counterions":
+            return self.start_prompt(
+                [FieldSpec("name")],
+                lambda **payload: self._offer_augment("counterions", payload.get("name") or ""),
+                title="Add counterion",
+            )
+        return ["Choose a library subsection first."]
+
+    def _offer_augment(self, sub_mode: str, name: str) -> list[str]:
+        """Ask whether to auto-resolve SMILES/aliases for *name* before finishing.
+
+        Args:
+            sub_mode: Library subsection (``materials``/``ncrm``/``counterions``).
+            name: The lead name to resolve (the ``common_name`` for NCRM entries).
+
+        Returns:
+            Prompt lines for the Yes/No augment question, or the finish form when
+            *name* is empty.
+        """
+        if not name:
+            return self._finish_library_add(sub_mode, name, None, [])
+        label = f"Augment '{name}' with SMILES & aliases?"
+        return self.start_prompt(
+            [FieldSpec(label, field_type="select", options=CONFIRM_OPTIONS, default="no")],
+            lambda **payload: self._resolve_augment(sub_mode, name, payload[_field_key(label)]),
+        )
+
+    async def _resolve_augment(self, sub_mode: str, name: str, answer: str | None) -> list[str]:
+        """Run augmentation when confirmed, then open the finish form pre-filled.
+
+        On a successful resolve, the SMILES seeds the finish form's ``smiles``
+        field and the aliases are carried through to be persisted on completion;
+        a status notice reports the source and alias count. On a miss (or "No"),
+        the form opens for manual SMILES entry.
+        """
+        if answer != "yes":
+            return self._finish_library_add(sub_mode, name, None, [])
+        result = await augment_name(name)
+        if result.resolved:
+            self._notice = (self._augment_success_message(result), "success")
+            return self._finish_library_add(sub_mode, name, result.smiles, result.aliases)
+        self._notice = (f"Could not resolve '{name}'. Enter SMILES manually.", "warning")
+        return self._finish_library_add(sub_mode, name, None, [])
+
+    @staticmethod
+    def _augment_success_message(result: ResolveResult) -> str:
+        """Build the success notice for a resolved augmentation."""
+        count = len(result.aliases)
+        plural = "alias" if count == 1 else "aliases"
+        return f"Resolved via {result.source}: SMILES pre-filled, {count} {plural} found."
+
+    def _finish_library_add(
+        self,
+        sub_mode: str,
+        name: str,
+        smiles: str | None,
+        aliases: list[str],
+    ) -> list[str]:
+        """Open the final add form, pre-filling SMILES and carrying *aliases*.
+
+        Args:
+            sub_mode: Library subsection.
+            name: The lead name collected earlier (``common_name`` for NCRM).
+            smiles: Resolved SMILES to seed the field, or ``None`` for manual entry.
+            aliases: Aliases to persist once the entity is created.
+
+        Returns:
+            Prompt-render lines for the finish form.
+        """
+        if sub_mode == "materials":
+            return self.start_prompt(
+                [FieldSpec("smiles", required=False, default=smiles)],
+                lambda **payload: self._create_material_from_prompt(
+                    name, payload.get("smiles"), aliases
+                ),
+                title="Add material",
+            )
+        if sub_mode == "counterions":
+            return self.start_prompt(
+                [FieldSpec("smiles", required=False, default=smiles)],
+                lambda **payload: self._create_counterion_from_prompt(
+                    name, payload.get("smiles"), aliases
+                ),
+                title="Add counterion",
             )
         if sub_mode == "ncrm":
             return self.start_prompt(
                 [
                     FieldSpec("display_name"),
-                    FieldSpec("common_name"),
                     FieldSpec(
                         "interpret_chemically",
                         field_type="select",
                         options=BOOL_OPTIONS,
                         default="false",
                     ),
-                    FieldSpec("smiles", required=False),
+                    FieldSpec("smiles", required=False, default=smiles),
                 ],
-                lambda **payload: self._create_ncrm_from_prompt(payload),
+                lambda **payload: self._create_ncrm_from_prompt(name, payload, aliases),
                 title="Add NCRM",
-            )
-        if sub_mode == "counterions":
-            return self.start_prompt(
-                [FieldSpec("name"), FieldSpec("smiles", required=False)],
-                lambda **payload: self._create_counterion_from_prompt(payload),
-                title="Add counterion",
             )
         return ["Choose a library subsection first."]
 
@@ -2612,54 +2707,71 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         dry_run: bool,
         skip_errors: bool,
     ) -> list[str]:
-        reader = csv.DictReader(StringIO(content))
+        importers = {
+            "ncrm": self._import_ncrm_row,
+            "counterions": self._import_counterion_row,
+        }
+        importer = importers.get(import_type)
+        if importer is None:
+            return ["Supported admin imports: materials, ncrm, counterions"]
+
         created = 0
         errors = 0
-        for row in reader:
+        for row in csv.DictReader(StringIO(content)):
+            if dry_run:
+                created += 1
+                continue
             try:
-                operation_succeeded = False
-                if import_type == "ncrm":
-                    if dry_run:
-                        created += 1
-                        continue
-                    ncrm_result = await create_ncrm_library_entry(
-                        NcrmLibraryCreate(
-                            display_name=(row.get("display_name") or "").strip(),
-                            common_name=(row.get("common_name") or "").strip(),
-                            interpret_chemically=(
-                                (row.get("interpret_chemically") or "false").strip().lower()
-                                == "true"
-                            ),
-                            smiles=(row.get("smiles") or "").strip() or None,
-                        ),
-                        self.env,
-                    )
-                    operation_succeeded = ncrm_result is not None
-                elif import_type == "counterions":
-                    if dry_run:
-                        created += 1
-                        continue
-                    counterion_result = await create_counterion(
-                        CounterionCreate(
-                            name=(row.get("name") or "").strip(),
-                            smiles=(row.get("smiles") or "").strip() or None,
-                        ),
-                        self.env,
-                    )
-                    operation_succeeded = counterion_result is not None
-                else:
-                    return ["Supported admin imports: materials, ncrm, counterions"]
-                if not operation_succeeded:
-                    errors += 1
-                    if not skip_errors:
-                        break
-                else:
-                    created += 1
-            except Exception:  # pylint: disable=broad-exception-caught  # import loop must not abort on single-row error
+                succeeded = await importer(row)
+            except Exception:  # pylint: disable=broad-exception-caught  # one bad row must not abort the import
+                succeeded = False
+            if succeeded:
+                created += 1
+            else:
                 errors += 1
                 if not skip_errors:
                     break
         return [f"{import_type} import: created={created} errors={errors} dry_run={dry_run}"]
+
+    async def _import_ncrm_row(self, row: dict[str, str]) -> bool:
+        """Create one NCRM entry plus its ``;``-separated aliases; ``False`` on failure."""
+        result = await create_ncrm_library_entry(
+            NcrmLibraryCreate(
+                display_name=(row.get("display_name") or "").strip(),
+                common_name=(row.get("common_name") or "").strip(),
+                interpret_chemically=(
+                    (row.get("interpret_chemically") or "false").strip().lower() == "true"
+                ),
+                smiles=(row.get("smiles") or "").strip() or None,
+            ),
+            self.env,
+        )
+        if result is None:
+            return False
+        for alias in split_aliases((row.get("aliases") or "").strip()):
+            await add_ncrm_alias(
+                NcrmLibraryAliasCreate(ncrm_library_id=UUID(str(result.id)), alias=alias),
+                self.env,
+            )
+        return True
+
+    async def _import_counterion_row(self, row: dict[str, str]) -> bool:
+        """Create one counterion plus its ``;``-separated aliases; ``False`` on failure."""
+        result = await create_counterion(
+            CounterionCreate(
+                name=(row.get("name") or "").strip(),
+                smiles=(row.get("smiles") or "").strip() or None,
+            ),
+            self.env,
+        )
+        if result is None:
+            return False
+        for alias in split_aliases((row.get("aliases") or "").strip()):
+            await add_counterion_alias(
+                CounterionAliasCreate(counterion_id=UUID(str(result.id)), alias=alias),
+                self.env,
+            )
+        return True
 
     async def _admin_db(self, args: list[str]) -> list[str]:
         action = args[0].lower()
@@ -3388,20 +3500,29 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 component_id=current.component_id,
             )
 
-    async def _create_material_from_prompt(self, payload: dict[str, str | None]) -> list[str]:
+    async def _create_material_from_prompt(
+        self, name: str, smiles: str | None, aliases: list[str]
+    ) -> list[str]:
         created = await create_material(
-            MaterialCreate(name=payload.get("name") or "", smiles=payload.get("smiles") or None),
+            MaterialCreate(name=name or "", smiles=smiles or None),
             self.env,
         )
         if created is None:
             return await self._refresh_with_notice("Failed to create material.", "error")
-        return await self._refresh_with_notice("Material created.")
+        for alias in aliases:
+            await add_material_alias(
+                MaterialAliasCreate(material_id=UUID(str(created.id)), alias=alias),
+                self.env,
+            )
+        return await self._refresh_with_notice(_created_notice("Material", aliases))
 
-    async def _create_ncrm_from_prompt(self, payload: dict[str, str | None]) -> list[str]:
+    async def _create_ncrm_from_prompt(
+        self, common_name: str, payload: dict[str, str | None], aliases: list[str]
+    ) -> list[str]:
         created = await create_ncrm_library_entry(
             NcrmLibraryCreate(
                 display_name=payload.get("display_name") or "",
-                common_name=payload.get("common_name") or "",
+                common_name=common_name or "",
                 interpret_chemically=_as_bool(payload.get("interpret_chemically")),
                 smiles=payload.get("smiles") or None,
             ),
@@ -3409,16 +3530,28 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         )
         if created is None:
             return await self._refresh_with_notice("Failed to create NCRM entry.", "error")
-        return await self._refresh_with_notice("NCRM entry created.")
+        for alias in aliases:
+            await add_ncrm_alias(
+                NcrmLibraryAliasCreate(ncrm_library_id=UUID(str(created.id)), alias=alias),
+                self.env,
+            )
+        return await self._refresh_with_notice(_created_notice("NCRM entry", aliases))
 
-    async def _create_counterion_from_prompt(self, payload: dict[str, str | None]) -> list[str]:
+    async def _create_counterion_from_prompt(
+        self, name: str, smiles: str | None, aliases: list[str]
+    ) -> list[str]:
         created = await create_counterion(
-            CounterionCreate(name=payload.get("name") or "", smiles=payload.get("smiles") or None),
+            CounterionCreate(name=name or "", smiles=smiles or None),
             self.env,
         )
         if created is None:
             return await self._refresh_with_notice("Failed to create counterion.", "error")
-        return await self._refresh_with_notice("Counterion created.")
+        for alias in aliases:
+            await add_counterion_alias(
+                CounterionAliasCreate(counterion_id=UUID(str(created.id)), alias=alias),
+                self.env,
+            )
+        return await self._refresh_with_notice(_created_notice("Counterion", aliases))
 
     async def _start_project_material_picker(self, payload: dict[str, str | None]) -> list[str]:
         materials = await list_materials(self.env)
@@ -3874,6 +4007,14 @@ HELP_TOPICS: dict[str, list[str]] = {
 
 def _field_key(label: str) -> str:
     return label.strip().lower().replace(" ", "_")
+
+
+def _created_notice(entity: str, aliases: list[str]) -> str:
+    """Build the success notice for a created entity, noting any added aliases."""
+    if not aliases:
+        return f"{entity} created."
+    plural = "alias" if len(aliases) == 1 else "aliases"
+    return f"{entity} created with {len(aliases)} {plural}."
 
 
 def _optional_int(value: str | None) -> int | None:

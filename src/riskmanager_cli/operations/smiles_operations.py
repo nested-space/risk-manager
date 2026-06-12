@@ -1,76 +1,54 @@
 """
 SMILES validation, canonicalization, and auto-detection operations.
 
-Wraps RDKit functions for use in the operations layer. All functions degrade
-gracefully when RDKit is unavailable or the SMILES string is invalid: they
-return ``None`` or ``False`` rather than raising.
+Delegates the RDKit-backed work (validation, canonicalization) to the
+``dmta_cli`` library so the cheminformatics logic lives in one place. The
+project-specific :func:`detect_search_type` heuristic (not part of the library)
+stays here.
 
 Why this exists:
     SMILES handling is used in material, NCRM, and counterion operations, and
-    in the admin ``/admin db canonicalize`` command. Centralising RDKit calls
-    here means the rest of the operations layer imports a simple bool/str API
-    and does not need to know about RDKit internals.
+    in the admin ``/admin db canonicalize`` command. Centralising it here means
+    the rest of the operations layer imports a simple bool/str API and does not
+    need to know which library performs the parsing.
 """
 
-from ..utils.console_formatting import print_warning
+import dmta_cli
 
 
 def is_valid_smiles(smiles: str) -> bool:
     """Return ``True`` if *smiles* is a valid, parseable SMILES string.
 
-    Uses RDKit's ``MolFromSmiles`` to attempt parsing. Returns ``False`` if
-    parsing fails or if RDKit is unavailable.
-
     Args:
         smiles: SMILES string to validate.
 
     Returns:
-        ``True`` if valid; ``False`` if invalid or RDKit unavailable.
+        ``True`` if valid; ``False`` otherwise (including empty input).
     """
-    try:
-        from rdkit import Chem  # pylint: disable=import-outside-toplevel
-
-        mol = Chem.MolFromSmiles(smiles)
-        return mol is not None
-    except ImportError:
-        print_warning("RDKit not available; SMILES validation skipped.")
-        return True  # non-blocking: treat as valid when RDKit absent
-    except Exception:  # pylint: disable=broad-except
-        return False
+    return dmta_cli.is_valid(smiles)
 
 
 def canonicalize_smiles(smiles: str) -> str | None:
-    """Return the RDKit canonical form of *smiles*, or ``None`` on failure.
+    """Return the canonical form of *smiles*, or ``None`` on failure.
 
     Args:
         smiles: SMILES string to canonicalize.
 
     Returns:
-        The canonical SMILES string, or ``None`` if invalid / RDKit unavailable.
+        The canonical SMILES string, or ``None`` if invalid/empty.
     """
-    try:
-        from rdkit import Chem  # pylint: disable=import-outside-toplevel
-
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            return None
-        return Chem.MolToSmiles(mol)
-    except ImportError:
-        print_warning("RDKit not available; returning SMILES unchanged.")
-        return smiles
-    except Exception:  # pylint: disable=broad-except
-        return None
+    return dmta_cli.canonicalize(smiles)
 
 
 def is_canonical_smiles(smiles: str) -> bool:
-    """Return ``True`` if *smiles* is already in canonical RDKit form.
+    """Return ``True`` if *smiles* is already in canonical form.
 
     Args:
         smiles: SMILES string to check.
 
     Returns:
         ``True`` if *smiles* == ``canonicalize_smiles(smiles)``; ``False``
-        if non-canonical, invalid, or RDKit unavailable.
+        if non-canonical or invalid.
     """
     canonical = canonicalize_smiles(smiles)
     return canonical is not None and canonical == smiles

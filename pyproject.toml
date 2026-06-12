@@ -13,8 +13,14 @@ dependencies = [
     "aiosqlite>=0.19.0",
     "blessed>=1.19.0",
     "colorama>=0.4.6",
+    # dmta-cli is not on PyPI; install the bundled wheel:
+    #   pip install lib/dmta_cli-0.1.1-py3-none-any.whl
+    "dmta-cli>=0.1.1",
     "httpx>=0.24.0",
     "pydantic>=2.0.0",
+    # rdkit is reached only transitively (via dmta-cli), but its bundled stubs
+    # ship a malformed rdchem.pyi:347 that breaks mypy; stubs/rdkit/ shadows it.
+    # Keep this pin explicit so that shadow stays matched to the expected version.
     "rdkit>=2023.3.1",
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlmodel>=0.0.8",
