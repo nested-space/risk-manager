@@ -1,14 +1,14 @@
 """
 Visualization operations for manufacturing route ASCII layout.
 
-Bridges the operations layer (database queries) with the layout engine
-(``utils/manufacturing_layout_engine.py``) to produce printable route diagrams.
+Bridges the operations layer (database queries) with the layout engines
+(``utils/component_graph_layout.py``) to produce printable route diagrams.
 Used by the route view renderer (``repl/renderers/route_renderer.py``).
 
 Why this exists:
-    The layout engine is a pure utility that knows nothing about the database.
-    This module fetches the required data and converts it into the ``StageNode``
-    objects that the layout engine consumes.
+    The layout engines are pure utilities that know nothing about the database.
+    This module fetches the required data and converts it into the
+    ``StageInput``/``ComponentInput`` structures the layout engines consume.
 """
 
 from uuid import UUID
@@ -19,33 +19,11 @@ from ..utils.component_graph_layout import (
     StageComponentInput,
     StageInput,
 )
-from ..utils.manufacturing_layout_engine import LayoutResult, StageNode, render_route_layout
 from .component_operations import list_components_for_process
 from .material_operations import get_material_by_id
 from .stage_component_operations import list_stage_components
 from .stage_operations import list_stages_for_process
 from .stage_risk_operations import list_risks_for_stage
-
-
-async def get_route_layout(
-    process_id: UUID,
-    env: Environment = Environment.DEV,
-    verbose: bool = False,
-) -> LayoutResult:
-    """Fetch stages for *process_id* and render an ASCII route diagram.
-
-    Args:
-        process_id: UUID of the manufacturing process.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        A :class:`~..utils.manufacturing_layout_engine.LayoutResult` with
-        rendered ASCII lines. Returns an empty-stage layout if no stages exist.
-    """
-    stages = await list_stages_for_process(process_id, env, verbose)
-    nodes = [StageNode(name=s.name, number=s.number) for s in stages]
-    return render_route_layout(nodes)
 
 
 async def get_graph_inputs(
@@ -79,6 +57,7 @@ async def get_graph_inputs(
         stage_inputs.append(
             StageInput(
                 name=stage.name,
+                number=stage.number,
                 stage_components=[
                     StageComponentInput(
                         component_id=str(link.component_id),

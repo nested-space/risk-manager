@@ -13,16 +13,22 @@ import pytest
 from riskmanager_cli.config.settings import Environment
 from riskmanager_cli.model.enums import TA
 from riskmanager_cli.model.tables import ManufacturingProcess
+from riskmanager_cli.operations.component_operations import create_component
 from riskmanager_cli.operations.manufacturing_process_operations import (
     create_manufacturing_process,
 )
 from riskmanager_cli.operations.material_operations import create_material
 from riskmanager_cli.operations.project_operations import create_project
+from riskmanager_cli.operations.stage_component_operations import create_stage_component
+from riskmanager_cli.operations.stage_operations import create_stage
 from riskmanager_cli.repl.renderers.route_renderer import render_route_screen
 from riskmanager_cli.schema.create import (
+    ComponentCreate,
     ManufacturingProcessCreate,
     MaterialCreate,
     ProjectCreate,
+    StageComponentCreate,
+    StageCreate,
 )
 
 
@@ -62,6 +68,50 @@ async def test_render_route_screen_has_section_rules_and_framed_diagram(
     # With no risks recorded the body shows the placeholder under the rule.
     risks_index = next(i for i, line in enumerate(lines) if "─ Risks " in line)
     assert any("(no risks recorded)" in line for line in lines[risks_index:])
+    # No stages yet → the framed diagram shows the empty-stage placeholder.
+    assert any("(no stages defined yet)" in line for line in lines)
+
+
+@pytest.mark.integration
+async def test_render_route_screen_shows_stage_table_when_graph_incomplete(
+    temp_env: Environment,
+) -> None:
+    """An in-progress process falls back to a #/Name/materials/products table."""
+    process = await _seed_process(temp_env)
+    process_id = UUID(str(process.id))
+
+    toluene = await create_material(
+        MaterialCreate(name="Toluene", smiles="Cc1ccccc1"), env=temp_env
+    )
+    assert toluene is not None
+    component = await create_component(
+        ComponentCreate(process_id=process_id, material_id=UUID(str(toluene.id))),
+        env=temp_env,
+    )
+    assert component is not None
+    # A stage with a reactant but no product cannot form a valid DAG, forcing the
+    # renderer onto the stage-list fallback.
+    stage = await create_stage(
+        StageCreate(process_id=process_id, name="Reaction", number=1), env=temp_env
+    )
+    assert stage is not None
+    link = await create_stage_component(
+        StageComponentCreate(
+            stage_id=UUID(str(stage.id)),
+            component_id=UUID(str(component.id)),
+            component_type="reactant",
+        ),
+        env=temp_env,
+    )
+    assert link is not None
+
+    lines = await render_route_screen(process, temp_env, width=100)
+
+    assert any("showing stage list" in line for line in lines)
+    header = next(line for line in lines if "Starting materials" in line)
+    assert "#" in header and "Name" in header and "Products" in header
+    # The reactant material appears; with no product the Products cell is "—".
+    assert any("Reaction" in line and "Toluene" in line and "—" in line for line in lines)
 
 
 @pytest.mark.integration

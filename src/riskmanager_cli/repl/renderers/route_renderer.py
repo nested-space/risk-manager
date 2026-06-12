@@ -10,14 +10,18 @@ from ...model.tables import ManufacturingProcess
 from ...operations.manufacturing_process_risk_operations import list_risks_for_process
 from ...operations.visualization_operations import (
     get_graph_inputs,
-    get_route_layout,
     get_route_risk_summary,
     get_unconnected_component_names,
 )
-from ...utils.component_graph_layout import IncompleteProcessError, split_for_width
+from ...utils.component_graph_layout import (
+    ComponentInput,
+    IncompleteProcessError,
+    StageInput,
+    split_for_width,
+)
 from ...utils.manufacturing_layout_engine import RiskDict, render_risk_summary
 from .box import render_box
-from .tables import section_rule, section_width
+from .tables import Column, render_table, section_rule, section_width
 
 # Box chrome consumed before the graph: two reserved screen margins, two box
 # borders, and ``2 * _PAD_X`` interior padding columns.
@@ -118,10 +122,45 @@ async def _diagram_lines(
         try:
             return _assemble_sections(split_for_width(stages, components, graph_budget, dim), dim)
         except IncompleteProcessError:
-            pass
+            return [
+                "(process graph incomplete — showing stage list)",
+                "",
+                *_stage_list_lines(stages, components),
+            ]
 
-    layout = await get_route_layout(UUID(str(process.id)), env)
-    return ["(process graph incomplete — showing stage list)", "", *layout.lines]
+    return ["(no stages defined yet)"]
+
+
+def _stage_list_lines(
+    stages: list[StageInput], components: list[ComponentInput]
+) -> list[str]:
+    """Render the stages as a table of #, name, starting materials, and products.
+
+    Used when the component graph can't be laid out as a single DAG (still being
+    built). A table — rather than arrow-joined boxes — avoids implying a stage
+    order we don't actually know yet.
+    """
+    name_by_id = {component.id: component.display_name for component in components}
+    columns = [
+        Column("#", align="right"),
+        Column("Name"),
+        Column("Starting materials"),
+        Column("Products"),
+    ]
+
+    def names(stage: StageInput, kind: str) -> str:
+        labels = [
+            name_by_id.get(link.component_id, link.component_id)
+            for link in stage.stage_components
+            if link.component_type == kind
+        ]
+        return ", ".join(labels) or "—"
+
+    rows = [
+        [str(stage.number), stage.name, names(stage, "reactant"), names(stage, "product")]
+        for stage in sorted(stages, key=lambda stage: stage.number)
+    ]
+    return render_table(columns, rows)
 
 
 def _assemble_sections(
