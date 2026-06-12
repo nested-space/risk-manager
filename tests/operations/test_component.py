@@ -7,10 +7,14 @@ import pytest
 from riskmanager_cli.config.settings import Environment
 from riskmanager_cli.model.enums import TA
 from riskmanager_cli.operations.component_operations import (
+    component_display_name,
     create_component,
+    format_salt_form,
     get_component_by_id,
     list_components_for_process,
 )
+from riskmanager_cli.operations.component_salt_operations import create_component_salt
+from riskmanager_cli.operations.counterion_operations import create_counterion
 from riskmanager_cli.operations.manufacturing_process_operations import (
     create_manufacturing_process,
 )
@@ -18,6 +22,8 @@ from riskmanager_cli.operations.material_operations import create_material
 from riskmanager_cli.operations.project_operations import create_project
 from riskmanager_cli.schema.create import (
     ComponentCreate,
+    ComponentSaltCreate,
+    CounterionCreate,
     ManufacturingProcessCreate,
     MaterialCreate,
     ProjectCreate,
@@ -97,3 +103,49 @@ async def test_list_components_for_process_returns_items(temp_env: Environment) 
     components = await list_components_for_process(UUID(proc_id), env=temp_env)
     assert len(components) == 1
     assert str(components[0].process_id) == proc_id
+
+
+@pytest.mark.parametrize(
+    ("base", "salts", "expected"),
+    [
+        ("A", [], "A"),
+        ("A", [(2, "B")], "A·2B"),
+        ("A", [(1, "B")], "A·B"),
+        ("A", [(None, "B")], "A·B"),
+        ("A", [(0.5, "C")], "A·0.5C"),
+        ("A", [(2, "B"), (0.5, "C")], "A·2B·0.5C"),
+    ],
+)
+def test_format_salt_form(
+    base: str, salts: list[tuple[float | None, str]], expected: str
+) -> None:
+    """Salt-form names chain salts and omit a stoichiometry of 1 or None."""
+    assert format_salt_form(base, salts) == expected
+
+
+@pytest.mark.integration
+async def test_component_display_name_includes_salt(temp_env: Environment) -> None:
+    """component_display_name resolves the material base plus its salts."""
+    mat_id, _proj_id, proc_id = await _setup_process(temp_env)
+    component = await create_component(
+        ComponentCreate(process_id=UUID(proc_id), material_id=UUID(mat_id)),
+        env=temp_env,
+    )
+    assert component is not None
+
+    # Bare material, no salts: just the material name.
+    assert await component_display_name(component, temp_env) == "TestCompMaterial"
+
+    counterion = await create_counterion(CounterionCreate(name="B"), env=temp_env)
+    assert counterion is not None
+    salt = await create_component_salt(
+        ComponentSaltCreate(
+            component_id=UUID(str(component.id)),
+            counterion_id=UUID(str(counterion.id)),
+            stoichiometry=2.0,
+        ),
+        env=temp_env,
+    )
+    assert salt is not None
+
+    assert await component_display_name(component, temp_env) == "TestCompMaterial·2B"

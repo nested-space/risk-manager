@@ -10,7 +10,7 @@ from riskmanager_cli.repl.commands import (
     PromptState,
 )
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
-from riskmanager_cli.repl.list_navigator import ListItem
+from riskmanager_cli.repl.list_navigator import ListItem, ListNavigator
 
 
 @pytest.mark.unit
@@ -87,30 +87,58 @@ def test_field_spec_float_type_raises_on_non_numeric() -> None:
 
 
 @pytest.mark.unit
-def test_field_spec_choice_type_accepts_valid_choice() -> None:
-    """A choice FieldSpec accepts a matching choice value."""
-    spec = FieldSpec(label="Type", field_type="choice", choices=["alpha", "beta"])
+def test_field_spec_select_type_accepts_value_text() -> None:
+    """A select FieldSpec resolves typed text matching an option value."""
+    spec = FieldSpec(label="Type", field_type="select", options=[("alpha", "a"), ("beta", "b")])
     state = PromptState(fields=[spec], collected=[None])
-    state.submit_value("alpha")
-    assert state.collected[0] == "alpha"
+    state.submit_value("a")
+    assert state.collected[0] == "a"
 
 
 @pytest.mark.unit
-def test_field_spec_choice_type_is_case_insensitive() -> None:
-    """A choice FieldSpec matches choices case-insensitively."""
-    spec = FieldSpec(label="Type", field_type="choice", choices=["Alpha", "Beta"])
+def test_field_spec_select_type_accepts_label_text_case_insensitively() -> None:
+    """A select FieldSpec resolves typed text matching an option label."""
+    spec = FieldSpec(label="Type", field_type="select", options=[("Yes", "true"), ("No", "false")])
     state = PromptState(fields=[spec], collected=[None])
-    state.submit_value("ALPHA")
-    assert state.collected[0] == "Alpha"
+    state.submit_value("yes")
+    assert state.collected[0] == "true"
 
 
 @pytest.mark.unit
-def test_field_spec_choice_type_raises_on_invalid_choice() -> None:
-    """A choice FieldSpec raises ValueError for a value not in the choices."""
-    spec = FieldSpec(label="Type", field_type="choice", choices=["alpha", "beta"])
+def test_field_spec_select_type_raises_on_unknown_text() -> None:
+    """A select FieldSpec raises ValueError for text matching no option."""
+    spec = FieldSpec(label="Type", field_type="select", options=[("alpha", "a"), ("beta", "b")])
     state = PromptState(fields=[spec], collected=[None])
     with pytest.raises(ValueError, match="must be one of"):
         state.submit_value("gamma")
+
+
+@pytest.mark.unit
+def test_select_field_submit_selection_stores_highlighted_value() -> None:
+    """submit_selection stores the highlighted option's value, not its label."""
+    spec = FieldSpec(label="Type", field_type="select", options=[("Yes", "true"), ("No", "false")])
+    state = PromptState(fields=[spec], collected=[None])
+    assert state.is_select_field is True
+    state.move_selection("down")  # highlight "No"
+    done = state.submit_selection()
+    assert done is True
+    assert state.collected[0] == "false"
+
+
+@pytest.mark.unit
+def test_select_field_default_highlights_matching_option() -> None:
+    """A select field's default highlights the option storing that value."""
+    spec = FieldSpec(
+        label="Defined",
+        field_type="select",
+        options=[("Not specified", ""), ("Yes", "true"), ("No", "false")],
+        default="true",
+    )
+    state = PromptState(fields=[spec], collected=[None])
+    navigator = state.select_navigator()
+    assert navigator is not None
+    assert navigator.selected is not None
+    assert navigator.selected.item_id == "true"
 
 
 @pytest.mark.unit
@@ -178,6 +206,85 @@ def test_picker_move_up_wraps_to_last_match() -> None:
     assert picker.selected.label == "Cafetannin"
 
 
+def _nav_items() -> tuple[list[ListItem], list[ListItem]]:
+    """Return (recents, all_items) for navigator preservation tests."""
+    recents = [ListItem(label=f"r{i}", item_id=f"r{i}") for i in range(3)]
+    all_items = [ListItem(label=f"a{i}", item_id=f"a{i}") for i in range(4)]
+    return recents, all_items
+
+
+@pytest.mark.unit
+def test_navigator_selection_survives_rebuild_by_id() -> None:
+    """Carrying the selected id into a rebuilt navigator preserves the cursor.
+
+    This mirrors the arrow-key loop: a key press moves the live navigator, then
+    the screen re-renders and rebuilds it. The rebuilt navigator must restore the
+    previous selection rather than snap back to the first item.
+    """
+    recents, all_items = _nav_items()
+    navigator = ListNavigator(recents, all_items)
+    navigator.move_down()
+    navigator.move_down()
+    assert navigator.selected is not None
+    moved_id = navigator.selected.item_id
+    assert moved_id == "r2"
+
+    rebuilt = ListNavigator(recents, all_items)
+    rebuilt.select_item_id(moved_id)
+    assert rebuilt.selected is not None
+    assert rebuilt.selected.item_id == "r2"
+
+
+@pytest.mark.unit
+def test_navigator_crosses_recents_all_boundary() -> None:
+    """Down from the last recent lands on the first all item, and up reverses."""
+    recents, all_items = _nav_items()
+    navigator = ListNavigator(recents, all_items)
+    for _ in range(2):
+        navigator.move_down()
+    assert navigator.selected is not None
+    assert navigator.selected.item_id == "r2"
+    navigator.move_down()
+    assert navigator.selected is not None
+    assert navigator.selected.item_id == "a0"
+    navigator.move_up()
+    assert navigator.selected is not None
+    assert navigator.selected.item_id == "r2"
+
+
+@pytest.mark.unit
+def test_render_lines_styles_and_aligns_subtitles() -> None:
+    """With a styler, subtitles are aligned into a column and styled in place."""
+    navigator = ListNavigator(
+        [],
+        [
+            ListItem(label="A (RSM)", subtitle="Stage 1 reactant", item_id="1"),
+            ListItem(label="A (Intermediate)", subtitle="unassigned", item_id="2"),
+        ],
+    )
+    lines = navigator.render_lines(
+        80, show_sections=False, subtitle_style=lambda text: f"<{text}>"
+    )
+
+    assert lines[0].startswith("▶ A (RSM)")
+    assert lines[0].endswith("<Stage 1 reactant>")
+    assert lines[1].endswith("<unassigned>")
+    # The styled subtitles start at the same column on every row.
+    assert lines[0].index("<") == lines[1].index("<")
+
+
+@pytest.mark.unit
+def test_render_lines_without_styler_appends_plain_subtitle() -> None:
+    """The legacy path leaves subtitles unstyled and space-appended."""
+    navigator = ListNavigator(
+        [], [ListItem(label="Acme", subtitle="(recent)", item_id="1")]
+    )
+
+    lines = navigator.render_lines(80, show_sections=False)
+
+    assert lines == ["▶ Acme (recent)"]
+
+
 def _hints_dispatcher(track: str) -> CommandDispatcher:
     """Build a dispatcher whose context points at *track* for hint tests.
 
@@ -193,21 +300,23 @@ def _hints_dispatcher(track: str) -> CommandDispatcher:
 @pytest.mark.unit
 @pytest.mark.parametrize("track", list(HELP_TOPICS))
 def test_command_hints_joins_help_topics_for_track(track: str) -> None:
-    """command_hints renders the track's HELP_TOPICS joined by ' · '."""
+    """command_hints renders the track's hotkey legend plus the ':' reminder."""
     hints = _hints_dispatcher(track).command_hints()
-    assert hints == " · ".join(HELP_TOPICS[track])
+    assert hints == " · ".join([*HELP_TOPICS[track], ": command"])
 
 
 @pytest.mark.unit
 def test_command_hints_falls_back_for_unknown_track() -> None:
-    """An unknown track yields the generic /help · /home · /quit fallback."""
+    """An unknown track yields the generic help/back/command fallback."""
     hints = _hints_dispatcher("does_not_exist").command_hints()
-    assert hints == "/help · /home · /quit"
+    assert hints == "? help · ^C back · : command"
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize("track", ["route_select", "stage_focus", "risk_mode"])
 def test_help_topics_define_previously_missing_tracks(track: str) -> None:
-    """The tracks that lacked hints now resolve to real commands."""
+    """Every track exposes a non-empty hotkey legend (no typed slash commands)."""
     assert HELP_TOPICS[track]
-    assert all(cmd.startswith("/") for cmd in HELP_TOPICS[track])
+    entries = HELP_TOPICS[track]
+    assert all(isinstance(entry, str) and entry for entry in entries)
+    assert not any(entry.startswith(("/add", "/list")) for entry in entries)

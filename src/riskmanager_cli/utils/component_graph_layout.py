@@ -75,10 +75,13 @@ class StageInput:
     Attributes:
         name: Display name of the stage.
         stage_components: Reactant/product links for this stage.
+        number: Sequence number within the process (used by the linear stage
+            list; ignored by the DAG layout).
     """
 
     name: str
     stage_components: list[StageComponentInput]
+    number: int = 0
 
 
 @dataclass(frozen=True)

@@ -10,12 +10,24 @@ from ...model.tables import ManufacturingProcess
 from ...operations.manufacturing_process_risk_operations import list_risks_for_process
 from ...operations.visualization_operations import (
     get_graph_inputs,
-    get_route_layout,
     get_route_risk_summary,
     get_unconnected_component_names,
 )
-from ...utils.component_graph_layout import IncompleteProcessError, split_for_width
+from ...utils.component_graph_layout import (
+    ComponentInput,
+    IncompleteProcessError,
+    StageInput,
+    split_for_width,
+)
 from ...utils.manufacturing_layout_engine import RiskDict, render_risk_summary
+from .box import render_box
+from .tables import Column, render_table, section_rule, section_width
+
+# Box chrome consumed before the graph: two reserved screen margins, two box
+# borders, and ``2 * _PAD_X`` interior padding columns.
+_PAD_X = 2
+_PAD_Y = 2
+_RESERVED = 2
 
 
 def _identity(text: str) -> str:
@@ -41,8 +53,9 @@ async def render_route_screen(
     Returns:
         Renderable output lines.
     """
-    route_label = f"{process.route_number}.{process.process_number}"
+    box_width = max(width - _RESERVED, 0)
     diagram_lines = await _diagram_lines(process, env, width, dim)
+    boxed_diagram = render_box(diagram_lines, box_width, pad_x=_PAD_X, pad_y=_PAD_Y)
 
     unconnected = await get_unconnected_component_names(UUID(str(process.id)), env)
     warning_lines: list[str] = []
@@ -53,11 +66,27 @@ async def render_route_screen(
             *[f"  • {name}" for name in unconnected],
         ]
 
+    rule_width = section_width(width)
+    process_title = f"Route {process.route_number} Process {process.process_number}"
+    # ``render_risk_summary`` already indents its rows into the body gutter.
+    risk_body = render_risk_summary(await _risk_dashboard(process, env), include_header=False)
+    return [
+        section_rule(process_title, rule_width),
+        "",
+        *boxed_diagram,
+        *warning_lines,
+        "",
+        section_rule("Risks", rule_width),
+        "",
+        *risk_body,
+    ]
+
+
+async def _risk_dashboard(process: ManufacturingProcess, env: Environment) -> list[RiskDict]:
+    """Collect stage and process risks into the dashboard's input rows."""
     stage_risks = await get_route_risk_summary(UUID(str(process.id)), env)
     process_risks = await list_risks_for_process(UUID(str(process.id)), env)
-    dashboard_input: list[RiskDict] = []
-    for stage_risk in stage_risks:
-        dashboard_input.append(dict(stage_risk))
+    dashboard_input: list[RiskDict] = [dict(stage_risk) for stage_risk in stage_risks]
     for process_risk in process_risks:
         dashboard_input.append(
             {
@@ -68,14 +97,7 @@ async def render_route_screen(
                 "component_name": "Process",
             }
         )
-    return [
-        f"Route {route_label}",
-        "",
-        *diagram_lines,
-        *warning_lines,
-        "",
-        *render_risk_summary(dashboard_input),
-    ]
+    return dashboard_input
 
 
 async def _diagram_lines(
@@ -90,16 +112,55 @@ async def _diagram_lines(
     linear stage strip when the graph is incomplete or invalid (still being
     built) so the route view stays usable at every step.
     """
+    # Reserve the box chrome (margins, borders, interior padding) so the graph
+    # never overflows the box; only break into sub-graphs once it exceeds the
+    # padded interior.
+    graph_budget = max(width - _RESERVED - 2 - 2 * _PAD_X, 1)
     inputs = await get_graph_inputs(UUID(str(process.id)), env)
     if inputs is not None:
         stages, components = inputs
         try:
-            return _assemble_sections(split_for_width(stages, components, width, dim), dim)
+            return _assemble_sections(split_for_width(stages, components, graph_budget, dim), dim)
         except IncompleteProcessError:
-            pass
+            return [
+                "(process graph incomplete — showing stage list)",
+                "",
+                *_stage_list_lines(stages, components),
+            ]
 
-    layout = await get_route_layout(UUID(str(process.id)), env)
-    return ["(process graph incomplete — showing stage list)", "", *layout.lines]
+    return ["(no stages defined yet)"]
+
+
+def _stage_list_lines(
+    stages: list[StageInput], components: list[ComponentInput]
+) -> list[str]:
+    """Render the stages as a table of #, name, starting materials, and products.
+
+    Used when the component graph can't be laid out as a single DAG (still being
+    built). A table — rather than arrow-joined boxes — avoids implying a stage
+    order we don't actually know yet.
+    """
+    name_by_id = {component.id: component.display_name for component in components}
+    columns = [
+        Column("#", align="right"),
+        Column("Name"),
+        Column("Starting materials"),
+        Column("Products"),
+    ]
+
+    def names(stage: StageInput, kind: str) -> str:
+        labels = [
+            name_by_id.get(link.component_id, link.component_id)
+            for link in stage.stage_components
+            if link.component_type == kind
+        ]
+        return ", ".join(labels) or "—"
+
+    rows = [
+        [str(stage.number), stage.name, names(stage, "reactant"), names(stage, "product")]
+        for stage in sorted(stages, key=lambda stage: stage.number)
+    ]
+    return render_table(columns, rows)
 
 
 def _assemble_sections(

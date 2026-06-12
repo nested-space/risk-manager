@@ -24,8 +24,12 @@ class ScreenManager:
 
     @property
     def output_height(self) -> int:
-        """Return the number of rows available in the output pane."""
-        return max(self._term.height - 4, 0)
+        """Return the number of rows available in the output pane.
+
+        Five rows are reserved as chrome: the header, the overline, the
+        underline, the input/nav row, and the info line.
+        """
+        return max(self._term.height - 5, 0)
 
     @property
     def width(self) -> int:
@@ -35,6 +39,28 @@ class ScreenManager:
     def dim(self, text: str) -> str:
         """Wrap *text* in the terminal's dim (greyed) styling."""
         return f"{self._term.dim}{text}{self._term.normal}"
+
+    def bold(self, text: str) -> str:
+        """Wrap *text* in the terminal's bold styling."""
+        return f"{self._term.bold}{text}{self._term.normal}"
+
+    def style_notice(self, message: str, level: str) -> str:
+        """Wrap a status *message* in a colour matching its *level*.
+
+        Args:
+            message: Notice text.
+            level: One of ``"success"`` (green), ``"warning"`` (amber), or
+                ``"error"`` (red); anything else renders unstyled.
+
+        Returns:
+            The styled, terminal-ready string.
+        """
+        color = {
+            "success": self._term.green,
+            "warning": self._term.yellow,
+            "error": self._term.red,
+        }.get(level, self._term.normal)
+        return f"{color}{message}{self._term.normal}"
 
     def draw_full(self, lines: list[str], input_line: str = "", info_line: str = "") -> None:
         """Fully repaint the screen.
@@ -51,56 +77,123 @@ class ScreenManager:
         self.draw_info_line(info_line)
 
     def draw_status_bar(self) -> None:
-        """Render the two-line status bar."""
-        self._write_status_row(0, self._ctx.breadcrumb())
-        self._write_status_row(1, self._ctx.mode_label())
+        """Render the single-row header: breadcrumb left, mode right."""
+        self._write_header_row(self._ctx.breadcrumb(), self._ctx.mode_label())
         sys.stdout.flush()
 
-    def draw_output(self, lines: list[str]) -> None:
-        """Clear the output pane and write lines, truncating to fit."""
-        for row in range(2, max(self._term.height - 2, 2)):
+    def draw_output(self, lines: list[str], offset: int = 0) -> None:
+        """Frame and fill the output pane: top spacer, content window, underline.
+
+        Row 1 is a blank spacer in the default background — one line of breathing
+        room below the header band. The underline (row ``height - 3``) is a fixed
+        content rule. The scrollable content sits between them on rows
+        ``2 … height - 4``.
+
+        Content is inset by one blank column on each side: every line is drawn
+        starting at column 1, and clipped so its last column stays blank. This
+        mirrors the top/bottom breathing room created by the chrome, giving the
+        centre panel matching horizontal margins.
+
+        Args:
+            lines: Full set of output lines (may exceed the pane height).
+            offset: Index of the first line to show; the pane displays
+                ``lines[offset : offset + output_height]``. Callers are
+                responsible for clamping *offset* to a valid range.
+        """
+        width = self._term.width
+        underline_row = max(self._term.height - 3, 2)
+        sys.stdout.write(self._term.move_xy(0, 1) + self._term.clear_eol)
+        for row in range(2, underline_row):
             sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol)
-        for offset, line in enumerate(lines[: self.output_height], start=2):
-            sys.stdout.write(self._term.move_xy(0, offset) + self._fit_width(line))
+        window = lines[offset : offset + self.output_height]
+        for row, line in enumerate(window, start=2):
+            sys.stdout.write(self._term.move_xy(1, row) + self._fit_width(line))
+        sys.stdout.write(self._term.move_xy(0, underline_row) + self._term.clear_eol + "_" * width)
         sys.stdout.flush()
+
+    def scroll_indicator(self, offset: int, total: int) -> str:
+        """Return a dimmed scroll-position hint, or ``""`` when nothing overflows.
+
+        Args:
+            offset: Index of the first visible line.
+            total: Total number of output lines.
+
+        Returns:
+            A hint like ``"▲▼ scroll (12–34 of 80)"`` (arrows reflect whether
+            content lies above/below the window), styled dim; empty when the
+            content fits the pane.
+        """
+        height = self.output_height
+        if total <= height or height <= 0:
+            return ""
+        first = offset + 1
+        last = min(offset + height, total)
+        up = "▲" if offset > 0 else " "
+        down = "▼" if offset + height < total else " "
+        return self.dim(f"{up}{down} scroll ({first}–{last} of {total})")
 
     def _fit_width(self, line: str) -> str:
-        """Truncate *line* to the terminal width by visible length.
+        """Truncate *line* to the inset content width by visible length.
+
+        Content is drawn from column 1 with the final column held blank, so the
+        usable width is two columns short of the terminal width — one reserved
+        margin on each side.
 
         Plain slicing would corrupt lines containing escape sequences (e.g.
         dimmed text), so only clip when the *printable* length overruns; blessed
         ``Terminal.length`` ignores escape codes.
         """
-        if self._term.length(line) <= self._term.width:
+        content_width = max(self._term.width - 2, 0)
+        if self._term.length(line) <= content_width:
             return line
-        return line[: self._term.width]
+        return line[:content_width]
 
-    def draw_input_line(self, prompt: str = "> ", text: str = "") -> None:
+    def draw_input_line(self, prompt: str = "> ", text: str = "", notice: str = "") -> None:
         """Render the input line at the bottom row.
 
         Args:
             prompt: Prompt prefix.
             text: User-entered text.
+            notice: Pre-styled status notice, right-aligned on the same row.
         """
         row = max(self._term.height - 2, 0)
-        content = f"{prompt}{text}"[: self._term.width]
-        sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol + content)
+        out = self._term.move_xy(0, row) + self._term.clear_eol + self._with_notice(
+            f"{prompt}{text}", notice
+        )
+        sys.stdout.write(out)
         sys.stdout.flush()
 
     def draw_nav_hint(
         self,
         hint: str = "↑↓ to navigate  ·  Enter to select  ·  /search <name> to filter",
+        notice: str = "",
     ) -> None:
         """Replace the input line with a list-navigation hint.
 
         Args:
             hint: Hint text to display.
+            notice: Pre-styled status notice, right-aligned on the same row.
         """
         row = max(self._term.height - 2, 0)
         sys.stdout.write(
-            self._term.move_xy(0, row) + self._term.clear_eol + hint[: self._term.width]
+            self._term.move_xy(0, row) + self._term.clear_eol + self._with_notice(hint, notice)
         )
         sys.stdout.flush()
+
+    def _with_notice(self, left: str, notice: str) -> str:
+        """Append a right-aligned *notice* to *left*, fit to the terminal width.
+
+        Printable width is measured with ``Terminal.length`` so embedded escape
+        sequences are not clobbered. The notice is dropped when fewer than one
+        column of separation remains, keeping the left content intact.
+        """
+        left_len = self._term.length(left)
+        if not notice:
+            return left[: self._term.width]
+        gap = self._term.width - left_len - self._term.length(notice)
+        if gap < 1:
+            return left[: self._term.width]
+        return left[: self._term.width] + (" " * gap) + notice
 
     def draw_info_line(self, hints: str = "") -> None:
         """Render the command-hint information line at the bottom row.
@@ -127,13 +220,24 @@ class ScreenManager:
         sys.stdout.write(self._term.home + self._term.clear)
         sys.stdout.flush()
 
-    def _write_status_row(self, row: int, text: str) -> None:
+    def _write_header_row(self, left: str, right: str) -> None:
+        """Render row 0 with *left* aligned left and *right* aligned right.
+
+        The two labels share a single ``on_blue`` band spanning the full width.
+        When they cannot both fit, the right label is dropped and the breadcrumb
+        is padded to width on its own.
+        """
+        width = self._term.width
+        if len(left) + len(right) + 1 > width:
+            text = left[:width].ljust(width)
+        else:
+            text = left + " " * (width - len(left) - len(right)) + right
         styled = (
-            self._term.move_xy(0, row)
+            self._term.move_xy(0, 0)
             + self._term.on_blue
             + self._term.bold
             + self._term.white
-            + text[: self._term.width].ljust(self._term.width)
+            + text
             + self._term.normal
         )
         sys.stdout.write(styled)

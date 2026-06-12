@@ -79,7 +79,7 @@ class ManufacturingProcessRiskCreate(BaseModel):
         risk_type: Category of risk (e.g. 'Safety', 'Quality', 'Supply').
         name: Short title of the risk.
         description: Optional detailed description.
-        current_level: Current risk score (1–10 typical).
+        current_level: Current risk score (1–5; 5 = Critical).
         proposed_mitigation: Proposed action to reduce risk.
         mitigated_level: Projected risk score after mitigation.
     """
@@ -88,9 +88,9 @@ class ManufacturingProcessRiskCreate(BaseModel):
     risk_type: str
     name: str
     description: str | None = None
-    current_level: int | None = Field(default=None, ge=1, le=10)
+    current_level: int | None = Field(default=None, ge=1, le=5)
     proposed_mitigation: str | None = None
-    mitigated_level: int | None = Field(default=None, ge=1, le=10)
+    mitigated_level: int | None = Field(default=None, ge=1, le=5)
 
 
 class ComponentCreate(BaseModel):
@@ -117,7 +117,7 @@ class ComponentRiskCreate(BaseModel):
         risk_type: Category of risk.
         name: Short title of the risk.
         description: Optional detailed description.
-        current_level: Current risk score (1–10 typical).
+        current_level: Current risk score (1–5; 5 = Critical).
         proposed_mitigation: Proposed mitigation action.
         mitigated_level: Post-mitigation risk score.
     """
@@ -126,9 +126,9 @@ class ComponentRiskCreate(BaseModel):
     risk_type: str
     name: str
     description: str | None = None
-    current_level: int | None = Field(default=None, ge=1, le=10)
+    current_level: int | None = Field(default=None, ge=1, le=5)
     proposed_mitigation: str | None = None
-    mitigated_level: int | None = Field(default=None, ge=1, le=10)
+    mitigated_level: int | None = Field(default=None, ge=1, le=5)
 
 
 class CounterionCreate(BaseModel):
@@ -193,7 +193,7 @@ class StageRiskCreate(BaseModel):
         risk_type: Category of risk (e.g. 'risk', 'ipc').
         name: Short title of the risk.
         description: Optional detailed description.
-        current_level: Current risk score (1–10 typical).
+        current_level: Current risk score (1–5; 5 = Critical).
         proposed_mitigation: Proposed mitigation action.
         mitigated_level: Post-mitigation risk score.
     """
@@ -202,9 +202,9 @@ class StageRiskCreate(BaseModel):
     risk_type: str
     name: str
     description: str | None = None
-    current_level: int | None = Field(default=None, ge=1, le=10)
+    current_level: int | None = Field(default=None, ge=1, le=5)
     proposed_mitigation: str | None = None
-    mitigated_level: int | None = Field(default=None, ge=1, le=10)
+    mitigated_level: int | None = Field(default=None, ge=1, le=5)
 
 
 class StageComponentCreate(BaseModel):
