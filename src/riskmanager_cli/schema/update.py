@@ -72,9 +72,9 @@ class ManufacturingProcessRiskUpdate(BaseModel):
     risk_type: str | None = None
     name: str | None = None
     description: str | None = None
-    current_level: int | None = Field(default=None, ge=1, le=10)
+    current_level: int | None = Field(default=None, ge=1, le=5)
     proposed_mitigation: str | None = None
-    mitigated_level: int | None = Field(default=None, ge=1, le=10)
+    mitigated_level: int | None = Field(default=None, ge=1, le=5)
 
 
 class ComponentUpdate(BaseModel):
@@ -104,9 +104,9 @@ class ComponentRiskUpdate(BaseModel):
     risk_type: str | None = None
     name: str | None = None
     description: str | None = None
-    current_level: int | None = Field(default=None, ge=1, le=10)
+    current_level: int | None = Field(default=None, ge=1, le=5)
     proposed_mitigation: str | None = None
-    mitigated_level: int | None = Field(default=None, ge=1, le=10)
+    mitigated_level: int | None = Field(default=None, ge=1, le=5)
 
 
 class CounterionUpdate(BaseModel):
@@ -160,9 +160,9 @@ class StageRiskUpdate(BaseModel):
     risk_type: str | None = None
     name: str | None = None
     description: str | None = None
-    current_level: int | None = Field(default=None, ge=1, le=10)
+    current_level: int | None = Field(default=None, ge=1, le=5)
     proposed_mitigation: str | None = None
-    mitigated_level: int | None = Field(default=None, ge=1, le=10)
+    mitigated_level: int | None = Field(default=None, ge=1, le=5)
 
 
 class StageComponentUpdate(BaseModel):

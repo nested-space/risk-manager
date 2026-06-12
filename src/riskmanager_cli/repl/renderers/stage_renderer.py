@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 from ...config.settings import Environment
+from ...model.severity import format_level
 from ...model.tables import Stage
 from ...operations.component_operations import get_component_by_id
 from ...operations.material_operations import get_material_by_id
@@ -206,4 +207,4 @@ async def _risk_rows(stage: Stage, env: Environment) -> list[StageRow]:
 
 
 def _level(value: int | None) -> str:
-    return str(value) if isinstance(value, int) else "-"
+    return format_level(value)

@@ -13,6 +13,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ...config.settings import Environment
+from ...model.severity import SEVERITY_BY_LEVEL, severity_name
 from ...model.tables import Project
 from ...operations.manufacturing_process_operations import list_processes_for_project
 from ...operations.manufacturing_process_risk_operations import list_risks_for_process
@@ -53,19 +54,13 @@ async def render_project_screen(
     """
     material = await get_material_by_id(UUID(str(project.material_id)), env)
     processes = await list_processes_for_project(UUID(str(project.id)), env)
-    summary = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+    summary = {name: 0 for name in SEVERITY_BY_LEVEL.values()}
     for process in processes:
         risks = await list_risks_for_process(UUID(str(process.id)), env)
         for risk in risks:
-            level = risk.current_level or 0
-            if level >= 9:
-                summary["Critical"] += 1
-            elif level >= 7:
-                summary["High"] += 1
-            elif level >= 5:
-                summary["Medium"] += 1
-            else:
-                summary["Low"] += 1
+            name = severity_name(risk.current_level)
+            if name in summary:
+                summary[name] += 1
 
     detail_table = render_table(
         [Column("Property"), Column("Value")],
@@ -77,7 +72,7 @@ async def render_project_screen(
     )
     risk_table = render_table(
         [Column("Level"), Column("Number", align="right")],
-        [[level, str(summary[level])] for level in ("Critical", "High", "Medium", "Low")],
+        [[name, str(summary[name])] for name in SEVERITY_BY_LEVEL.values()],
     )
     routes_block = route_lines if route_lines is not None else [f"{len(processes)} total"]
 

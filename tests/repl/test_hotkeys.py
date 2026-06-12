@@ -331,12 +331,13 @@ async def test_risk_mode_add_hotkey_creates_stage_risk(temp_env: Environment) ->
     await dispatcher.advance_prompt("Safety")
     await dispatcher.advance_prompt("Exotherm")
     await dispatcher.advance_prompt("")  # description (optional)
-    await dispatcher.advance_prompt("")  # current_level (optional)
-    await dispatcher.advance_prompt("")  # proposed_mitigation (optional)
-    await dispatcher.advance_prompt("")  # mitigated_level (optional)
+    await dispatcher.advance_prompt("4")  # current_level (required select)
+    await dispatcher.advance_prompt("Add cooling")  # proposed_mitigation (required)
+    await dispatcher.advance_prompt("2")  # mitigated_level (required select)
 
     risks = await list_risks_for_stage(UUID(str(stage.id)), env=temp_env)
     assert [risk.name for risk in risks] == ["Exotherm"]
+    assert (risks[0].current_level, risks[0].mitigated_level) == (4, 2)
 
 
 @pytest.mark.integration
@@ -350,11 +351,14 @@ async def test_risk_mode_add_hotkey_creates_process_risk(temp_env: Environment) 
     assert dispatcher.prompt_state is not None
     await dispatcher.advance_prompt("Quality")
     await dispatcher.advance_prompt("Impurity carryover")
-    for _ in range(4):
-        await dispatcher.advance_prompt("")
+    await dispatcher.advance_prompt("")  # description (optional)
+    await dispatcher.advance_prompt("Critical (5)")  # current_level (select by label)
+    await dispatcher.advance_prompt("Inline assay")  # proposed_mitigation (required)
+    await dispatcher.advance_prompt("3")  # mitigated_level (select by value)
 
     risks = await list_risks_for_process(UUID(process_id), env=temp_env)
     assert [risk.name for risk in risks] == ["Impurity carryover"]
+    assert (risks[0].current_level, risks[0].mitigated_level) == (5, 3)
 
 
 @pytest.mark.integration
@@ -379,7 +383,12 @@ async def test_risk_mode_edit_hotkey_prefills_and_updates_risk(temp_env: Environ
     assert stage is not None
     risk = await create_stage_risk(
         StageRiskCreate(
-            stage_id=UUID(str(stage.id)), risk_type="Safety", name="Exotherm", current_level=5
+            stage_id=UUID(str(stage.id)),
+            risk_type="Safety",
+            name="Exotherm",
+            current_level=5,
+            proposed_mitigation="Add cooling",
+            mitigated_level=2,
         ),
         env=temp_env,
     )
@@ -399,13 +408,14 @@ async def test_risk_mode_edit_hotkey_prefills_and_updates_risk(temp_env: Environ
     assert dispatcher.prompt_prefill() == "Exotherm"  # name pre-filled
     await dispatcher.advance_prompt("Runaway exotherm")  # change name
     for _ in range(4):
-        await dispatcher.advance_prompt("")  # keep remaining defaults
+        await dispatcher.advance_prompt("")  # keep remaining defaults (incl. level selects)
 
     risks = await list_risks_for_stage(UUID(str(stage.id)), env=temp_env)
     assert len(risks) == 1
     assert risks[0].risk_type == "Hazard"
     assert risks[0].name == "Runaway exotherm"
-    assert risks[0].current_level == 5  # unchanged default preserved
+    # The level number-selects pre-select the stored values; empty submit keeps them.
+    assert (risks[0].current_level, risks[0].mitigated_level) == (5, 2)
 
 
 @pytest.mark.integration

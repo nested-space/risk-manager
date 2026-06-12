@@ -52,7 +52,7 @@ async def _seed_project(env: Environment, *, with_risk: bool) -> Project:
                 manufacturing_process_id=UUID(str(process.id)),
                 risk_type="Safety",
                 name="Exotherm",
-                current_level=8,  # High band (7-8)
+                current_level=4,  # High on the 1-5 scale
             ),
             env=env,
         )
@@ -89,10 +89,12 @@ async def test_render_project_screen_sections_and_tables_are_populated(
     assert "SMILES" in joined
     assert "c1ccccc1" in joined
 
-    # The Risks table tallies the seeded current-level-8 risk into the High band.
+    # The Risks table tallies the seeded level-4 risk into the High band, and the
+    # 1-5 scale adds a Negligible row.
     risks_index = next(i for i, line in enumerate(lines) if "─ Risks " in line)
     high_row = next(line for line in lines[risks_index:] if "High" in line and "│" in line)
     assert "1" in high_row
+    assert any("Negligible" in line and "│" in line for line in lines[risks_index:])
 
 
 @pytest.mark.integration

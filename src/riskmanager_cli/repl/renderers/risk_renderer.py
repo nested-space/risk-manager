@@ -4,14 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-import blessed
-
-_LEVEL_NAMES: dict[int, str] = {
-    9: "Critical",
-    8: "High",
-    6: "Medium",
-    0: "Low",
-}
+from ...model.severity import format_level
+from .tables import Column, render_table
 
 
 async def render_risk_table(
@@ -25,35 +19,35 @@ async def render_risk_table(
         scope_label: Human-readable scope label.
 
     Returns:
-        Renderable output lines.
+        Renderable output lines: a title line, a blank line, then either the
+        empty-state notice or a box-drawn table of risks.
     """
-    term = blessed.Terminal()
-    header = f"Risks · {scope_label}"
-    lines = [header, "", "#  Type         Name                      Level       Mitigated  Scope"]
+    title = f"Risks · {scope_label}"
     if not risks:
-        lines.append("(no risks recorded)")
-        return lines
+        return [title, "", "(no risks recorded)"]
 
-    for index, risk in enumerate(risks, start=1):
-        risk_type = str(risk.get("risk_type") or "")[:12]
-        name = str(risk.get("name") or "")[:25]
-        current_level = _format_level(term, risk.get("current_level"))
-        mitigated = _format_numeric(risk.get("mitigated_level"))
-        scope = str(risk.get("scope") or scope_label)[:10]
-        lines.append(
-            f"{index:>2} {risk_type:<12} {name:<25} {current_level:<11} {mitigated:<10} {scope}"
-        )
-    return lines
+    columns = [
+        Column("#", align="right"),
+        Column("Type"),
+        Column("Name"),
+        Column("Level"),
+        Column("Mitigated"),
+        Column("Scope"),
+    ]
+    rows = [
+        [
+            str(index),
+            str(risk.get("risk_type") or ""),
+            str(risk.get("name") or ""),
+            format_level(_as_level(risk.get("current_level"))),
+            format_level(_as_level(risk.get("mitigated_level"))),
+            str(risk.get("scope") or scope_label),
+        ]
+        for index, risk in enumerate(risks, start=1)
+    ]
+    return [title, "", *render_table(columns, rows)]
 
 
-def _format_level(term: blessed.Terminal, value: Any) -> str:
-    raw_value = value if isinstance(value, int) else 0
-    label = next(
-        (name for threshold, name in _LEVEL_NAMES.items() if raw_value >= threshold), "Low"
-    )
-    colour = term.red if label == "Critical" else term.yellow if label == "High" else term.cyan
-    return f"{colour}{label}{term.normal}"
-
-
-def _format_numeric(value: Any) -> str:
-    return str(value) if isinstance(value, int) else "-"
+def _as_level(value: Any) -> int | None:
+    """Coerce a risk-dict level cell to ``int`` or ``None`` for formatting."""
+    return value if isinstance(value, int) else None

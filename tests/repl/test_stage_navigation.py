@@ -133,8 +133,8 @@ async def _seed(env: Environment) -> _Seed:
             stage_id=UUID(str(stage.id)),
             risk_type="process",
             name="Exotherm",
-            current_level=8,
-            mitigated_level=6,
+            current_level=5,
+            mitigated_level=3,
         ),
         env=env,
     )
@@ -196,7 +196,7 @@ async def test_selecting_risk_opens_edit_form_and_persists(temp_env: Environment
     await dispatcher.advance_prompt("Runaway exotherm")  # name
     await dispatcher.advance_prompt("")  # description
     await dispatcher.advance_prompt("4")  # current_level
-    await dispatcher.advance_prompt("")  # proposed_mitigation
+    await dispatcher.advance_prompt("Add cooling")  # proposed_mitigation (required)
     await dispatcher.advance_prompt("1")  # mitigated_level
 
     assert dispatcher.prompt_state is None

@@ -13,6 +13,8 @@ Why this exists:
 
 from dataclasses import dataclass, field
 
+from ..model.severity import SEVERITY_BY_LEVEL
+
 # Risk value type alias: maps field names to primitive scalar values.
 RiskDict = dict[str, str | int | float | bool | None]
 
@@ -140,18 +142,9 @@ def render_route_layout(
     return LayoutResult(lines=lines, width=max(len(line) for line in lines))
 
 
-# Risk level → display label mapping.
+# Risk level → uppercase display label, derived from the shared 1-5 scale.
 _LEVEL_LABELS: dict[int, str] = {
-    10: "CRITICAL",
-    9: "CRITICAL",
-    8: "HIGH",
-    7: "HIGH",
-    6: "MEDIUM",
-    5: "MEDIUM",
-    4: "LOW",
-    3: "LOW",
-    2: "INFO",
-    1: "INFO",
+    level: name.upper() for level, name in SEVERITY_BY_LEVEL.items()
 }
 
 
@@ -215,6 +208,6 @@ def render_risk_summary(
         level = _risk_level(r)
         label = _LEVEL_LABELS.get(level, "INFO")
         name = str(r.get("name", "Unknown"))
-        lines.append(f"  [{label:<8}] {name}{_risk_context(r)}")
+        lines.append(f"  [{label:<10}] {name}{_risk_context(r)}")
 
     return lines

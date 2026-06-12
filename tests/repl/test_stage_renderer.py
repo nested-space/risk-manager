@@ -119,8 +119,8 @@ async def _seed_stage(env: Environment, *, with_risk: bool, with_links: bool = T
                 stage_id=UUID(str(stage.id)),
                 risk_type="process",
                 name="Exotherm",
-                current_level=8,
-                mitigated_level=6,
+                current_level=4,
+                mitigated_level=3,
             ),
             env=env,
         )
@@ -158,8 +158,8 @@ async def test_render_stage_screen_sections_and_tables_are_populated(
     for name, role in [("A", "Reactant"), ("B", "Reactant"), ("C", "Product")]:
         assert name in joined and role in joined
     assert "methanol" in joined and "Solvent" in joined
-    # The risk row shows its name and raw numeric levels (current 8, mitigated 6).
-    assert "Exotherm" in joined and " 8 " in joined and " 6 " in joined
+    # The risk row shows its name and severity-labelled levels (current 4, mitigated 3).
+    assert "Exotherm" in joined and "High (4)" in joined and "Medium (3)" in joined
 
     # Reactants sort ahead of the product despite the product being linked first.
     a_row = next(i for i, line in enumerate(lines) if "│ A " in line)

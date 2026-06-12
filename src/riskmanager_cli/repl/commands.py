@@ -16,6 +16,7 @@ from uuid import UUID
 
 from ..config.settings import Environment
 from ..model.enums import TA, NcrmRole
+from ..model.severity import LEVEL_OPTIONS
 from ..model.tables import Component, ManufacturingProcess, Project, Stage
 from ..operations.component_operations import (
     create_component,
@@ -3632,16 +3633,17 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             FieldSpec("risk_type"),
             FieldSpec("name"),
             FieldSpec("description", required=False),
-            FieldSpec("current_level", field_type="int", required=False),
-            FieldSpec("proposed_mitigation", required=False),
-            FieldSpec("mitigated_level", field_type="int", required=False),
+            FieldSpec("current_level", field_type="select", options=LEVEL_OPTIONS),
+            FieldSpec("proposed_mitigation"),
+            FieldSpec("mitigated_level", field_type="select", options=LEVEL_OPTIONS),
         ]
 
     def _risk_edit_fields(self, risk: Any) -> list[FieldSpec]:
         """Return the risk fields pre-filled from *risk* for an edit form.
 
         Stage, process, and component risks share the same editable columns, so
-        one helper serves every scope.
+        one helper serves every scope. The level fields are number-selects on the
+        1-5 severity scale, pre-selected to the risk's stored level.
         """
         return [
             FieldSpec("risk_type", default=risk.risk_type),
@@ -3649,15 +3651,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             FieldSpec("description", required=False, default=risk.description),
             FieldSpec(
                 "current_level",
-                field_type="int",
-                required=False,
+                field_type="select",
+                options=LEVEL_OPTIONS,
                 default=_default_text(risk.current_level),
             ),
-            FieldSpec("proposed_mitigation", required=False, default=risk.proposed_mitigation),
+            FieldSpec("proposed_mitigation", default=risk.proposed_mitigation),
             FieldSpec(
                 "mitigated_level",
-                field_type="int",
-                required=False,
+                field_type="select",
+                options=LEVEL_OPTIONS,
                 default=_default_text(risk.mitigated_level),
             ),
         ]
