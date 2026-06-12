@@ -19,8 +19,7 @@ from ..utils.component_graph_layout import (
     StageComponentInput,
     StageInput,
 )
-from .component_operations import list_components_for_process
-from .material_operations import get_material_by_id
+from .component_operations import component_display_name, list_components_for_process
 from .stage_component_operations import list_stage_components
 from .stage_operations import list_stages_for_process
 from .stage_risk_operations import list_risks_for_stage
@@ -70,11 +69,10 @@ async def get_graph_inputs(
 
     component_inputs: list[ComponentInput] = []
     for component in await list_components_for_process(process_id, env, verbose):
-        material = await get_material_by_id(UUID(str(component.material_id)), env, verbose)
         component_inputs.append(
             ComponentInput(
                 id=str(component.id),
-                display_name=material.name if material else str(component.id),
+                display_name=await component_display_name(component, env, verbose),
                 control_strategy_role=component.control_strategy_role,
                 is_isolated=component.is_isolated,
             )
@@ -112,8 +110,7 @@ async def get_unconnected_component_names(
     for component in await list_components_for_process(process_id, env, verbose):
         if str(component.id) in linked_ids:
             continue
-        material = await get_material_by_id(UUID(str(component.material_id)), env, verbose)
-        name = material.name if material else str(component.id)
+        name = await component_display_name(component, env, verbose)
         if component.control_strategy_role:
             name = f"{name} ({component.control_strategy_role})"
         names.append(name)

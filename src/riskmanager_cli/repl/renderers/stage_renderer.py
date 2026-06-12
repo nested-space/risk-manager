@@ -19,8 +19,7 @@ from uuid import UUID
 from ...config.settings import Environment
 from ...model.severity import format_level
 from ...model.tables import Stage
-from ...operations.component_operations import get_component_by_id
-from ...operations.material_operations import get_material_by_id
+from ...operations.component_operations import component_display_name, get_component_by_id
 from ...operations.ncrm_library_operations import get_ncrm_by_id
 from ...operations.stage_component_operations import list_stage_components
 from ...operations.stage_ncrm_operations import list_ncrms_for_stage
@@ -159,9 +158,7 @@ async def _component_rows(stage: Stage, env: Environment) -> list[StageRow]:
         name = str(link.component_id)
         component = await get_component_by_id(UUID(str(link.component_id)), env)
         if component is not None:
-            material = await get_material_by_id(UUID(str(component.material_id)), env)
-            if material is not None:
-                name = material.name
+            name = await component_display_name(component, env)
         rows.append(
             (
                 link.component_type,

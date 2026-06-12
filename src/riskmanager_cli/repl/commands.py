@@ -19,6 +19,7 @@ from ..model.enums import TA, NcrmRole
 from ..model.severity import LEVEL_OPTIONS
 from ..model.tables import Component, ManufacturingProcess, Project, Stage
 from ..operations.component_operations import (
+    component_display_name,
     create_component,
     delete_component,
     get_component_by_id,
@@ -2148,10 +2149,14 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return ["Component not found."]
         material = await get_material_by_id(UUID(str(component.material_id)), self.env)
         sections = await gather_component_sections(component, material, self.env)
+        display_name = await component_display_name(component, self.env)
         navigator = self._rebuild_list_navigator([], component_targets(sections))
         selected_id = navigator.selected.item_id if navigator.selected is not None else None
         return render_component_screen(
-            component, material, sections, width=self.screen.width, selected_id=selected_id
+            sections,
+            display_name=display_name,
+            width=self.screen.width,
+            selected_id=selected_id,
         )
 
     async def _render_library(
@@ -2284,9 +2289,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 component = await get_component_by_id(UUID(str(link.component_id)), self.env)
                 name = str(link.component_id)
                 if component is not None:
-                    material = await get_material_by_id(UUID(str(component.material_id)), self.env)
-                    if material is not None:
-                        name = material.name
+                    name = await component_display_name(component, self.env)
                 lines.append(f"{link.component_type}: {name}")
             return lines
         if kind == "ncrm":
@@ -2455,7 +2458,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             material = await get_material_by_id(UUID(str(component.material_id)), self.env)
             material_name = material.name if material else str(component.id)
             if lowered in material_name.lower():
-                component_lines.append(f"component: {material_name}")
+                display = await component_display_name(component, self.env)
+                component_lines.append(f"component: {display}")
         return [
             f"Search results for '{query}'",
             "",
@@ -2469,10 +2473,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if not components:
             return [*lines, "(none)"]
         for component in components:
-            material = await get_material_by_id(UUID(str(component.material_id)), self.env)
-            mat_label = material.name if material else str(component.id)
+            label = await component_display_name(component, self.env)
             role = component.control_strategy_role or "-"
-            lines.append(f"{mat_label} — {role}")
+            lines.append(f"{label} — {role}")
         return lines
 
     async def _list_process_ncrm_lines(self, process: ManufacturingProcess) -> list[str]:
@@ -2782,7 +2785,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return await self._render_stage_focus()
 
     async def _open_component(self, component: Component) -> list[str]:
-        material = await get_material_by_id(UUID(str(component.material_id)), self.env)
         self.ctx.push(
             ContextFrame(
                 track="component_focus",
@@ -2791,7 +2793,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 process_id=self.ctx.current.process_id,
                 route_label=self.ctx.current.route_label,
                 component_id=str(component.id),
-                component_name=material.name if material else str(component.id),
+                component_name=await component_display_name(component, self.env),
             )
         )
         self.session.update_context(track="component_focus", component_id=str(component.id))
@@ -2842,7 +2844,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         )
 
     async def _process_component_items(self, process: ManufacturingProcess) -> list[ListItem]:
-        """Build picker items for every component in *process*, labelled by material.
+        """Build picker items for every component in *process*, labelled by salt-form name.
 
         Each item's subtitle summarises the component's current stage assignments
         (``Stage {n} {role}``, comma-separated) so that several components sharing
@@ -2859,11 +2861,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         assignments = await self._component_assignment_map(process)
         items: list[ListItem] = []
         for component in components:
-            material = await get_material_by_id(UUID(str(component.material_id)), self.env)
-            material_name = material.name if material else str(component.id)
-            label = material_name
+            label = await component_display_name(component, self.env)
             if component.control_strategy_role:
-                label = f"{material_name} ({component.control_strategy_role})"
+                label = f"{label} ({component.control_strategy_role})"
             entries = sorted(assignments.get(str(component.id), []))
             subtitle = (
                 ", ".join(f"Stage {number} {role}" for number, role in entries)

@@ -102,19 +102,19 @@ def component_targets(sections: ComponentSections) -> list[ListItem]:
 
 
 def render_component_screen(
-    component: Component,
-    material: Material | None,
     sections: ComponentSections,
     *,
+    display_name: str,
     width: int = 80,
     selected_id: str | None = None,
 ) -> list[str]:
     """Return display lines for the Component Focus page.
 
     Args:
-        component: Component being rendered.
-        material: The component's material, if resolved (used for the title).
         sections: Pre-fetched section rows (see :func:`gather_component_sections`).
+        display_name: The component's salt-form name (see
+            :func:`~...operations.component_operations.component_display_name`),
+            used for the title.
         width: Terminal width; section rules use the shared standard width.
         selected_id: ``item_id`` of the caret-selected row, if any.
 
@@ -122,8 +122,7 @@ def render_component_screen(
         Renderable lines: a component title and underline at column zero, then
         the two-space-indented sections with a ``>`` caret on the selected row.
     """
-    name = material.name if material is not None else str(component.id)
-    title = f"Component: {name}"
+    title = f"Component: {display_name}"
     lines = [title, "─" * len(title)]
 
     body_width = section_width(width)

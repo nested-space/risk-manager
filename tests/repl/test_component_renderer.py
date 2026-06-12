@@ -13,7 +13,10 @@ import pytest
 from riskmanager_cli.config.settings import Environment
 from riskmanager_cli.model.enums import TA
 from riskmanager_cli.model.tables import Component, Material
-from riskmanager_cli.operations.component_operations import create_component
+from riskmanager_cli.operations.component_operations import (
+    component_display_name,
+    create_component,
+)
 from riskmanager_cli.operations.component_risks_operations import create_component_risk
 from riskmanager_cli.operations.component_salt_operations import create_component_salt
 from riskmanager_cli.operations.counterion_operations import create_counterion
@@ -111,12 +114,14 @@ async def test_render_component_screen_sections_and_tables_are_populated(
     component, material = await _seed_component(temp_env, with_salt=True, with_risk=True)
 
     sections = await gather_component_sections(component, material, temp_env)
-    lines = render_component_screen(component, material, sections, width=120)
+    display_name = await component_display_name(component, temp_env)
+    lines = render_component_screen(sections, display_name=display_name, width=120)
     joined = "\n".join(lines)
 
-    # Component title and its underline open the page at column zero.
-    assert lines[0] == "Component: Widget"
-    assert lines[1] == "─" * len("Component: Widget")
+    # The title shows the salt-form name (stoichiometry 1 omits the number).
+    assert display_name == "Widget·Chloride"
+    assert lines[0] == "Component: Widget·Chloride"
+    assert lines[1] == "─" * len("Component: Widget·Chloride")
 
     # Each section has a titled rule.
     assert any("─ Details " in line for line in lines)
@@ -145,8 +150,12 @@ async def test_component_targets_select_salt_and_risk_rows(temp_env: Environment
     salt_target, risk_target = targets
     assert salt_target.label == "Chloride"
 
+    display_name = await component_display_name(component, temp_env)
     lines = render_component_screen(
-        component, material, sections, width=120, selected_id=salt_target.item_id
+        sections,
+        display_name=display_name,
+        width=120,
+        selected_id=salt_target.item_id,
     )
     caret_lines = [line for line in lines if line.startswith("> ")]
     assert len(caret_lines) == 1
@@ -162,7 +171,8 @@ async def test_render_component_screen_empty_sections_show_placeholders(
 
     sections = await gather_component_sections(component, material, temp_env)
     assert component_targets(sections) == []
-    lines = render_component_screen(component, material, sections, width=80)
+    display_name = await component_display_name(component, temp_env)
+    lines = render_component_screen(sections, display_name=display_name, width=80)
     joined = "\n".join(lines)
 
     assert "(no salts)" in joined
