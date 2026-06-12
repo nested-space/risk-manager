@@ -252,6 +252,39 @@ def test_navigator_crosses_recents_all_boundary() -> None:
     assert navigator.selected.item_id == "r2"
 
 
+@pytest.mark.unit
+def test_render_lines_styles_and_aligns_subtitles() -> None:
+    """With a styler, subtitles are aligned into a column and styled in place."""
+    navigator = ListNavigator(
+        [],
+        [
+            ListItem(label="A (RSM)", subtitle="Stage 1 reactant", item_id="1"),
+            ListItem(label="A (Intermediate)", subtitle="unassigned", item_id="2"),
+        ],
+    )
+    lines = navigator.render_lines(
+        80, show_sections=False, subtitle_style=lambda text: f"<{text}>"
+    )
+
+    assert lines[0].startswith("▶ A (RSM)")
+    assert lines[0].endswith("<Stage 1 reactant>")
+    assert lines[1].endswith("<unassigned>")
+    # The styled subtitles start at the same column on every row.
+    assert lines[0].index("<") == lines[1].index("<")
+
+
+@pytest.mark.unit
+def test_render_lines_without_styler_appends_plain_subtitle() -> None:
+    """The legacy path leaves subtitles unstyled and space-appended."""
+    navigator = ListNavigator(
+        [], [ListItem(label="Acme", subtitle="(recent)", item_id="1")]
+    )
+
+    lines = navigator.render_lines(80, show_sections=False)
+
+    assert lines == ["▶ Acme (recent)"]
+
+
 def _hints_dispatcher(track: str) -> CommandDispatcher:
     """Build a dispatcher whose context points at *track* for hint tests.
 

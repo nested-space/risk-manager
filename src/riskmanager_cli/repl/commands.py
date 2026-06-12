@@ -2844,6 +2844,11 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     async def _process_component_items(self, process: ManufacturingProcess) -> list[ListItem]:
         """Build picker items for every component in *process*, labelled by material.
 
+        Each item's subtitle summarises the component's current stage assignments
+        (``Stage {n} {role}``, comma-separated) so that several components sharing
+        a material — e.g. a reactant reused across stages — stay distinguishable.
+        Components with no assignments read ``unassigned``.
+
         Args:
             process: The manufacturing process whose components to list.
 
@@ -2851,6 +2856,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             One :class:`ListItem` per component (empty when the process has none).
         """
         components = await list_components_for_process(UUID(str(process.id)), self.env)
+        assignments = await self._component_assignment_map(process)
         items: list[ListItem] = []
         for component in components:
             material = await get_material_by_id(UUID(str(component.material_id)), self.env)
@@ -2858,8 +2864,26 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             label = material_name
             if component.control_strategy_role:
                 label = f"{material_name} ({component.control_strategy_role})"
-            items.append(ListItem(label=label, item_id=str(component.id)))
+            entries = sorted(assignments.get(str(component.id), []))
+            subtitle = (
+                ", ".join(f"Stage {number} {role}" for number, role in entries)
+                if entries
+                else "unassigned"
+            )
+            items.append(ListItem(label=label, subtitle=subtitle, item_id=str(component.id)))
         return items
+
+    async def _component_assignment_map(
+        self, process: ManufacturingProcess
+    ) -> dict[str, list[tuple[int, str]]]:
+        """Map each component id to its ``(stage_number, component_type)`` links."""
+        assignments: dict[str, list[tuple[int, str]]] = {}
+        for stage in await list_stages_for_process(UUID(str(process.id)), self.env):
+            for link in await list_stage_components(UUID(str(stage.id)), self.env):
+                assignments.setdefault(str(link.component_id), []).append(
+                    (stage.number, link.component_type)
+                )
+        return assignments
 
     def _start_assign_role_prompt(self, stage: Stage, component_item: ListItem) -> list[str]:
         return self.start_prompt(
@@ -3730,7 +3754,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             self._picker_state.label,
             "",
             *self._picker_state.navigator.render_lines(
-                self._prompt_interior_width, show_sections=False
+                self._prompt_interior_width,
+                show_sections=False,
+                subtitle_style=self.screen.dim,
             ),
             "",
             self.screen.dim("Type to filter · Enter select · Esc cancel"),
