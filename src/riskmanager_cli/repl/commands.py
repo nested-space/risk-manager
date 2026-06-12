@@ -3015,7 +3015,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             ListItem(label=entry.display_name, item_id=str(entry.id)) for entry in entries
         ]
         return self.start_picker(
-            "Select NCRM to link",
+            "Assign NCRM to stage",
             items,
             lambda item: self._start_stage_ncrm_role_prompt(stage_id, item.item_id),
         )
@@ -3381,7 +3381,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             lambda **payload: self._create_component_salt_from_prompt(
                 component, counterion.item_id, payload
             ),
-            title="Add salt",
+            title="Assign salt",
         )
 
     async def _create_component_salt_from_prompt(
@@ -3726,7 +3726,7 @@ HELP_TOPICS: dict[str, list[str]] = {
         "^C back",
     ],
     "stage_focus": ["^A add", "^L list", "^E edit", "^R risks", "^X delete", "^C back"],
-    "component_focus": ["^A add salt", "^E edit", "^X delete", "^R risks", "^C back"],
+    "component_focus": ["^A assign salt", "^E edit", "^X delete", "^R risks", "^C back"],
     "library": ["^A add", "^E edit", "^X delete", "^O show", "^F filter", "/ search", "^C back"],
     "admin": ["^A action", "^C back"],
     "risk_mode": ["^A add", "^E edit", "^L refresh", "^C back"],
