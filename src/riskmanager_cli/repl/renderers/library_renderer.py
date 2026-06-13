@@ -36,9 +36,11 @@ async def render_library_screen(
 
     for index, item in enumerate(items, start=1):
         name = str(item.get("display_name") or item.get("name") or item.get("id") or "Unknown")
-        secondary = item.get("common_name") or item.get("smiles") or ""
+        secondary = item.get("name") or item.get("smiles") or ""
         if isinstance(secondary, bool):
             secondary = "yes" if secondary else "no"
-        detail = f" — {secondary}" if secondary else ""
+        # Hide the secondary line when it merely repeats the primary label
+        # (e.g. display_name defaulted to name).
+        detail = f" — {secondary}" if secondary and str(secondary) != name else ""
         lines.append(f"{index:>2}. {name}{detail}")
     return lines

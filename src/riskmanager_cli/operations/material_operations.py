@@ -47,7 +47,12 @@ async def create_material(
             smiles = canonicalize_smiles(data.smiles) or data.smiles
 
         async with get_db_session(env, verbose) as session:
-            material = Material(name=data.name, smiles=smiles)
+            material = Material(
+                name=data.name,
+                display_name=data.display_name or data.name,
+                interpret_chemically=data.interpret_chemically,
+                smiles=smiles,
+            )
             session.add(material)
             await session.commit()
             await session.refresh(material)
@@ -280,7 +285,10 @@ async def bulk_import_materials(
 ) -> dict[str, int]:
     """Bulk-import materials from CSV content.
 
-    CSV format: ``name,smiles,aliases`` (aliases semicolon-separated).
+    CSV format: ``name,display_name,interpret_chemically,smiles,aliases``
+    (aliases semicolon-separated). Only ``name`` is required: ``display_name``
+    defaults to ``name`` and ``interpret_chemically`` defaults to ``false`` when
+    their columns are absent, so legacy ``name,smiles,aliases`` files still import.
 
     Args:
         csv_content: Full CSV file content as a UTF-8 string.
@@ -302,13 +310,24 @@ async def bulk_import_materials(
 
         smiles_raw = row.get("smiles", "").strip() or None
         aliases_raw = row.get("aliases", "").strip()
+        display_name = row.get("display_name", "").strip() or None
+        interpret_chemically = row.get("interpret_chemically", "").strip().lower() == "true"
 
         if dry_run:
             print_warning(f"[DRY RUN] Would create material '{name}'.")
             counts["created"] += 1
             continue
 
-        result = await create_material(MaterialCreate(name=name, smiles=smiles_raw), env, verbose)
+        result = await create_material(
+            MaterialCreate(
+                name=name,
+                display_name=display_name,
+                interpret_chemically=interpret_chemically,
+                smiles=smiles_raw,
+            ),
+            env,
+            verbose,
+        )
         if result is None:
             counts["errors"] += 1
             if not skip_errors:

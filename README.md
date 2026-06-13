@@ -507,12 +507,14 @@ All import commands support `--skip-errors` and `--dry-run` flags.
 #### Materials
 
 ```csv
-name,smiles,aliases
-Aspirin,CC(=O)Oc1ccccc1C(=O)O,Acetylsalicylic Acid;ASA
-Ibuprofen,CC(C)Cc1ccc(C(C)C(=O)O)cc1,Advil;Motrin
+name,display_name,interpret_chemically,smiles,aliases
+Aspirin,ASA,false,CC(=O)Oc1ccccc1C(=O)O,Acetylsalicylic Acid;ASA
+Ibuprofen,,false,CC(C)Cc1ccc(C(C)C(=O)O)cc1,Advil;Motrin
 ```
 
-Multiple aliases are separated by semicolons.
+Only `name` is required. `display_name` defaults to `name` when blank and
+`interpret_chemically` defaults to `false`, so the legacy `name,smiles,aliases`
+header still imports. Multiple aliases are separated by semicolons.
 
 #### Projects
 
@@ -541,18 +543,22 @@ Project Alpha,1,1,Purification,2
 #### NCRM Library
 
 ```csv
-display_name,common_name,aliases,interpret_chemically,smiles
+display_name,name,aliases,interpret_chemically,smiles
 Sodium bicarbonate,NaHCO3,Baking soda;Bicarb,false,
 Palladium on carbon,Pd/C,,true,
 ```
 
+`name` is the common chemical name; `display_name` defaults to it when blank.
+
 #### Counterions
 
 ```csv
-name,smiles,aliases
-Chloride,[Cl-],Cl-;chloride anion
-Sodium,[Na+],Na+
+name,display_name,interpret_chemically,smiles,aliases
+Chloride,,false,[Cl-],Cl-;chloride anion
+Sodium,,false,[Na+],Na+
 ```
+
+Only `name` is required; the legacy `name,smiles,aliases` header still imports.
 
 ---
 

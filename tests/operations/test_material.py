@@ -31,6 +31,43 @@ async def test_create_material_returns_material_with_id(temp_env: Environment) -
 
 
 @pytest.mark.integration
+async def test_create_material_display_name_defaults_to_name(temp_env: Environment) -> None:
+    """Omitting display_name falls back to the material name."""
+    result = await create_material(MaterialCreate(name="Aspirin"), env=temp_env)
+    assert result is not None
+    assert result.display_name == "Aspirin"
+    assert result.interpret_chemically is False
+
+
+@pytest.mark.integration
+async def test_create_material_keeps_explicit_display_name_and_flag(
+    temp_env: Environment,
+) -> None:
+    """An explicit display_name and interpret_chemically flag are persisted."""
+    result = await create_material(
+        MaterialCreate(name="Aspirin", display_name="ASA", interpret_chemically=True),
+        env=temp_env,
+    )
+    assert result is not None
+    assert result.display_name == "ASA"
+    assert result.interpret_chemically is True
+
+
+@pytest.mark.integration
+async def test_create_materials_allow_duplicate_display_name(temp_env: Environment) -> None:
+    """display_name is not unique: two materials may share one."""
+    first = await create_material(
+        MaterialCreate(name="Ethyl ester", display_name="Ester"), env=temp_env
+    )
+    second = await create_material(
+        MaterialCreate(name="Methyl ester", display_name="Ester"), env=temp_env
+    )
+    assert first is not None
+    assert second is not None
+    assert first.display_name == second.display_name == "Ester"
+
+
+@pytest.mark.integration
 async def test_create_material_with_valid_smiles_stores_canonical(temp_env: Environment) -> None:
     """Valid SMILES is canonicalised and stored on the material."""
     result = await create_material(

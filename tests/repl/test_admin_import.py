@@ -81,7 +81,7 @@ async def test_admin_import_ncrm_loads_aliases_and_boolean(
     """NCRM import reads the true/false boolean and the ``aliases`` column."""
     csv_path = tmp_path / "ncrm.csv"
     csv_path.write_text(
-        "display_name,common_name,interpret_chemically,smiles,aliases\n"
+        "display_name,name,interpret_chemically,smiles,aliases\n"
         "(COCl)2,Oxalyl chloride,true,,oxalyl dichloride;ethanedioyl dichloride\n"
         "(+)-CSA,Camphorsulfonic acid,false,,\n",
         encoding="utf-8",

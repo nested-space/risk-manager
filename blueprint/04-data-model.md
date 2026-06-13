@@ -68,6 +68,8 @@ Central entity representing a chemical substance.
 |--------|------|-------------|-------------|
 | `id` | TEXT | PK | UUID (Python-generated) |
 | `name` | TEXT | NOT NULL, UNIQUE | Human-readable name |
+| `display_name` | TEXT | NOT NULL | Short label for listings; defaults to `name` |
+| `interpret_chemically` | INTEGER (BOOLEAN) | NOT NULL | Whether SMILES is interpreted |
 | `smiles` | TEXT | UNIQUE, nullable | SMILES notation string (canonical) |
 | `created_at` | DATETIME | NOT NULL | UTC creation timestamp |
 | `updated_at` | DATETIME | NOT NULL | UTC last-modified timestamp |
@@ -323,8 +325,8 @@ Non-controlled raw materials library (solvents, reagents, catalysts, etc.).
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | TEXT | PK | UUID |
-| `display_name` | TEXT | NOT NULL, UNIQUE | Primary display name |
-| `common_name` | TEXT | NOT NULL, UNIQUE | Common chemical name |
+| `display_name` | TEXT | NOT NULL | Short label for listings; defaults to `name` |
+| `name` | TEXT | NOT NULL, UNIQUE | Common chemical name |
 | `interpret_chemically` | INTEGER (BOOLEAN) | NOT NULL | Whether SMILES is interpreted |
 | `smiles` | TEXT | nullable | SMILES notation (if interpret_chemically=True) |
 | `created_at` | DATETIME | NOT NULL | UTC creation timestamp |
@@ -376,6 +378,8 @@ Charged chemical species used in salt formation.
 |--------|------|-------------|-------------|
 | `id` | TEXT | PK | UUID |
 | `name` | TEXT | NOT NULL, UNIQUE | Counterion name (e.g., 'Chloride') |
+| `display_name` | TEXT | NOT NULL | Short label for listings; defaults to `name` |
+| `interpret_chemically` | INTEGER (BOOLEAN) | NOT NULL | Whether SMILES is interpreted |
 | `smiles` | TEXT | UNIQUE, nullable | SMILES notation |
 | `created_at` | DATETIME | NOT NULL | UTC creation timestamp |
 | `updated_at` | DATETIME | NOT NULL | UTC last-modified timestamp |
@@ -410,11 +414,13 @@ PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
 CREATE TABLE material (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    smiles      TEXT UNIQUE,
-    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id                  TEXT PRIMARY KEY,
+    name                TEXT NOT NULL UNIQUE,
+    display_name        TEXT NOT NULL,
+    interpret_chemically INTEGER NOT NULL DEFAULT 0,
+    smiles              TEXT UNIQUE,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE material_alias (
@@ -487,11 +493,13 @@ CREATE TABLE component_risk (
 CREATE INDEX idx_component_risk_component_id ON component_risk(component_id);
 
 CREATE TABLE counterion (
-    id         TEXT PRIMARY KEY,
-    name       TEXT NOT NULL UNIQUE,
-    smiles     TEXT UNIQUE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id                  TEXT PRIMARY KEY,
+    name                TEXT NOT NULL UNIQUE,
+    display_name        TEXT NOT NULL,
+    interpret_chemically INTEGER NOT NULL DEFAULT 0,
+    smiles              TEXT UNIQUE,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE counterion_alias (
@@ -553,8 +561,8 @@ CREATE INDEX idx_stage_components_type      ON stage_components(component_type);
 
 CREATE TABLE ncrm_library (
     id                  TEXT PRIMARY KEY,
-    display_name        TEXT NOT NULL UNIQUE,
-    common_name         TEXT NOT NULL UNIQUE,
+    display_name        TEXT NOT NULL,
+    name                TEXT NOT NULL UNIQUE,
     interpret_chemically INTEGER NOT NULL,
     smiles              TEXT,
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

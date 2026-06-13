@@ -43,7 +43,12 @@ async def create_counterion(
             smiles = canonicalize_smiles(data.smiles) or data.smiles
 
         async with get_db_session(env, verbose) as session:
-            counterion = Counterion(name=data.name, smiles=smiles)
+            counterion = Counterion(
+                name=data.name,
+                display_name=data.display_name or data.name,
+                interpret_chemically=data.interpret_chemically,
+                smiles=smiles,
+            )
             session.add(counterion)
             await session.commit()
             await session.refresh(counterion)

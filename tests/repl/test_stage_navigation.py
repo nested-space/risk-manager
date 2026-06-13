@@ -123,7 +123,7 @@ async def _seed(env: Environment) -> _Seed:
     assert link is not None
 
     ncrm = await create_ncrm_library_entry(
-        NcrmLibraryCreate(display_name="methanol", common_name="methanol"), env=env
+        NcrmLibraryCreate(display_name="methanol", name="methanol"), env=env
     )
     assert ncrm is not None
     ncrm_link = await create_stage_ncrm(

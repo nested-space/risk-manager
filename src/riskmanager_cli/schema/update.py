@@ -24,10 +24,14 @@ class MaterialUpdate(BaseModel):
 
     Attributes:
         name: New human-readable name.
+        display_name: New short label.
+        interpret_chemically: Update chemical interpretation flag.
         smiles: New canonical SMILES notation; pass ``""`` to clear.
     """
 
     name: str | None = None
+    display_name: str | None = None
+    interpret_chemically: bool | None = None
     smiles: str | None = None
 
 
@@ -114,10 +118,14 @@ class CounterionUpdate(BaseModel):
 
     Attributes:
         name: New counterion name.
+        display_name: New short label.
+        interpret_chemically: Update chemical interpretation flag.
         smiles: New canonical SMILES notation.
     """
 
     name: str | None = None
+    display_name: str | None = None
+    interpret_chemically: bool | None = None
     smiles: str | None = None
 
 
@@ -179,14 +187,14 @@ class NcrmLibraryUpdate(BaseModel):
     """Updatable fields on a :class:`~..model.tables.NcrmLibrary` entry.
 
     Attributes:
-        display_name: New primary display name.
-        common_name: New common chemical name.
+        display_name: New short label.
+        name: New common chemical name.
         interpret_chemically: Update chemical interpretation flag.
         smiles: New canonical SMILES notation.
     """
 
     display_name: str | None = None
-    common_name: str | None = None
+    name: str | None = None
     interpret_chemically: bool | None = None
     smiles: str | None = None
 
