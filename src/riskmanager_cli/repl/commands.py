@@ -3851,6 +3851,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 else []
             )
             return [f"Select {current.label}", "", *options]
+        if current.default is not None:
+            return [f"Enter {current.label}", "", self.screen.dim(current.default)]
         return [f"Enter {current.label}"]
 
     def _multi_field_body(self, state: PromptState) -> list[str]:
@@ -3865,6 +3867,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             value = state.collected[index]
             if value is not None:
                 cell = value
+            elif field_spec.default is not None and field_spec.field_type != "select":
+                cell = self.screen.dim(field_spec.default)
             elif active and not state.is_select_field:
                 cell = self.screen.dim("▏")
             else:

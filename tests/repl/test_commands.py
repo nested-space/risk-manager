@@ -320,3 +320,57 @@ def test_help_topics_define_previously_missing_tracks(track: str) -> None:
     entries = HELP_TOPICS[track]
     assert all(isinstance(entry, str) and entry for entry in entries)
     assert not any(entry.startswith(("/add", "/list")) for entry in entries)
+
+
+class _StubScreen:
+    """Minimal screen stand-in exposing the styling hooks rendering touches."""
+
+    width = 80
+
+    @staticmethod
+    def dim(text: str) -> str:
+        """Return *text* unchanged (no terminal styling under test)."""
+        return text
+
+    @staticmethod
+    def bold(text: str) -> str:
+        """Return *text* unchanged (no terminal styling under test)."""
+        return text
+
+
+def _render_dispatcher() -> CommandDispatcher:
+    """Build a dispatcher whose only used collaborator is the stub screen.
+
+    ``_render_prompt_lines`` reads ``self.screen`` (width/dim/bold) and the
+    active ``_prompt_state``; the context/session/env are unused for rendering.
+    """
+    return CommandDispatcher(ContextManager(), None, _StubScreen(), None)  # type: ignore[arg-type]
+
+
+@pytest.mark.unit
+def test_multi_field_form_shows_prefilled_default() -> None:
+    """A pre-filled (defaulted) field shows its value in the multi-field form body."""
+    dispatcher = _render_dispatcher()
+    dispatcher.start_prompt(
+        [
+            FieldSpec("display_name"),
+            FieldSpec("smiles", required=False, default="CC(C)=O"),
+        ],
+        lambda **payload: [],
+        title="Add NCRM",
+    )
+    rendered = "\n".join(dispatcher._render_prompt_lines())  # pylint: disable=protected-access
+    assert "CC(C)=O" in rendered
+
+
+@pytest.mark.unit
+def test_single_field_form_shows_prefilled_default() -> None:
+    """A single-field form surfaces the pre-filled default below the heading."""
+    dispatcher = _render_dispatcher()
+    dispatcher.start_prompt(
+        [FieldSpec("smiles", required=False, default="CC(=O)O")],
+        lambda **payload: [],
+        title="Add material",
+    )
+    rendered = "\n".join(dispatcher._render_prompt_lines())  # pylint: disable=protected-access
+    assert "CC(=O)O" in rendered
