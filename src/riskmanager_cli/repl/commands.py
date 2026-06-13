@@ -2520,8 +2520,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         items = await self._library_items(sub_mode)
         lowered = name.lower()
         for item in items:
-            item_name = str(item.get("name") or item.get("display_name") or "")
-            if item_name.lower() == lowered:
+            if _library_item_matches(item, lowered):
                 return [f"{sub_mode} item", "", *[f"{key}: {value}" for key, value in item.items()]]
         return [f"No {sub_mode} item matched '{name}'."]
 
@@ -2539,8 +2538,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             )
         if sub_mode == "ncrm":
             return self.start_prompt(
-                [FieldSpec("common_name")],
-                lambda **payload: self._offer_augment("ncrm", payload.get("common_name") or ""),
+                [FieldSpec("name")],
+                lambda **payload: self._offer_augment("ncrm", payload.get("name") or ""),
                 title="Add NCRM",
             )
         if sub_mode == "counterions":
@@ -2556,7 +2555,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
         Args:
             sub_mode: Library subsection (``materials``/``ncrm``/``counterions``).
-            name: The lead name to resolve (the ``common_name`` for NCRM entries).
+            name: The lead chemical name to resolve.
 
         Returns:
             Prompt lines for the Yes/No augment question, or the finish form when
@@ -2586,6 +2585,26 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         self._notice = (f"Could not resolve '{name}'. Enter SMILES manually.", "warning")
         return self._finish_library_add(sub_mode, name, None, [])
 
+    # Library add/edit titles keyed by sub-mode. Materials, counterions, and
+    # NCRM entries now share the same shape (name, display_name,
+    # interpret_chemically, smiles), so the add/edit flows are uniform.
+    _LIBRARY_ADD_TITLES = {
+        "materials": "Add material",
+        "counterions": "Add counterion",
+        "ncrm": "Add NCRM",
+    }
+
+    def _library_create_handler(
+        self, sub_mode: str
+    ) -> Callable[[str, dict[str, str | None], list[str]], Awaitable[list[str]]] | None:
+        """Return the ``(name, payload, aliases)`` create handler for *sub_mode*."""
+        handlers = {
+            "materials": self._create_material_from_prompt,
+            "counterions": self._create_counterion_from_prompt,
+            "ncrm": self._create_ncrm_from_prompt,
+        }
+        return handlers.get(sub_mode)
+
     def _finish_library_add(
         self,
         sub_mode: str,
@@ -2601,45 +2620,30 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
         Args:
             sub_mode: Library subsection.
-            name: The lead name collected earlier (``common_name`` for NCRM).
+            name: The lead chemical name collected earlier.
             smiles: Pre-filled SMILES, or ``None`` for manual entry.
             aliases: Aliases to persist once the entity is created.
 
         Returns:
             Prompt-render lines for the finish form.
         """
-        if sub_mode == "materials":
-            return self.start_prompt(
-                [FieldSpec("smiles", required=False, default=smiles)],
-                lambda **payload: self._create_material_from_prompt(
-                    name, payload.get("smiles"), aliases
+        handler = self._library_create_handler(sub_mode)
+        if handler is None:
+            return ["Choose a library subsection first."]
+        return self.start_prompt(
+            [
+                FieldSpec("display_name", required=False),
+                FieldSpec(
+                    "interpret_chemically",
+                    field_type="select",
+                    options=BOOL_OPTIONS,
+                    default="false",
                 ),
-                title="Add material",
-            )
-        if sub_mode == "counterions":
-            return self.start_prompt(
-                [FieldSpec("smiles", required=False, default=smiles)],
-                lambda **payload: self._create_counterion_from_prompt(
-                    name, payload.get("smiles"), aliases
-                ),
-                title="Add counterion",
-            )
-        if sub_mode == "ncrm":
-            return self.start_prompt(
-                [
-                    FieldSpec("display_name"),
-                    FieldSpec(
-                        "interpret_chemically",
-                        field_type="select",
-                        options=BOOL_OPTIONS,
-                        default="false",
-                    ),
-                    FieldSpec("smiles", required=False, default=smiles),
-                ],
-                lambda **payload: self._create_ncrm_from_prompt(name, payload, aliases),
-                title="Add NCRM",
-            )
-        return ["Choose a library subsection first."]
+                FieldSpec("smiles", required=False, default=smiles),
+            ],
+            lambda **payload: handler(name, payload, aliases),
+            title=self._LIBRARY_ADD_TITLES[sub_mode],
+        )
 
     def _finish_library_add_augmented(
         self,
@@ -2650,69 +2654,44 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """Open the finish form with augmentation *result* shown read-only.
 
         Builds the "Retrieved values" section from the resolved name/SMILES/aliases
-        and leaves only the truly remaining fields editable. NCRM keeps
-        ``display_name`` and ``interpret_chemically``; materials and counterions
-        have nothing left to fill, so a single create confirmation is shown.
+        and leaves ``display_name`` and ``interpret_chemically`` editable for all
+        three library subsections. The resolved SMILES is carried through to be
+        persisted on completion.
 
         Args:
             sub_mode: Library subsection.
-            name: The lead name collected earlier (``common_name`` for NCRM).
+            name: The lead chemical name collected earlier.
             result: The successful resolution carrying SMILES, aliases and source.
 
         Returns:
             Prompt-render lines for the finish form.
         """
-        name_label = "common name" if sub_mode == "ncrm" else "name"
-        rows: list[tuple[str, str]] = [(name_label, name)]
+        handler = self._library_create_handler(sub_mode)
+        if handler is None:
+            return ["Choose a library subsection first."]
+        rows: list[tuple[str, str]] = [("name", name)]
         if result.smiles:
             rows.append(("smiles", result.smiles))
         if result.aliases:
             rows.append(("aliases", ", ".join(result.aliases)))
         info = InfoSection(title=f"Retrieved values (source: {result.source})", rows=rows)
 
-        if sub_mode == "ncrm":
-            return self.start_prompt(
-                [
-                    FieldSpec("display_name"),
-                    FieldSpec(
-                        "interpret_chemically",
-                        field_type="select",
-                        options=BOOL_OPTIONS,
-                        default="false",
-                    ),
-                ],
-                lambda **payload: self._create_ncrm_from_prompt(
-                    name, {**payload, "smiles": result.smiles}, result.aliases
+        return self.start_prompt(
+            [
+                FieldSpec("display_name", required=False),
+                FieldSpec(
+                    "interpret_chemically",
+                    field_type="select",
+                    options=BOOL_OPTIONS,
+                    default="false",
                 ),
-                title="Add NCRM",
-                info_section=info,
-            )
-        if sub_mode in ("materials", "counterions"):
-            title = "Add material" if sub_mode == "materials" else "Add counterion"
-            label = "Create entry?"
-            return self.start_prompt(
-                [FieldSpec(label, field_type="select", options=CONFIRM_OPTIONS, default="yes")],
-                lambda **payload: self._confirm_library_add(
-                    sub_mode, name, result, payload[_field_key(label)]
-                ),
-                title=title,
-                info_section=info,
-            )
-        return ["Choose a library subsection first."]
-
-    async def _confirm_library_add(
-        self,
-        sub_mode: str,
-        name: str,
-        result: ResolveResult,
-        answer: str | None,
-    ) -> list[str]:
-        """Create the material/counterion when confirmed, else cancel the add."""
-        if answer != "yes":
-            return await self._refresh_with_notice("Add cancelled.", "info")
-        if sub_mode == "materials":
-            return await self._create_material_from_prompt(name, result.smiles, result.aliases)
-        return await self._create_counterion_from_prompt(name, result.smiles, result.aliases)
+            ],
+            lambda **payload: handler(
+                name, {**payload, "smiles": result.smiles}, result.aliases
+            ),
+            title=self._LIBRARY_ADD_TITLES[sub_mode],
+            info_section=info,
+        )
 
     async def _start_library_edit_prompt(self, sub_mode: str, name: str) -> list[str]:
         item = await self._find_library_item(sub_mode, name)
@@ -2722,6 +2701,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 [
                     FieldSpec("name", default=str(item["name"])),
+                    FieldSpec("display_name", default=_default_text(item.get("display_name"))),
+                    FieldSpec(
+                        "interpret_chemically",
+                        field_type="select",
+                        options=BOOL_OPTIONS,
+                        default="true" if bool(item.get("interpret_chemically")) else "false",
+                    ),
                     FieldSpec("smiles", required=False, default=_default_text(item.get("smiles"))),
                 ],
                 lambda **payload: self._update_material_entry(str(item["id"]), payload),
@@ -2730,8 +2716,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if sub_mode == "ncrm":
             return self.start_prompt(
                 [
+                    FieldSpec("name", default=str(item["name"])),
                     FieldSpec("display_name", default=str(item["display_name"])),
-                    FieldSpec("common_name", default=str(item["common_name"])),
                     FieldSpec(
                         "interpret_chemically",
                         field_type="select",
@@ -2746,6 +2732,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return self.start_prompt(
             [
                 FieldSpec("name", default=str(item["name"])),
+                FieldSpec("display_name", default=_default_text(item.get("display_name"))),
+                FieldSpec(
+                    "interpret_chemically",
+                    field_type="select",
+                    options=BOOL_OPTIONS,
+                    default="true" if bool(item.get("interpret_chemically")) else "false",
+                ),
                 FieldSpec("smiles", required=False, default=_default_text(item.get("smiles"))),
             ],
             lambda **payload: self._update_counterion_entry(str(item["id"]), payload),
@@ -2828,8 +2821,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """Create one NCRM entry plus its ``;``-separated aliases; ``False`` on failure."""
         result = await create_ncrm_library_entry(
             NcrmLibraryCreate(
-                display_name=(row.get("display_name") or "").strip(),
-                common_name=(row.get("common_name") or "").strip(),
+                name=(row.get("name") or "").strip(),
+                display_name=(row.get("display_name") or "").strip() or None,
                 interpret_chemically=(
                     (row.get("interpret_chemically") or "false").strip().lower() == "true"
                 ),
@@ -2851,6 +2844,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         result = await create_counterion(
             CounterionCreate(
                 name=(row.get("name") or "").strip(),
+                display_name=(row.get("display_name") or "").strip() or None,
+                interpret_chemically=(
+                    (row.get("interpret_chemically") or "false").strip().lower() == "true"
+                ),
                 smiles=(row.get("smiles") or "").strip() or None,
             ),
             self.env,
@@ -3592,10 +3589,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             )
 
     async def _create_material_from_prompt(
-        self, name: str, smiles: str | None, aliases: list[str]
+        self, name: str, payload: dict[str, str | None], aliases: list[str]
     ) -> list[str]:
         created = await create_material(
-            MaterialCreate(name=name or "", smiles=smiles or None),
+            MaterialCreate(
+                name=name or "",
+                display_name=payload.get("display_name") or None,
+                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
+                smiles=payload.get("smiles") or None,
+            ),
             self.env,
         )
         if created is None:
@@ -3608,12 +3610,12 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return await self._refresh_with_notice(_created_notice("Material", aliases))
 
     async def _create_ncrm_from_prompt(
-        self, common_name: str, payload: dict[str, str | None], aliases: list[str]
+        self, name: str, payload: dict[str, str | None], aliases: list[str]
     ) -> list[str]:
         created = await create_ncrm_library_entry(
             NcrmLibraryCreate(
-                display_name=payload.get("display_name") or "",
-                common_name=common_name or "",
+                name=name or "",
+                display_name=payload.get("display_name") or None,
                 interpret_chemically=_as_bool(payload.get("interpret_chemically")),
                 smiles=payload.get("smiles") or None,
             ),
@@ -3629,10 +3631,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return await self._refresh_with_notice(_created_notice("NCRM entry", aliases))
 
     async def _create_counterion_from_prompt(
-        self, name: str, smiles: str | None, aliases: list[str]
+        self, name: str, payload: dict[str, str | None], aliases: list[str]
     ) -> list[str]:
         created = await create_counterion(
-            CounterionCreate(name=name or "", smiles=smiles or None),
+            CounterionCreate(
+                name=name or "",
+                display_name=payload.get("display_name") or None,
+                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
+                smiles=payload.get("smiles") or None,
+            ),
             self.env,
         )
         if created is None:
@@ -3754,7 +3761,12 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     ) -> list[str]:
         updated = await update_material(
             UUID(item_id),
-            MaterialUpdate(name=payload.get("name"), smiles=payload.get("smiles") or None),
+            MaterialUpdate(
+                name=payload.get("name"),
+                display_name=payload.get("display_name") or None,
+                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
+                smiles=payload.get("smiles") or None,
+            ),
             self.env,
         )
         if updated is None:
@@ -3766,7 +3778,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             UUID(item_id),
             NcrmLibraryUpdate(
                 display_name=payload.get("display_name"),
-                common_name=payload.get("common_name"),
+                name=payload.get("name"),
                 interpret_chemically=_as_bool(payload.get("interpret_chemically")),
                 smiles=payload.get("smiles") or None,
             ),
@@ -3781,7 +3793,12 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     ) -> list[str]:
         updated = await update_counterion(
             UUID(item_id),
-            CounterionUpdate(name=payload.get("name"), smiles=payload.get("smiles") or None),
+            CounterionUpdate(
+                name=payload.get("name"),
+                display_name=payload.get("display_name") or None,
+                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
+                smiles=payload.get("smiles") or None,
+            ),
             self.env,
         )
         if updated is None:
@@ -3865,7 +3882,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     async def _library_items(self, sub_mode: str) -> list[dict[str, Any]]:
         if sub_mode == "materials":
             return [
-                {"id": item.id, "name": item.name, "smiles": item.smiles}
+                {
+                    "id": item.id,
+                    "name": item.name,
+                    "display_name": item.display_name,
+                    "interpret_chemically": item.interpret_chemically,
+                    "smiles": item.smiles,
+                }
                 for item in await list_materials(self.env)
             ]
         if sub_mode == "ncrm":
@@ -3873,7 +3896,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 {
                     "id": item.id,
                     "display_name": item.display_name,
-                    "common_name": item.common_name,
+                    "name": item.name,
                     "interpret_chemically": item.interpret_chemically,
                     "smiles": item.smiles,
                 }
@@ -3881,7 +3904,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             ]
         if sub_mode == "counterions":
             return [
-                {"id": item.id, "name": item.name, "smiles": item.smiles}
+                {
+                    "id": item.id,
+                    "name": item.name,
+                    "display_name": item.display_name,
+                    "interpret_chemically": item.interpret_chemically,
+                    "smiles": item.smiles,
+                }
                 for item in await list_counterions(self.env)
             ]
         return []
@@ -3889,8 +3918,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     async def _find_library_item(self, sub_mode: str, name: str) -> dict[str, Any] | None:
         lowered = name.lower()
         for item in await self._library_items(sub_mode):
-            item_name = str(item.get("name") or item.get("display_name") or "")
-            if item_name.lower() == lowered:
+            if _library_item_matches(item, lowered):
                 return item
         return None
 
@@ -4167,3 +4195,12 @@ def _default_text(value: Any) -> str | None:
     if value in {None, ""}:
         return None
     return str(value)
+
+
+def _library_item_matches(item: dict[str, Any], lowered: str) -> bool:
+    """True if *lowered* matches the item's ``name`` or ``display_name``."""
+    for key in ("name", "display_name"):
+        value = item.get(key)
+        if value and str(value).lower() == lowered:
+            return True
+    return False

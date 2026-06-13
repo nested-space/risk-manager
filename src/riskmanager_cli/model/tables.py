@@ -128,6 +128,9 @@ class Material(SQLModel, CRUDMixin, table=True):
     Attributes:
         id: UUID primary key (TEXT in SQLite).
         name: Human-readable name; unique across all materials.
+        display_name: Short label shown in listings; required, not unique
+            (defaults to ``name`` when not supplied).
+        interpret_chemically: Whether SMILES is semantically interpreted.
         smiles: Canonical SMILES notation; unique when set.
         created_at: UTC timestamp of record creation.
         updated_at: UTC timestamp of most recent modification.
@@ -144,6 +147,10 @@ class Material(SQLModel, CRUDMixin, table=True):
         sa_column=Column(Text, primary_key=True),
     )
     name: str = Field(sa_column=Column(Text, nullable=False, unique=True))
+    display_name: str = Field(sa_column=Column(Text, nullable=False))
+    interpret_chemically: bool = Field(
+        sa_column=Column(Boolean, nullable=False, default=False)
+    )
     smiles: str | None = Field(default=None, sa_column=Column(Text, unique=True))
     created_at: datetime | None = Field(
         default_factory=_now,
@@ -436,6 +443,9 @@ class Counterion(SQLModel, CRUDMixin, table=True):
     Attributes:
         id: UUID primary key.
         name: Counterion name (e.g. 'Chloride'); unique.
+        display_name: Short label shown in listings; required, not unique
+            (defaults to ``name`` when not supplied).
+        interpret_chemically: Whether SMILES is semantically interpreted.
         smiles: Optional canonical SMILES notation; unique when set.
         created_at: UTC timestamp of record creation.
         updated_at: UTC timestamp of most recent modification.
@@ -448,6 +458,10 @@ class Counterion(SQLModel, CRUDMixin, table=True):
         sa_column=Column(Text, primary_key=True),
     )
     name: str = Field(sa_column=Column(Text, nullable=False, unique=True))
+    display_name: str = Field(sa_column=Column(Text, nullable=False))
+    interpret_chemically: bool = Field(
+        sa_column=Column(Boolean, nullable=False, default=False)
+    )
     smiles: str | None = Field(default=None, sa_column=Column(Text, unique=True))
     created_at: datetime | None = Field(
         default_factory=_now,
@@ -691,8 +705,9 @@ class NcrmLibrary(SQLModel, CRUDMixin, table=True):
 
     Attributes:
         id: UUID primary key.
-        display_name: Primary display name; unique.
-        common_name: Common chemical name; unique.
+        display_name: Short label shown in listings; required, not unique
+            (defaults to ``name`` when not supplied).
+        name: Common chemical name; unique.
         interpret_chemically: Whether SMILES is semantically interpreted.
         smiles: Optional canonical SMILES notation.
         created_at: UTC timestamp of record creation.
@@ -705,8 +720,8 @@ class NcrmLibrary(SQLModel, CRUDMixin, table=True):
         default_factory=_uuid,
         sa_column=Column(Text, primary_key=True),
     )
-    display_name: str = Field(sa_column=Column(Text, nullable=False, unique=True))
-    common_name: str = Field(sa_column=Column(Text, nullable=False, unique=True))
+    display_name: str = Field(sa_column=Column(Text, nullable=False))
+    name: str = Field(sa_column=Column(Text, nullable=False, unique=True))
     interpret_chemically: bool = Field(sa_column=Column(Boolean, nullable=False, default=False))
     smiles: str | None = Field(default=None, sa_column=Column(Text))
     created_at: datetime | None = Field(

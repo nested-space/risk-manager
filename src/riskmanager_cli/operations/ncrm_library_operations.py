@@ -35,14 +35,14 @@ async def create_ncrm_library_entry(
         smiles: str | None = None
         if data.smiles:
             if not is_valid_smiles(data.smiles):
-                print_error(f"Invalid SMILES for NCRM '{data.display_name}': {data.smiles}")
+                print_error(f"Invalid SMILES for NCRM '{data.name}': {data.smiles}")
                 return None
             smiles = canonicalize_smiles(data.smiles) or data.smiles
 
         async with get_db_session(env, verbose) as session:
             entry = NcrmLibrary(
-                display_name=data.display_name,
-                common_name=data.common_name,
+                display_name=data.display_name or data.name,
+                name=data.name,
                 interpret_chemically=data.interpret_chemically,
                 smiles=smiles,
             )

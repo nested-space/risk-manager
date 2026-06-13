@@ -24,10 +24,14 @@ class MaterialCreate(BaseModel):
 
     Attributes:
         name: Human-readable material name; must be unique.
+        display_name: Short label; defaults to ``name`` when omitted.
+        interpret_chemically: Whether SMILES is semantically interpreted.
         smiles: Optional canonical SMILES notation.
     """
 
     name: str
+    display_name: str | None = None
+    interpret_chemically: bool = False
     smiles: str | None = None
 
 
@@ -136,10 +140,14 @@ class CounterionCreate(BaseModel):
 
     Attributes:
         name: Counterion name (e.g. 'Chloride'); must be unique.
+        display_name: Short label; defaults to ``name`` when omitted.
+        interpret_chemically: Whether SMILES is semantically interpreted.
         smiles: Optional canonical SMILES notation.
     """
 
     name: str
+    display_name: str | None = None
+    interpret_chemically: bool = False
     smiles: str | None = None
 
 
@@ -225,14 +233,14 @@ class NcrmLibraryCreate(BaseModel):
     """Fields required to create a :class:`~..model.tables.NcrmLibrary` entry.
 
     Attributes:
-        display_name: Primary display name; must be unique.
-        common_name: Common chemical name; must be unique.
+        name: Common chemical name; must be unique.
+        display_name: Short label; defaults to ``name`` when omitted.
         interpret_chemically: Whether SMILES is semantically interpreted.
         smiles: Optional canonical SMILES notation.
     """
 
-    display_name: str
-    common_name: str
+    name: str
+    display_name: str | None = None
     interpret_chemically: bool = False
     smiles: str | None = None
 
