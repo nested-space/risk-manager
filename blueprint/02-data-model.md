@@ -106,7 +106,7 @@ A project links a material to a therapy area and contains manufacturing processe
 |--------|------|-------------|-------------|
 | `id` | TEXT | PK | UUID |
 | `name` | TEXT | NOT NULL | Project name |
-| `therapy_area` | TEXT | NOT NULL | Enum: TA (see `05-enums.md`) |
+| `therapy_area` | TEXT | NOT NULL | Enum: TA (see `src/riskmanager_cli/model/enums.py`) |
 | `material_id` | TEXT | FK → material.id RESTRICT, NOT NULL | Associated material |
 | `created_at` | DATETIME | NOT NULL | UTC creation timestamp |
 | `updated_at` | DATETIME | NOT NULL | UTC last-modified timestamp |
@@ -364,7 +364,7 @@ Junction table linking a stage to an NCRM with its role.
 | `id` | TEXT | PK | UUID |
 | `ncrm_id` | TEXT | FK → ncrm_library.id RESTRICT, NOT NULL | Linked NCRM entry |
 | `stage_id` | TEXT | FK → stage.id RESTRICT, NOT NULL | Linked stage |
-| `role` | TEXT | NOT NULL | Enum: NcrmRole (see `05-enums.md`) |
+| `role` | TEXT | NOT NULL | Enum: NcrmRole (see `src/riskmanager_cli/model/enums.py`) |
 | `created_at` | DATETIME | NOT NULL | UTC creation timestamp |
 | `updated_at` | DATETIME | NOT NULL | UTC last-modified timestamp |
 

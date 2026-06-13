@@ -1,8 +1,11 @@
-# Copilot Instructions — `riskmanager-cli`
+# Contributor Guide — `riskmanager-cli`
 
-These rules are **mandatory** and apply to every contribution, AI-assisted or
-human. No exceptions without explicit project-owner approval documented in the
-PR description.
+These rules are **mandatory** and apply to every contribution, AI-assisted (any
+tool) or human. No exceptions without explicit project-owner approval documented
+in the PR description.
+
+For design rationale behind the architecture and schema, see `blueprint/`
+(`01-architecture.md`, `02-data-model.md`, `03-repl-ux.md`).
 
 ---
 
@@ -260,9 +263,9 @@ docs: update README with counterion import format
 refactor: extract CRUDMixin to model/util.py
 test: add integration tests for stage_ncrm_operations
 chore: bump version to 0.4.0
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 ```
+
+Never add a `Co-authored-by:` trailer to commit messages.
 
 ---
 

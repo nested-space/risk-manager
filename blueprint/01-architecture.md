@@ -238,15 +238,15 @@ runs synchronously to ensure clean terminal control.
 - DMTA enrichment
 - Bulk CSV import with `skip_errors` support
 
-This layer is **unchanged** from the earlier blueprint specification. See
-`07-operations-patterns.md` for full detail.
+See `AGENTS.md` §5 (Async Patterns / Error Handling) and the
+`src/riskmanager_cli/operations/` modules for the operation pattern.
 
 ---
 
 ### Layer 7: Database Layer (`database/`, `model/`, `schema/`)
 
-**Unchanged** from the blueprint specification. See `10-persistence-layer.md`
-and `04-data-model.md` for full detail.
+See `02-data-model.md` for the schema, and `src/riskmanager_cli/database/`
+for the engine/session implementation.
 
 ---
 
