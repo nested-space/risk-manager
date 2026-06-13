@@ -182,6 +182,19 @@ class FieldSpec:
     options: list[tuple[str, str]] = field(default_factory=list)
 
 
+@dataclass
+class InfoSection:
+    """Read-only key/value rows shown above a form's editable fields.
+
+    Attributes:
+        title: Section heading (e.g. ``"Retrieved values (source: pubchem)"``).
+        rows: ``(label, value)`` pairs rendered as non-editable lines.
+    """
+
+    title: str
+    rows: list[tuple[str, str]]
+
+
 #: Yes/No options for required boolean ``select`` fields.
 BOOL_OPTIONS: list[tuple[str, str]] = [("Yes", "true"), ("No", "false")]
 
@@ -263,6 +276,7 @@ class PromptState:
     collected: list[str | None]
     current_index: int = 0
     title: str | None = None
+    info_section: InfoSection | None = None
     _select_navigator: ListNavigator | None = field(default=None, init=False, repr=False)
 
     @property
@@ -495,6 +509,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         on_complete: Callable[..., Any],
         *,
         title: str | None = None,
+        info_section: InfoSection | None = None,
     ) -> list[str]:
         """Enter guided prompt mode.
 
@@ -502,12 +517,17 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             fields: Prompt field definitions.
             on_complete: Callback invoked once all values are collected.
             title: Optional form heading shown above multi-field forms.
+            info_section: Optional read-only key/value block shown above the
+                editable fields (e.g. augmentation results).
 
         Returns:
             Initial prompt-render lines.
         """
         self._prompt_state = PromptState(
-            fields=fields, collected=[None] * len(fields), title=title
+            fields=fields,
+            collected=[None] * len(fields),
+            title=title,
+            info_section=info_section,
         )
         self._prompt_callback = on_complete
         return self._render_prompt_lines()
@@ -2507,8 +2527,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
     def _start_library_add_prompt(self, sub_mode: str) -> list[str]:
         # Each add flow is a three-step chain: collect the lead name, offer to
-        # auto-resolve SMILES/aliases, then collect the remaining fields with the
-        # resolved SMILES pre-filled (see _offer_augment / _finish_library_add).
+        # auto-resolve SMILES/aliases, then collect the remaining fields. On a
+        # successful resolve the retrieved values are shown read-only and only the
+        # remaining fields stay editable (see _offer_augment /
+        # _finish_library_add_augmented); otherwise SMILES is entered manually.
         if sub_mode == "materials":
             return self.start_prompt(
                 [FieldSpec("name")],
@@ -2549,28 +2571,20 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         )
 
     async def _resolve_augment(self, sub_mode: str, name: str, answer: str | None) -> list[str]:
-        """Run augmentation when confirmed, then open the finish form pre-filled.
+        """Run augmentation when confirmed, then open the finish form.
 
-        On a successful resolve, the SMILES seeds the finish form's ``smiles``
-        field and the aliases are carried through to be persisted on completion;
-        a status notice reports the source and alias count. On a miss (or "No"),
-        the form opens for manual SMILES entry.
+        On a successful resolve, the retrieved SMILES and aliases are shown in a
+        read-only "Retrieved values" section on the finish form (and carried
+        through to be persisted on completion); only the remaining fields stay
+        editable. On a miss (or "No"), the form opens for manual SMILES entry.
         """
         if answer != "yes":
             return self._finish_library_add(sub_mode, name, None, [])
         result = await augment_name(name)
         if result.resolved:
-            self._notice = (self._augment_success_message(result), "success")
-            return self._finish_library_add(sub_mode, name, result.smiles, result.aliases)
+            return self._finish_library_add_augmented(sub_mode, name, result)
         self._notice = (f"Could not resolve '{name}'. Enter SMILES manually.", "warning")
         return self._finish_library_add(sub_mode, name, None, [])
-
-    @staticmethod
-    def _augment_success_message(result: ResolveResult) -> str:
-        """Build the success notice for a resolved augmentation."""
-        count = len(result.aliases)
-        plural = "alias" if count == 1 else "aliases"
-        return f"Resolved via {result.source}: SMILES pre-filled, {count} {plural} found."
 
     def _finish_library_add(
         self,
@@ -2579,12 +2593,16 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         smiles: str | None,
         aliases: list[str],
     ) -> list[str]:
-        """Open the final add form, pre-filling SMILES and carrying *aliases*.
+        """Open the final add form for the manual (non-augmented) path.
+
+        Used when the user declined augmentation or it missed: SMILES is an
+        editable field. See :meth:`_finish_library_add_augmented` for the form
+        shown after a successful resolve.
 
         Args:
             sub_mode: Library subsection.
             name: The lead name collected earlier (``common_name`` for NCRM).
-            smiles: Resolved SMILES to seed the field, or ``None`` for manual entry.
+            smiles: Pre-filled SMILES, or ``None`` for manual entry.
             aliases: Aliases to persist once the entity is created.
 
         Returns:
@@ -2622,6 +2640,79 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 title="Add NCRM",
             )
         return ["Choose a library subsection first."]
+
+    def _finish_library_add_augmented(
+        self,
+        sub_mode: str,
+        name: str,
+        result: ResolveResult,
+    ) -> list[str]:
+        """Open the finish form with augmentation *result* shown read-only.
+
+        Builds the "Retrieved values" section from the resolved name/SMILES/aliases
+        and leaves only the truly remaining fields editable. NCRM keeps
+        ``display_name`` and ``interpret_chemically``; materials and counterions
+        have nothing left to fill, so a single create confirmation is shown.
+
+        Args:
+            sub_mode: Library subsection.
+            name: The lead name collected earlier (``common_name`` for NCRM).
+            result: The successful resolution carrying SMILES, aliases and source.
+
+        Returns:
+            Prompt-render lines for the finish form.
+        """
+        name_label = "common name" if sub_mode == "ncrm" else "name"
+        rows: list[tuple[str, str]] = [(name_label, name)]
+        if result.smiles:
+            rows.append(("smiles", result.smiles))
+        if result.aliases:
+            rows.append(("aliases", ", ".join(result.aliases)))
+        info = InfoSection(title=f"Retrieved values (source: {result.source})", rows=rows)
+
+        if sub_mode == "ncrm":
+            return self.start_prompt(
+                [
+                    FieldSpec("display_name"),
+                    FieldSpec(
+                        "interpret_chemically",
+                        field_type="select",
+                        options=BOOL_OPTIONS,
+                        default="false",
+                    ),
+                ],
+                lambda **payload: self._create_ncrm_from_prompt(
+                    name, {**payload, "smiles": result.smiles}, result.aliases
+                ),
+                title="Add NCRM",
+                info_section=info,
+            )
+        if sub_mode in ("materials", "counterions"):
+            title = "Add material" if sub_mode == "materials" else "Add counterion"
+            label = "Create entry?"
+            return self.start_prompt(
+                [FieldSpec(label, field_type="select", options=CONFIRM_OPTIONS, default="yes")],
+                lambda **payload: self._confirm_library_add(
+                    sub_mode, name, result, payload[_field_key(label)]
+                ),
+                title=title,
+                info_section=info,
+            )
+        return ["Choose a library subsection first."]
+
+    async def _confirm_library_add(
+        self,
+        sub_mode: str,
+        name: str,
+        result: ResolveResult,
+        answer: str | None,
+    ) -> list[str]:
+        """Create the material/counterion when confirmed, else cancel the add."""
+        if answer != "yes":
+            return await self._refresh_with_notice("Add cancelled.", "info")
+        if sub_mode == "materials":
+            return await self._create_material_from_prompt(name, result.smiles, result.aliases)
+        return await self._create_counterion_from_prompt(name, result.smiles, result.aliases)
 
     async def _start_library_edit_prompt(self, sub_mode: str, name: str) -> list[str]:
         item = await self._find_library_item(sub_mode, name)
@@ -3830,6 +3921,16 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             if len(state.fields) == 1
             else self._multi_field_body(state)
         )
+        prefix: list[str] = []
+        # Preserve current behavior: single-field forms without an info section
+        # show no title (today's _single_field_body ignores it). A title is drawn
+        # for multi-field forms and for any form carrying a read-only section.
+        if state.title and (len(state.fields) > 1 or state.info_section is not None):
+            prefix += [self.screen.bold(state.title), ""]
+        if state.info_section is not None:
+            prefix += self._info_section_lines(state.info_section, state)
+            prefix += ["", self.screen.dim("Remaining fields"), ""]
+        body = [*prefix, *body]
         boxed = render_box(body, max(self.screen.width - 2, 0), align="left", pad_x=2, pad_y=1)
         if message:
             return [self.screen.style_notice(message, "error"), "", *boxed]
@@ -3855,12 +3956,31 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return [f"Enter {current.label}", "", self.screen.dim(current.default)]
         return [f"Enter {current.label}"]
 
+    def _info_section_lines(self, section: InfoSection, state: PromptState) -> list[str]:
+        """Render a read-only key/value block, aligned with the editable fields.
+
+        Row labels share a column width with the form's field labels so the value
+        columns line up, and rows are indented two spaces to sit under the ``▶ ``
+        marker column of the editable fields below.
+        """
+        width = self._form_label_width(state)
+        lines = [self.screen.dim(section.title)]
+        for label, value in section.rows:
+            lines.append(f"  {self.screen.dim(label.ljust(width))}  {value}")
+        return lines
+
+    @staticmethod
+    def _form_label_width(state: PromptState) -> int:
+        """Return the shared label column width for info rows and editable fields."""
+        labels = [field_spec.label for field_spec in state.fields]
+        if state.info_section is not None:
+            labels += [label for label, _ in state.info_section.rows]
+        return max((len(label) for label in labels), default=0)
+
     def _multi_field_body(self, state: PromptState) -> list[str]:
         """Render a multi-field form as a labelled overview of every field."""
         lines: list[str] = []
-        if state.title:
-            lines.extend([self.screen.bold(state.title), ""])
-        label_width = max(len(field_spec.label) for field_spec in state.fields)
+        label_width = self._form_label_width(state)
         for index, field_spec in enumerate(state.fields):
             active = index == state.current_index
             marker = "▶" if active else " "
