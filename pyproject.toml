@@ -74,7 +74,7 @@ warn_unused_ignores = true
 # (https://github.com/kuelumbus/rdkit-pypi/issues — auto-generated stubs)
 mypy_path = "stubs"
 # No global ignore_errors or ignore_missing_imports — all suppressions must
-# be inline with justification comment (see .github/copilot-instructions.md)
+# be inline with justification comment (see AGENTS.md)
 
 [[tool.mypy.overrides]]
 module = "rdkit.*"
@@ -95,7 +95,7 @@ max-line-length = 100
 # across typed modules for different SQLModel classes. pylint's SimilarChecker
 # reports R0801 at the runner level — it cannot be suppressed inline — so this
 # is the only available mechanism. All other suppressions must be inline with
-# justification. See .github/copilot-instructions.md § Suppression Policy.
+# justification. See AGENTS.md § Suppression Policy.
 disable = ["R0801"]
 
 [tool.pylint.typecheck]

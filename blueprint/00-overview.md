@@ -1,17 +1,18 @@
-# Riskmanager CLI — Blueprint Overview
+# Riskmanager CLI — Design Overview
 
 ## Purpose
 
-This blueprint describes the complete specification for a **greenfield, single-user,
-self-sufficient Python interactive REPL application** for managing pharmaceutical
-manufacturing riskmanager data. It is derived from the `riskmanager-cli` reference
-implementation but redesigned as a **persistent, full-screen interactive shell**
-using `blessed` for terminal control, adapted to use **SQLite** (not PostgreSQL),
-and contains **no dependency** on the `riskmanager_server` wheel.
+This is the **design reference** for `riskmanager-cli`, a single-user,
+self-sufficient Python interactive REPL application for managing pharmaceutical
+manufacturing riskmanager data. It captures the architecture and design rationale
+of the implemented application: a **persistent, full-screen interactive shell**
+using `blessed` for terminal control, backed by **SQLite** (not PostgreSQL), with
+**no dependency** on any `riskmanager_server` wheel.
 
-The output of this blueprint is a standalone application a developer can build
-from scratch, covering the interactive REPL layer, business logic layer, and
-persistence layer.
+These docs explain *why* the application is shaped the way it is. The code is the
+source of truth for behaviour; the README is the source of truth for usage; this
+directory records the design decisions behind both. See the sibling docs:
+`01-architecture.md`, `02-data-model.md`, `03-repl-ux.md`.
 
 ### Key Design Philosophy: Context-Aware Navigation
 
@@ -137,7 +138,7 @@ All JSONB columns from the reference implementation are either:
 
 ---
 
-## File Structure (Greenfield Target)
+## Source Layout
 
 ```
 src/

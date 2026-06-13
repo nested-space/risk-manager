@@ -188,7 +188,7 @@ def run_async_in_session(
     Not used directly — all operations open their own sessions via
     :func:`~..database.db_session.get_db_session`. Retained as a reference
     point for the session-per-operation design documented in
-    ``blueprint/08-code-quality.md``.
+    ``AGENTS.md`` §5 (Async Patterns).
 
     Args:
         session: An open async session (unused in current implementation).
