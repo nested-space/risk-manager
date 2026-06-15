@@ -62,6 +62,7 @@ async def render_project_screen(
             if name in summary:
                 summary[name] += 1
 
+    # Two columns are lost to the screen inset and two to the section body indent.
     detail_table = render_table(
         [Column("Property"), Column("Value")],
         [
@@ -69,10 +70,12 @@ async def render_project_screen(
             ["Therapy Area", project.therapy_area.value],
             ["SMILES", material.smiles if material and material.smiles else "-"],
         ],
+        max_width=width - 4,
     )
     risk_table = render_table(
         [Column("Level"), Column("Number", align="right")],
         [[name, str(summary[name])] for name in SEVERITY_BY_LEVEL.values()],
+        max_width=width - 4,
     )
     routes_block = route_lines if route_lines is not None else [f"{len(processes)} total"]
 

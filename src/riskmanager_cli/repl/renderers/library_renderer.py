@@ -80,6 +80,7 @@ async def render_library_screen(
     sub_mode: str,
     items: list[dict[str, Any]],
     *,
+    width: int = 80,
     selected_id: str | None = None,
 ) -> list[str]:
     """Return display lines for the Library track.
@@ -88,6 +89,7 @@ async def render_library_screen(
         sub_mode: Active library sub-mode (``materials``/``ncrm``/``counterions``
             or ``select`` for the subsection chooser).
         items: Library rows already converted to dictionaries, in display order.
+        width: Terminal width; the table is shrunk to fit it.
         selected_id: ``item_id`` of the caret-selected row, if any.
 
     Returns:
@@ -111,7 +113,8 @@ async def render_library_screen(
         lines.append("(no items found)")
         return lines
 
-    table = render_table(_COLUMNS, [row.cells for row in rows])
+    # Two columns are lost to the screen inset and two to the caret/indent gutter.
+    table = render_table(_COLUMNS, [row.cells for row in rows], max_width=width - 4)
     data_start = 3  # top border, header, separator precede the data rows
     for index, line in enumerate(table):
         is_data = data_start <= index < data_start + len(rows)

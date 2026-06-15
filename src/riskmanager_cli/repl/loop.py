@@ -15,6 +15,7 @@ from .commands import CommandDispatcher
 from .context import ContextManager
 from .screen import ScreenManager
 from .session_state import SessionState
+from .sticky_window import reserved_top
 
 T = TypeVar("T")
 
@@ -390,12 +391,18 @@ def _selected_line_index(lines: list[str]) -> int | None:
 
 
 def _follow_selection(lines: list[str], offset: int, height: int) -> int:
-    """Adjust *offset* so the caret-marked line stays within the visible window."""
+    """Adjust *offset* so the caret-marked line stays within the visible window.
+
+    When the caret sits inside a box-table, a pinned header (see
+    :func:`~.sticky_window.pinned_window`) hides ``reserved`` rows at the top of
+    the window, so the caret is kept that many rows clear of the top edge.
+    """
     selected = _selected_line_index(lines)
     if selected is None:
         return offset
-    if selected < offset:
-        return selected
+    reserved = reserved_top(lines, selected)
+    if selected < offset + reserved:
+        return max(0, selected - reserved)
     if selected >= offset + height:
         return selected - height + 1
     return offset

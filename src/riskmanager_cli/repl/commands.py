@@ -2188,7 +2188,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             items = [item for item in items if not item.get("smiles")]
         navigator = self._rebuild_list_navigator([], library_targets(items))
         selected_id = navigator.selected.item_id if navigator.selected is not None else None
-        return await render_library_screen(sub_mode, items, selected_id=selected_id)
+        return await render_library_screen(
+            sub_mode, items, width=self.screen.width, selected_id=selected_id
+        )
 
     async def _render_risk_mode(  # pylint: disable=too-many-return-statements  # one return per risk scope
         self,
@@ -2229,7 +2231,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                         "scope": label,
                     }
                 )
-        return await render_risk_table(risks, scope_label=f"project · {project.name}")
+        return await render_risk_table(
+            risks, scope_label=f"project · {project.name}", width=self.screen.width
+        )
 
     async def _render_process_risks(self, process: ManufacturingProcess) -> list[str]:
         risks = [
@@ -2243,7 +2247,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             for risk in await list_risks_for_process(UUID(str(process.id)), self.env)
         ]
         return await render_risk_table(
-            risks, scope_label=f"route {self.ctx.current.route_label or ''}"
+            risks,
+            scope_label=f"route {self.ctx.current.route_label or ''}",
+            width=self.screen.width,
         )
 
     async def _render_stage_risks(self, stage: Stage) -> list[str]:
@@ -2257,7 +2263,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             }
             for risk in await list_risks_for_stage(UUID(str(stage.id)), self.env)
         ]
-        return await render_risk_table(risks, scope_label=f"stage · {stage.name}")
+        return await render_risk_table(
+            risks, scope_label=f"stage · {stage.name}", width=self.screen.width
+        )
 
     async def _render_component_risks(self, component: Component) -> list[str]:
         risks = [
@@ -2271,7 +2279,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             for risk in await list_risks_for_component(UUID(str(component.id)), self.env)
         ]
         return await render_risk_table(
-            risks, scope_label=f"component · {self.ctx.current.component_name or ''}"
+            risks,
+            scope_label=f"component · {self.ctx.current.component_name or ''}",
+            width=self.screen.width,
         )
 
     async def _handle_route_list(self, process: ManufacturingProcess, kind: str) -> list[str]:

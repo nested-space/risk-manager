@@ -54,3 +54,53 @@ def test_render_table_centers_aligned_columns() -> None:
     assert "│   4   │" in lines[3]
     # The name is left-justified flush after its leading pad space.
     assert lines[3].startswith("│ Equipment fault │")
+
+
+def _column_widths(border: str) -> list[int]:
+    """Recover each column's content width from a ``┌──┬──┐`` border line."""
+    return [len(segment) - 2 for segment in border.strip("┌┐").split("┬")]
+
+
+@pytest.mark.unit
+def test_render_table_keeps_natural_width_when_budget_is_ample() -> None:
+    """An ample *max_width* leaves the table identical to its natural rendering."""
+    columns = [Column("Name"), Column("Role")]
+    rows = [["Acetonitrile", "Solvent"]]
+    assert render_table(columns, rows, max_width=200) == render_table(columns, rows)
+
+
+@pytest.mark.unit
+def test_render_table_shrinks_to_fit_and_elides_overflow() -> None:
+    """An over-wide table is shrunk within budget and long cells gain ``…``."""
+    lines = render_table(
+        [Column("Name"), Column("SMILES")],
+        [["Acetonitrile", "C1=CC=CC=C1OCC"]],
+        max_width=20,
+    )
+    assert len({len(line) for line in lines}) == 1  # one shared width
+    assert len(lines[0]) <= 20
+    assert "…" in lines[3]  # at least one cell was clipped
+
+
+@pytest.mark.unit
+def test_render_table_respects_min_width_under_pressure() -> None:
+    """A column is not shrunk below its ``min_width`` while another has slack."""
+    lines = render_table(
+        [Column("A"), Column("B", min_width=10)],
+        [["x" * 30, "y" * 30]],
+        max_width=21,
+    )
+    # Budget forces both to their floors: A to the default 4, B to its 10.
+    assert _column_widths(lines[0]) == [4, 10]
+
+
+@pytest.mark.unit
+def test_render_table_drops_minimums_when_they_cannot_all_fit() -> None:
+    """When the minimums exceed the budget, no column collapses below one column."""
+    lines = render_table(
+        [Column("A", min_width=10), Column("B", min_width=10)],
+        [["x" * 20, "y" * 20]],
+        max_width=15,
+    )
+    assert min(_column_widths(lines[0])) >= 1
+    assert len(lines[0]) <= 15

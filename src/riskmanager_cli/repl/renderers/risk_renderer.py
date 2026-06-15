@@ -11,12 +11,15 @@ from .tables import Column, render_table
 async def render_risk_table(
     risks: list[dict[str, Any]],
     scope_label: str,
+    *,
+    width: int = 80,
 ) -> list[str]:
     """Return display lines for Risk Mode.
 
     Args:
         risks: Risk dictionaries to render.
         scope_label: Human-readable scope label.
+        width: Terminal width; the table is shrunk to fit it.
 
     Returns:
         Renderable output lines: a title line, a blank line, then either the
@@ -45,7 +48,8 @@ async def render_risk_table(
         ]
         for index, risk in enumerate(risks, start=1)
     ]
-    return [title, "", *render_table(columns, rows)]
+    # The risk table is drawn un-indented; only the screen inset is reserved.
+    return [title, "", *render_table(columns, rows, max_width=width - 2)]
 
 
 def _as_level(value: Any) -> int | None:

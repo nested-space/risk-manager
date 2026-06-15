@@ -125,11 +125,10 @@ def render_component_screen(
     title = f"Component: {display_name}"
     lines = [title, "─" * len(title)]
 
-    body_width = section_width(width)
     body: list[tuple[str, str | None]] = []
-    body += _section_body("Details", _DETAIL_COLUMNS, sections.details, body_width, "(none)")
-    body += _section_body("Salts", _SALT_COLUMNS, sections.salts, body_width, "(no salts)")
-    body += _section_body("Risks", _RISK_COLUMNS, sections.risks, body_width, "(no risks recorded)")
+    body += _section_body("Details", _DETAIL_COLUMNS, sections.details, width, "(none)")
+    body += _section_body("Salts", _SALT_COLUMNS, sections.salts, width, "(no salts)")
+    body += _section_body("Risks", _RISK_COLUMNS, sections.risks, width, "(no risks recorded)")
 
     for text, item_id in body:
         if not text:
@@ -144,24 +143,25 @@ def _section_body(
     title: str,
     columns: list[Column],
     rows: list[ComponentRow],
-    body_width: int,
+    width: int,
     empty_placeholder: str,
 ) -> list[tuple[str, str | None]]:
     """Build ``(text, item_id)`` body lines for one section.
 
     A blank line precedes the section rule; the table's data rows carry their
     row ``item_id`` (everything else is ``None``). Empty sections render the
-    placeholder instead of a table.
+    placeholder instead of a table. The table is shrunk to the terminal *width*
+    less the screen inset and the two-column caret/indent gutter.
     """
     out: list[tuple[str, str | None]] = [
         ("", None),
-        (section_rule(title, body_width), None),
+        (section_rule(title, section_width(width)), None),
         ("", None),
     ]
     if not rows:
         out.append((empty_placeholder, None))
         return out
-    table = render_table(columns, [row.cells for row in rows])
+    table = render_table(columns, [row.cells for row in rows], max_width=width - 4)
     data_start = 3  # top border, header, separator precede the data rows
     for index, line in enumerate(table):
         is_data = data_start <= index < data_start + len(rows)

@@ -7,6 +7,7 @@ import sys
 import blessed
 
 from .context import ContextManager
+from .sticky_window import pinned_window
 
 
 class ScreenManager:
@@ -96,8 +97,10 @@ class ScreenManager:
 
         Args:
             lines: Full set of output lines (may exceed the pane height).
-            offset: Index of the first line to show; the pane displays
-                ``lines[offset : offset + output_height]``. Callers are
+            offset: Index of the first line to show. The window is built by
+                :func:`~.sticky_window.pinned_window`, which keeps a box-table's
+                header visible whenever its rows are on screen; absent a table it
+                is just ``lines[offset : offset + output_height]``. Callers are
                 responsible for clamping *offset* to a valid range.
         """
         width = self._term.width
@@ -105,7 +108,7 @@ class ScreenManager:
         sys.stdout.write(self._term.move_xy(0, 1) + self._term.clear_eol)
         for row in range(2, underline_row):
             sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol)
-        window = lines[offset : offset + self.output_height]
+        window = pinned_window(lines, offset, self.output_height)
         for row, line in enumerate(window, start=2):
             sys.stdout.write(self._term.move_xy(1, row) + self._fit_width(line))
         sys.stdout.write(self._term.move_xy(0, underline_row) + self._term.clear_eol + "_" * width)

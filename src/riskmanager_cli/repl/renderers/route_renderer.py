@@ -125,18 +125,26 @@ async def _diagram_lines(
             return [
                 "(process graph incomplete — showing stage list)",
                 "",
-                *_stage_list_lines(stages, components),
+                *_stage_list_lines(stages, components, graph_budget),
             ]
 
     return ["(no stages defined yet)"]
 
 
-def _stage_list_lines(stages: list[StageInput], components: list[ComponentInput]) -> list[str]:
+def _stage_list_lines(
+    stages: list[StageInput], components: list[ComponentInput], max_width: int
+) -> list[str]:
     """Render the stages as a table of #, name, starting materials, and products.
 
     Used when the component graph can't be laid out as a single DAG (still being
     built). A table — rather than arrow-joined boxes — avoids implying a stage
     order we don't actually know yet.
+
+    Args:
+        stages: Stages to list.
+        components: Components, used to resolve display names.
+        max_width: Columns available inside the diagram box; the table is shrunk
+            to fit so it never overflows the box interior.
     """
     name_by_id = {component.id: component.display_name for component in components}
     columns = [
@@ -158,7 +166,7 @@ def _stage_list_lines(stages: list[StageInput], components: list[ComponentInput]
         [str(stage.number), stage.name, names(stage, "reactant"), names(stage, "product")]
         for stage in sorted(stages, key=lambda stage: stage.number)
     ]
-    return render_table(columns, rows)
+    return render_table(columns, rows, max_width=max_width)
 
 
 def _assemble_sections(
