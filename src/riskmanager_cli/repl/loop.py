@@ -361,6 +361,7 @@ def _in_list_mode(ctx: ContextManager) -> bool:
         "route_select",
         "stage_focus",
         "component_focus",
+        "library",
     }
 
 

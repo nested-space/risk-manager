@@ -11,6 +11,21 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Selectable library tables: the materials, NCRM and counterion subsections now
+  render as navigable, alphabetised box tables with a `>` selection caret. ↑/↓
+  move the caret and Enter (or `^E`) edits the highlighted row inline, replacing
+  the previous "which one?" chooser; `^X` deletes and `^O` shows the selected
+  row. Tables gain Name · Display name · Aliases · SMILES columns, with
+  chemically-rendered display names (stoichiometric subscripts, e.g. `H₂SO₄`)
+  via `utils.formula_parser.render_chemical_formula` and per-entry alias counts
+  from new `*_alias_counts` operations.
+- First-run reference-library seeding: when no database file exists at the
+  resolved path, the app now creates the schema and seeds the default
+  counterion (24) and NCRM (325) libraries from committed JSON
+  (`riskmanager_cli/data/seed/*.json`), showing a live initialisation progress
+  box. Subsequent launches detect the existing file and skip seeding.
+  New: `operations/seed_operations.py`, `repl/bootstrap.py`, and
+  `config.settings.get_db_path`
 - Stage 9 test suite: 75 tests across `tests/operations/`, `tests/repl/`, and
   `tests/utils/` covering material, project, and component CRUD operations;
   SMILES validation; context-stack navigation; session state persistence; and

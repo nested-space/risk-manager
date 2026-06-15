@@ -44,6 +44,10 @@ rmgr = "riskmanager_cli.__main__:cli_main"
 where = ["src"]
 include = ["riskmanager_cli*"]
 
+[tool.setuptools.package-data]
+# Ship the committed JSON reference libraries seeded into new databases on first run.
+riskmanager_cli = ["data/seed/*.json"]
+
 # ---------------------------------------------------------------------------
 # Ruff — linter and formatter
 # ---------------------------------------------------------------------------

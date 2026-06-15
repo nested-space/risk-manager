@@ -5,6 +5,7 @@ All functions are ``async def`` and open their own sessions. On error they
 log via ``print_error`` and return ``None`` / ``[]`` / ``False``.
 """
 
+from collections import Counter
 from uuid import UUID
 
 from ..config.settings import Environment
@@ -184,6 +185,29 @@ async def list_materials(
     except Exception as exc:  # pylint: disable=broad-except
         print_error(f"Failed to list materials: {exc}")
         return []
+
+
+async def material_alias_counts(
+    env: Environment = Environment.DEV,
+    verbose: bool = False,
+) -> dict[str, int]:
+    """Return a mapping of material id to its alias count.
+
+    Args:
+        env: Database environment.
+        verbose: If ``True``, prints the database path.
+
+    Returns:
+        A ``dict`` keyed by material id string; materials with no aliases are
+        absent. Empty ``dict`` on error.
+    """
+    try:
+        async with get_db_session(env, verbose) as session:
+            aliases = await MaterialAlias.get_all(session)
+            return dict(Counter(str(alias.material_id) for alias in aliases))
+    except Exception as exc:  # pylint: disable=broad-except
+        print_error(f"Failed to count material aliases: {exc}")
+        return {}
 
 
 async def update_material(

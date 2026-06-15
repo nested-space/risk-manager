@@ -1,0 +1,296 @@
+[
+  {
+    "name": "sulfate",
+    "display_name": "H2SO4",
+    "interpret_chemically": true,
+    "smiles": "[O-]S(=O)(=O)[O-]",
+    "aliases": [
+      "Sulfate ion",
+      "Sulphate",
+      "14808-79-8",
+      "Sulfate(2-)"
+    ]
+  },
+  {
+    "name": "methanesulfonate",
+    "display_name": "mesylate",
+    "interpret_chemically": false,
+    "smiles": "CS(=O)(=O)[O-]",
+    "aliases": [
+      "Ms",
+      "methylsulfonate",
+      "16053-58-0",
+      "Methanesulfonate anion"
+    ]
+  },
+  {
+    "name": "maleate",
+    "display_name": "maleate",
+    "interpret_chemically": false,
+    "smiles": "C(=C\\C(=O)[O-])\\C(=O)[O-]",
+    "aliases": [
+      "maleic acid",
+      "maleate(2-)",
+      "(2Z)-but-2-enedioate",
+      "(Z)-but-2-enedioate",
+      "(Z)-2-Butenedioate"
+    ]
+  },
+  {
+    "name": "fumarate",
+    "display_name": "fumarate",
+    "interpret_chemically": false,
+    "smiles": "C(=C/C(=O)[O-])\\C(=O)[O-]",
+    "aliases": [
+      "fumaric acid",
+      "(2E)-but-2-enedioate",
+      "Fumarate(2-)",
+      "(E)-but-2-enedioate",
+      "142-42-7"
+    ]
+  },
+  {
+    "name": "camphorsulfonic acid",
+    "display_name": "CSA",
+    "interpret_chemically": false,
+    "smiles": "CC1([C@@H]2CC[C@]1(C(=O)C2)CS(=O)(=O)O)C",
+    "aliases": [
+      "Reychler's acid",
+      "d-Camphorsulfonic acid",
+      "Camphersulfosaeure",
+      "d-camphor sulfonic acid",
+      "Camphorsulfonic acid, d-"
+    ]
+  },
+  {
+    "name": "citric acid",
+    "display_name": "citrate",
+    "interpret_chemically": false,
+    "smiles": "C(C(=O)O)C(CC(=O)O)(C(=O)O)O",
+    "aliases": [
+      "77-92-9",
+      "2-hydroxypropane-1,2,3-tricarboxylic acid",
+      "Citric acid, anhydrous",
+      "Aciletten"
+    ]
+  },
+  {
+    "name": "succinic acid",
+    "display_name": "succinate",
+    "interpret_chemically": false,
+    "smiles": "C(CC(=O)O)C(=O)O",
+    "aliases": [
+      "butanedioic acid",
+      "110-15-6",
+      "Amber acid",
+      "Asuccin"
+    ]
+  },
+  {
+    "name": "benzoic acid",
+    "display_name": "benzoate",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C(C=C1)C(=O)O",
+    "aliases": [
+      "65-85-0",
+      "Dracylic acid",
+      "benzenecarboxylic acid",
+      "Benzeneformic acid"
+    ]
+  },
+  {
+    "name": "lactic acid",
+    "display_name": "lactate",
+    "interpret_chemically": false,
+    "smiles": "CC(C(=O)O)O",
+    "aliases": [
+      "2-hydroxypropanoic acid",
+      "DL-Lactic acid",
+      "50-21-5",
+      "2-hydroxypropionic acid"
+    ]
+  },
+  {
+    "name": "glycolic acid",
+    "display_name": "glycolate",
+    "interpret_chemically": false,
+    "smiles": "C(C(=O)O)O",
+    "aliases": [
+      "2-Hydroxyacetic acid",
+      "79-14-1",
+      "hydroxyacetic acid",
+      "Hydroxyethanoic acid"
+    ]
+  },
+  {
+    "name": "acetic acid",
+    "display_name": "acetate",
+    "interpret_chemically": false,
+    "smiles": "CC(=O)O",
+    "aliases": [
+      "64-19-7",
+      "ethanoic acid",
+      "Vinegar acid",
+      "Acetic acid glacial"
+    ]
+  },
+  {
+    "name": "formic acid",
+    "display_name": "formate",
+    "interpret_chemically": false,
+    "smiles": "C(=O)O",
+    "aliases": [
+      "64-18-6",
+      "Methanoic acid",
+      "Formylic acid",
+      "Aminic acid"
+    ]
+  },
+  {
+    "name": "phosphoric acid",
+    "display_name": "H3PO4",
+    "interpret_chemically": true,
+    "smiles": "OP(=O)(O)O",
+    "aliases": [
+      "phosphate",
+      "7664-38-2",
+      "ORTHOPHOSPHORIC ACID",
+      "o-Phosphoric acid",
+      "Wc-reiniger"
+    ]
+  },
+  {
+    "name": "methanesulfonic acid",
+    "display_name": "MsOH",
+    "interpret_chemically": false,
+    "smiles": "CS(=O)(=O)O",
+    "aliases": [
+      "MSA",
+      "75-75-2",
+      "Methylsulfonic acid",
+      "Methanesulphonic acid",
+      "Kyselina methansulfonova"
+    ]
+  },
+  {
+    "name": "p-toluenecarboxylic acid",
+    "display_name": "p-toluate",
+    "interpret_chemically": false,
+    "smiles": "CC1=CC=C(C=C1)C(=O)[O-]",
+    "aliases": [
+      "4-Methylbenzoate",
+      "4-TOLUENECARBOXYLATE",
+      "p-methylbenzoate",
+      "p-toluenecarboxylate"
+    ]
+  },
+  {
+    "name": "oxalate",
+    "display_name": "oxalate",
+    "interpret_chemically": false,
+    "smiles": "C(=O)(C(=O)[O-])[O-]",
+    "aliases": [
+      "Oxalates",
+      "Oxalate Ion",
+      "ethanedioate",
+      "oxalate(2-)"
+    ]
+  },
+  {
+    "name": "trifluoroacetic acid",
+    "display_name": "TFA",
+    "interpret_chemically": false,
+    "smiles": "C(=O)(C(F)(F)F)O",
+    "aliases": [
+      "76-05-1",
+      "Perfluoroacetic acid",
+      "2,2,2-trifluoroacetic acid",
+      "Trifluoracetic acid"
+    ]
+  },
+  {
+    "name": "adipic acid",
+    "display_name": "adipate",
+    "interpret_chemically": false,
+    "smiles": "C(CCC(=O)O)CC(=O)O",
+    "aliases": [
+      "AZ10075352",
+      "hexanedioic acid",
+      "124-04-9",
+      "Adipinic acid",
+      "1,4-Butanedicarboxylic acid"
+    ]
+  },
+  {
+    "name": "L-(–)-tartaric acid",
+    "display_name": "L-tartrate",
+    "interpret_chemically": false,
+    "smiles": "O=C(O)[C@@H](O)[C@@H](O)C(=O)O",
+    "aliases": []
+  },
+  {
+    "name": "D-(+)-tartaric acid",
+    "display_name": "D-tartrate",
+    "interpret_chemically": false,
+    "smiles": "C(C(C(=O)[O-])O)(C(=O)[O-])O",
+    "aliases": [
+      "tartarate",
+      "2,3-dihydroxybutanedioate",
+      "2,3-dihydroxysuccinate",
+      "(+) tartarate",
+      "tartrate(2-)"
+    ]
+  },
+  {
+    "name": "hydrochloric acid",
+    "display_name": "HCl",
+    "interpret_chemically": true,
+    "smiles": "Cl",
+    "aliases": [
+      "hydrogen chloride",
+      "7647-01-0",
+      "Muriatic acid",
+      "chlorane"
+    ]
+  },
+  {
+    "name": "para-toluenesulfonic acid",
+    "display_name": "tosylate",
+    "interpret_chemically": false,
+    "smiles": "CC1=CC=C(C=C1)S(=O)(=O)O",
+    "aliases": [
+      "Ts",
+      "4-Methylbenzenesulfonic acid",
+      "P-TOLUENESULFONIC ACID",
+      "104-15-4",
+      "4-Toluenesulfonic acid",
+      "p-Toluenesulphonic acid"
+    ]
+  },
+  {
+    "name": "water",
+    "display_name": "water",
+    "interpret_chemically": false,
+    "smiles": "O",
+    "aliases": [
+      "hydrate",
+      "7732-18-5",
+      "Distilled water",
+      "Dihydrogen oxide",
+      "Purified water"
+    ]
+  },
+  {
+    "name": "xinafoic acid",
+    "display_name": "xinafoate",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C2C(=C1)C=CC(=C2O)C(=O)O",
+    "aliases": [
+      "1-Hydroxy-2-naphthoic acid",
+      "86-48-6",
+      "1-hydroxynaphthalene-2-carboxylic acid",
+      "1-Naphthol-2-carboxylic acid",
+      "2-Carboxy-1-naphthol"
+    ]
+  }
+]

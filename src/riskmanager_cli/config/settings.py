@@ -59,6 +59,38 @@ def build_db_url(env: Environment, verbose: bool = False) -> str:
     return f"sqlite+aiosqlite:///{db_path}"
 
 
+def get_db_path(env: Environment) -> Path | None:
+    """Resolve the SQLite database file path for *env*, or ``None`` if in-memory.
+
+    Applies the same precedence as :func:`build_db_url` (``APP_DB_PATH`` →
+    ``APP_PROD_DB_PATH`` → ``APP_DEV_DB_PATH``) but returns the bare filesystem
+    path rather than a connection URL.
+
+    Why this exists:
+        First-run seeding must decide whether a database already exists before
+        :func:`~..database.db_session.init_db` creates it. That decision needs
+        the resolved file path, not the connection URL.
+
+    Args:
+        env: Target environment.
+
+    Returns:
+        The resolved :class:`pathlib.Path`, or ``None`` for an in-memory
+        database (``:memory:``), which has no file and is never seeded.
+    """
+    override = os.getenv("APP_DB_PATH")
+    if override:
+        raw = override
+    elif env is Environment.PROD:
+        raw = os.getenv("APP_PROD_DB_PATH", "./riskmanager.db")
+    else:
+        raw = os.getenv("APP_DEV_DB_PATH", "./riskmanager-dev.db")
+
+    if raw == ":memory:" or not raw.strip():
+        return None
+    return Path(raw).expanduser()
+
+
 def get_session_path() -> Path:
     """Return the path to the JSON session state file.
 

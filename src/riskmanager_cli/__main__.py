@@ -30,6 +30,7 @@ import blessed
 
 from .config.settings import Environment, build_db_url
 from .database.db_session import init_db
+from .repl.bootstrap import is_first_run, run_first_time_setup
 from .repl.commands import CommandDispatcher
 from .repl.context import ContextManager
 from .repl.loop import start_repl
@@ -91,15 +92,21 @@ def cli_main() -> None:
 
     import asyncio  # pylint: disable=import-outside-toplevel
 
+    term = blessed.Terminal()
+    _register_atexit_cleanup(term)
+
     try:
-        asyncio.run(init_db(build_db_url(env)))
+        if is_first_run(env):
+            # New install: create the schema and seed the reference libraries,
+            # showing a live progress box before the REPL launches.
+            asyncio.run(run_first_time_setup(term, env))
+        else:
+            asyncio.run(init_db(build_db_url(env)))
     except Exception as exc:  # pylint: disable=broad-except  # startup must report clearly
         sys.stderr.write(f"riskmanager-cli: database initialisation failed: {exc}\n")
         sys.exit(1)
 
     session = SessionState.load()
-    term = blessed.Terminal()
-    _register_atexit_cleanup(term)
 
     ctx = ContextManager()
     screen = ScreenManager(term, ctx)

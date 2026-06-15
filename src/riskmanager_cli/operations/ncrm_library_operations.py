@@ -5,6 +5,7 @@ All functions are ``async def`` and open their own database sessions. On error,
 they log via ``print_error`` and return ``None`` / ``[]`` / ``False``.
 """
 
+from collections import Counter
 from uuid import UUID
 
 from ..config.settings import Environment
@@ -124,6 +125,29 @@ async def list_ncrm_library(
     except Exception as exc:  # pylint: disable=broad-except
         print_error(f"Failed to list NCRM library: {exc}")
         return []
+
+
+async def ncrm_alias_counts(
+    env: Environment = Environment.DEV,
+    verbose: bool = False,
+) -> dict[str, int]:
+    """Return a mapping of NCRM library entry id to its alias count.
+
+    Args:
+        env: Database environment.
+        verbose: If ``True``, prints the database path.
+
+    Returns:
+        A ``dict`` keyed by NCRM entry id string; entries with no aliases are
+        absent. Empty ``dict`` on error.
+    """
+    try:
+        async with get_db_session(env, verbose) as session:
+            aliases = await NcrmLibraryAlias.get_all(session)
+            return dict(Counter(str(alias.ncrm_library_id) for alias in aliases))
+    except Exception as exc:  # pylint: disable=broad-except
+        print_error(f"Failed to count NCRM aliases: {exc}")
+        return {}
 
 
 async def update_ncrm_library_entry(

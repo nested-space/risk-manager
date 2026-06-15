@@ -1,0 +1,3876 @@
+[
+  {
+    "name": "(1S)-(+)-10-Camphorsulfonic acid",
+    "display_name": "(+)-CSA",
+    "interpret_chemically": false,
+    "smiles": "CC1([C@@H]2CC[C@]1(C(=O)C2)CS(=O)(=O)O)C",
+    "aliases": [
+      "Reychler's acid",
+      "d-Camphorsulfonic acid",
+      "Camphersulfosaeure",
+      "d-camphor sulfonic acid",
+      "Camphorsulfonic acid, d-"
+    ]
+  },
+  {
+    "name": "Oxalyl chloride",
+    "display_name": "(COCl)2",
+    "interpret_chemically": true,
+    "smiles": "C(=O)(C(=O)Cl)Cl",
+    "aliases": [
+      "Oxalyl dichloride",
+      "79-37-8",
+      "Ethanedioyl dichloride",
+      "Oxalic dichloride"
+    ]
+  },
+  {
+    "name": "ammonium carbonate",
+    "display_name": "(NH4)2CO3",
+    "interpret_chemically": true,
+    "smiles": "C(=O)([O-])[O-].[NH4+].[NH4+]",
+    "aliases": [
+      "506-87-6",
+      "Diammonium carbonate",
+      "Carbonic acid, diammonium salt",
+      "Ammoniumcarbonat"
+    ]
+  },
+  {
+    "name": "Chloro(R)-(+)-2,2′-bis(diphenylphosphino)-1,1′-binaphthylruthenium(II) chloride",
+    "display_name": "(R)-[RuCl(p-cymene)(BINAP)]CI",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "2-methyltetrahydrofuran",
+    "display_name": "2-MeTHF",
+    "interpret_chemically": false,
+    "smiles": "CC1CCCO1",
+    "aliases": [
+      "96-47-9",
+      "2-Methyloxolane",
+      "Tetrahydrosylvan",
+      "Tetrahydro-2-methylfuran"
+    ]
+  },
+  {
+    "name": "acetic anhydride",
+    "display_name": "Ac2O",
+    "interpret_chemically": true,
+    "smiles": "CC(=O)OC(=O)C",
+    "aliases": [
+      "Acetyl acetate",
+      "108-24-7",
+      "Acetanhydride",
+      "Ethanoic anhydride"
+    ]
+  },
+  {
+    "name": "acetyl chloride",
+    "display_name": "AcCl",
+    "interpret_chemically": true,
+    "smiles": "CC(=O)Cl",
+    "aliases": [
+      "75-36-5",
+      "Ethanoyl chloride",
+      "Acetic chloride",
+      "Acetic acid chloride"
+    ]
+  },
+  {
+    "name": "acetic acid",
+    "display_name": "AcOH",
+    "interpret_chemically": true,
+    "smiles": "CC(=O)O",
+    "aliases": [
+      "ethanoic acid",
+      "64-19-7",
+      "Vinegar acid",
+      "Acetic acid glacial"
+    ]
+  },
+  {
+    "name": "activated carbon",
+    "display_name": "activated carbon",
+    "interpret_chemically": false,
+    "smiles": "[C]",
+    "aliases": [
+      "Elemental Carbon",
+      "Carbon, Vitreous",
+      "Carbon 12",
+      "SUPERSORBON S1",
+      "231-153-3"
+    ]
+  },
+  {
+    "name": "adipic acid",
+    "display_name": "adipic acid",
+    "interpret_chemically": false,
+    "smiles": "C(CCC(=O)O)CC(=O)O",
+    "aliases": [
+      "hexanedioic acid",
+      "124-04-9",
+      "Adipinic acid",
+      "1,4-Butanedicarboxylic acid"
+    ]
+  },
+  {
+    "name": "silver(I) oxide",
+    "display_name": "Ag2O",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "silver chloride",
+    "display_name": "AgCl",
+    "interpret_chemically": true,
+    "smiles": "Cl[Ag]",
+    "aliases": [
+      "7783-90-6",
+      "chlorosilver",
+      "Silver chloride (AgCl)"
+    ]
+  },
+  {
+    "name": "aluminium",
+    "display_name": "Al",
+    "interpret_chemically": true,
+    "smiles": "[Al]",
+    "aliases": [
+      "ALUMINUM",
+      "7429-90-5",
+      "Aluminum metal",
+      "Aluminum powder"
+    ]
+  },
+  {
+    "name": "aluminium chloride",
+    "display_name": "AlCl3",
+    "interpret_chemically": true,
+    "smiles": "[Al](Cl)(Cl)Cl",
+    "aliases": [
+      "Aluminum trichloride",
+      "trichloroalumane",
+      "Aluminium trichloride",
+      "Trichloroaluminum"
+    ]
+  },
+  {
+    "name": "allyl acetate",
+    "display_name": "allyl acetate",
+    "interpret_chemically": false,
+    "smiles": "CC(=O)OCC=C",
+    "aliases": [
+      "591-87-7",
+      "3-Acetoxypropene",
+      "Acetic acid, 2-propenyl ester",
+      "3-Acetoxy-1-propene"
+    ]
+  },
+  {
+    "name": "anisole",
+    "display_name": "anisole",
+    "interpret_chemically": false,
+    "smiles": "COC1=CC=CC=C1",
+    "aliases": [
+      "methoxybenzene",
+      "100-66-3",
+      "Benzene, methoxy-",
+      "Methyl phenyl ether"
+    ]
+  },
+  {
+    "name": "ATA-036 enzyme",
+    "display_name": "ATA-036",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "triisopropyl borate",
+    "display_name": "B(OiPr)3",
+    "interpret_chemically": true,
+    "smiles": "B(OC(C)C)(OC(C)C)OC(C)C",
+    "aliases": [
+      "5419-55-6",
+      "Isopropyl borate",
+      "Triisopropyl orthoborate",
+      "tri-i-Propylborate"
+    ]
+  },
+  {
+    "name": "bis(pinacolato)diboron",
+    "display_name": "B2Pin2",
+    "interpret_chemically": true,
+    "smiles": "B1(OC(C(O1)(C)C)(C)C)B2OC(C(O2)(C)C)(C)C",
+    "aliases": [
+      "73183-34-3",
+      "bis(pinacolato)diborane",
+      "Pinacol diborane",
+      "Dipinacoldiboron"
+    ]
+  },
+  {
+    "name": "boron tribromide",
+    "display_name": "BBr3",
+    "interpret_chemically": true,
+    "smiles": "B(Br)(Br)Br",
+    "aliases": [
+      "Tribromoborane",
+      "10294-33-4",
+      "Borane, tribromo-",
+      "Boron bromide"
+    ]
+  },
+  {
+    "name": "boron trichloride",
+    "display_name": "BCl3",
+    "interpret_chemically": true,
+    "smiles": "B(Cl)(Cl)Cl",
+    "aliases": [
+      "Trichloroborane",
+      "10294-34-5",
+      "Borane, trichloro-",
+      "Trichloroboron"
+    ]
+  },
+  {
+    "name": "bromomethylbenzene",
+    "display_name": "benzyl bromide",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C(C=C1)CBr",
+    "aliases": [
+      "BnBr",
+      "100-39-0",
+      "(Bromomethyl)benzene",
+      "alpha-Bromotoluene",
+      "Bromophenylmethane"
+    ]
+  },
+  {
+    "name": "chloromethylbenzene",
+    "display_name": "benzyl chloride",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C(C=C1)CCl",
+    "aliases": [
+      "BnCl",
+      "(Chloromethyl)benzene",
+      "100-44-7",
+      "alpha-Chlorotoluene"
+    ]
+  },
+  {
+    "name": "boron trifluoride diethyl etherate",
+    "display_name": "BF3.Et2O",
+    "interpret_chemically": true,
+    "smiles": "B(F)(F)F.CCOCC",
+    "aliases": [
+      "174674-80-7",
+      "Boron fluoride etherate",
+      "Boron fluoride monoetherate",
+      "(diethyloxo)trifluoro-lambda5-borane"
+    ]
+  },
+  {
+    "name": "borane–THF",
+    "display_name": "BH3.THF",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "(2,2′-bis(diphenylphosphino)-1,1′-binaphthyl)",
+    "display_name": "BINAP",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "di-tert-butyl dicarbonate",
+    "display_name": "Boc2O",
+    "interpret_chemically": true,
+    "smiles": "CC(C)(C)OC(=O)OC(=O)OC(C)(C)C",
+    "aliases": [
+      "Boc anhydride",
+      "24424-99-5",
+      "di-tert-Butyl pyrocarbonate",
+      "Bis(tert-butoxycarbonyl)oxide",
+      "BOC-anhydride"
+    ]
+  },
+  {
+    "name": "bromine",
+    "display_name": "Br2",
+    "interpret_chemically": true,
+    "smiles": "BrBr",
+    "aliases": [
+      "Dibromine",
+      "7726-95-6",
+      "molecular bromine",
+      "Brom"
+    ]
+  },
+  {
+    "name": "BrettPhos Pd precatalyst",
+    "display_name": "BrettPhos Pd G3",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "Baeyer-Villiger monooxygenase",
+    "display_name": "BVMO",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "carbon",
+    "display_name": "carbon",
+    "interpret_chemically": false,
+    "smiles": "[C]",
+    "aliases": [
+      "Elemental Carbon",
+      "Carbon, Vitreous",
+      "Carbon 12",
+      "SUPERSORBON S1",
+      "231-153-3"
+    ]
+  },
+  {
+    "name": "1,2-dihydroxybenzene",
+    "display_name": "catechol",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C(C(=C1)O)O",
+    "aliases": [
+      "pyrocatechol",
+      "120-80-9",
+      "1,2-benzenediol"
+    ]
+  },
+  {
+    "name": "benzyloxycarbonyl chloride",
+    "display_name": "CbzCl",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)COC(=O)Cl",
+    "aliases": [
+      "Z chloride",
+      "BENZYL CHLOROFORMATE",
+      "501-53-1",
+      "Benzyl carbonochloridate",
+      "Carbobenzoxy chloride",
+      "Benzyl chlorocarbonate"
+    ]
+  },
+  {
+    "name": "1,1′-Carbonyldiimidazole",
+    "display_name": "CDI",
+    "interpret_chemically": false,
+    "smiles": "C1=CN(C=N1)C(=O)N2C=CN=C2",
+    "aliases": [
+      "Carbonyldiimidazole",
+      "530-62-1",
+      "1,1'-Carbonyldiimidazole",
+      "N,N'-Carbonyldiimidazole",
+      "N,N-Carbonyldiimidazole",
+      "Carbonyl diimidazole"
+    ]
+  },
+  {
+    "name": "CDX-068 enzyme",
+    "display_name": "CDX-068",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "citric acid",
+    "display_name": "citric acid",
+    "interpret_chemically": false,
+    "smiles": "C(C(=O)O)C(CC(=O)O)(C(=O)O)O",
+    "aliases": [
+      "2-hydroxypropane-1,2,3-tricarboxylic acid",
+      "77-92-9",
+      "Citric acid, anhydrous",
+      "Aciletten"
+    ]
+  },
+  {
+    "name": "chlorine",
+    "display_name": "Cl2",
+    "interpret_chemically": true,
+    "smiles": "ClCl",
+    "aliases": [
+      "Molecular chlorine",
+      "7782-50-5",
+      "dichlorine",
+      "Bertholite"
+    ]
+  },
+  {
+    "name": "carbon monoxide",
+    "display_name": "CO",
+    "interpret_chemically": true,
+    "smiles": "[C-]#[O+]",
+    "aliases": [
+      "carbon monooxide",
+      "Carbonic oxide",
+      "Carbon oxide (CO)",
+      "630-08-0"
+    ]
+  },
+  {
+    "name": "carbon dioxide",
+    "display_name": "CO2",
+    "interpret_chemically": true,
+    "smiles": "C(=O)=O",
+    "aliases": [
+      "carbonic anhydride",
+      "124-38-9",
+      "carbonic acid gas",
+      "Carbonic acid anhydride"
+    ]
+  },
+  {
+    "name": "cyclopentyl methyl ether",
+    "display_name": "CPME",
+    "interpret_chemically": false,
+    "smiles": "COC1CCCC1",
+    "aliases": [
+      "cyclopentylmethyl ether",
+      "Methoxycyclopentane",
+      "5614-37-9",
+      "Cyclopentane, methoxy-",
+      "Cyclopentane,methoxy-"
+    ]
+  },
+  {
+    "name": "chromium trioxide",
+    "display_name": "CrO3",
+    "interpret_chemically": true,
+    "smiles": "O=[Cr](=O)=O",
+    "aliases": [
+      "trioxochromium",
+      "Chromium(VI) oxide",
+      "Chromtrioxid"
+    ]
+  },
+  {
+    "name": "cesium carbonate",
+    "display_name": "Cs2CO3",
+    "interpret_chemically": true,
+    "smiles": "C(=O)([O-])[O-].[Cs+].[Cs+]",
+    "aliases": [
+      "534-17-8",
+      "Dicesium carbonate",
+      "QQI20A14P4",
+      "208-591-9"
+    ]
+  },
+  {
+    "name": "copper",
+    "display_name": "Cu",
+    "interpret_chemically": true,
+    "smiles": "[Cu]",
+    "aliases": [
+      "7440-50-8",
+      "Copper powder",
+      "cuprum",
+      "Copper bronze"
+    ]
+  },
+  {
+    "name": "copper(II) acetate",
+    "display_name": "Cu(OAc)2",
+    "interpret_chemically": true,
+    "smiles": "CC(=O)[O-].CC(=O)[O-].[Cu+2]",
+    "aliases": [
+      "cupric acetate",
+      "142-71-2",
+      "Copper diacetate",
+      "Copper(2+) diacetate"
+    ]
+  },
+  {
+    "name": "copper(I) oxide",
+    "display_name": "Cu2O",
+    "interpret_chemically": true,
+    "smiles": "O=[Cu].[Cu]",
+    "aliases": [
+      "(cupriooxy)copper",
+      "1317-39-1",
+      "Brown copper oxide",
+      "Caocobre",
+      "Caswell No. 266"
+    ]
+  },
+  {
+    "name": "copper(I) bromide",
+    "display_name": "CuBr",
+    "interpret_chemically": true,
+    "smiles": "[Cu]Br",
+    "aliases": [
+      "cuprous bromide",
+      "7787-70-4",
+      "Bromocopper",
+      "Copper(1+) bromide"
+    ]
+  },
+  {
+    "name": "copper(I) chloride",
+    "display_name": "CuCl",
+    "interpret_chemically": true,
+    "smiles": "Cl[Cu]",
+    "aliases": [
+      "cuprous chloride",
+      "7758-89-6",
+      "Copper monochloride",
+      "Dicopper dichloride"
+    ]
+  },
+  {
+    "name": "copper(I) cyanide",
+    "display_name": "CuCN",
+    "interpret_chemically": true,
+    "smiles": "[C-]#N.[Cu+]",
+    "aliases": [
+      "544-92-3",
+      "Cupricin",
+      "Copper(+1) cyanide",
+      "RCRA waste no. P029",
+      "UN1587"
+    ]
+  },
+  {
+    "name": "(Dicyclohexylphosphino)biphenyl,(2-Biphenyl)dicyclohexylphosphine",
+    "display_name": "CyJohnPhos",
+    "interpret_chemically": false,
+    "smiles": "C1CCC(CC1)P(C2CCCCC2)C3=CC=CC=C3C4=CC=CC=C4",
+    "aliases": [
+      "Cyclohexyl JohnPhos",
+      "2-(Dicyclohexylphosphino)biphenyl",
+      "247940-06-3",
+      "2-[dicyclohexylphosphino]biphenyl",
+      "480-030-2",
+      "607-439-2"
+    ]
+  },
+  {
+    "name": "cyclohexane",
+    "display_name": "cyclohexane",
+    "interpret_chemically": false,
+    "smiles": "C1CCCCC1",
+    "aliases": [
+      "110-82-7",
+      "Hexamethylene",
+      "Hexahydrobenzene",
+      "Hexanaphthene"
+    ]
+  },
+  {
+    "name": "trans-N,N′-Dimethylcyclohexane-1,2-diamine",
+    "display_name": "CyDMEDA",
+    "interpret_chemically": false,
+    "smiles": "CN[C@@H]1CCCC[C@H]1NC",
+    "aliases": [
+      "67579-81-1",
+      "trans-N,N'-Dimethyl-1,2-cyclohexanediamine",
+      "68737-65-5",
+      "(1r,2r)-n,n'-dimethyl-1,2-cyclohexanediamine",
+      "(1r,2r)-n1,n2-dimethylcyclohexane-1,2-diamine"
+    ]
+  },
+  {
+    "name": "copper(II) oxide",
+    "display_name": "CuO",
+    "interpret_chemically": true,
+    "smiles": "[O-2].[Cu+2]",
+    "aliases": [
+      "Copper oxide (CuO)",
+      "Copper(2+) oxide",
+      "Copper monoxide",
+      "Cuprum oxydatum nigrum",
+      "V1XJQ704R4"
+    ]
+  },
+  {
+    "name": "copper(II) sulfate",
+    "display_name": "CuSO4",
+    "interpret_chemically": true,
+    "smiles": "[O-]S(=O)(=O)[O-].[Cu+2]",
+    "aliases": [
+      "cupric sulfate",
+      "Copper sulfate",
+      "7758-98-7",
+      "Cupric sulfate anhydrous"
+    ]
+  },
+  {
+    "name": "1,4-diazabicyclo[2.2.2]octane",
+    "display_name": "DABCO",
+    "interpret_chemically": false,
+    "smiles": "C1CN2CCN1CC2",
+    "aliases": [
+      "Triethylenediamine",
+      "280-57-9",
+      "1,4-DIAZABICYCLO(2.2.2)OCTANE"
+    ]
+  },
+  {
+    "name": "1,5-diazabicyclo[4.3.0]non-5-ene",
+    "display_name": "DBN",
+    "interpret_chemically": false,
+    "smiles": "C1CC2=NCCCN2C1",
+    "aliases": [
+      "3001-72-7",
+      "2,3,4,6,7,8-Hexahydropyrrolo[1,2-a]pyrimidine",
+      "1,5-Diazabicyclo(4.3.0)non-5-ene",
+      "978M4OL12Q"
+    ]
+  },
+  {
+    "name": "1,8-diazabicyclo[5.4.0]undec-7-ene",
+    "display_name": "DBU",
+    "interpret_chemically": false,
+    "smiles": "C1CCC2=NCCCN2CC1",
+    "aliases": [
+      "6674-22-2",
+      "1,8-Diazabicyclo(5.4.0)undec-7-ene",
+      "Pyrimido[1,2-a]azepine, 2,3,4,6,7,8,9,10-octahydro-",
+      "H1ILJ6IBUX"
+    ]
+  },
+  {
+    "name": "N,N'-dicyclohexylcarbodiimide",
+    "display_name": "DCC",
+    "interpret_chemically": false,
+    "smiles": "C1CCC(CC1)N=C=NC2CCCCC2",
+    "aliases": [
+      "DICYCLOHEXYLCARBODIIMIDE",
+      "538-75-0",
+      "1,3-Dicyclohexylcarbodiimide",
+      "DCCD"
+    ]
+  },
+  {
+    "name": "1,2-Dichloroethane",
+    "display_name": "DCE",
+    "interpret_chemically": false,
+    "smiles": "C(CCl)Cl",
+    "aliases": [
+      "ethylene dichloride",
+      "107-06-2",
+      "Ethylene chloride",
+      "Glycol dichloride"
+    ]
+  },
+  {
+    "name": "dichloromethane",
+    "display_name": "DCM",
+    "interpret_chemically": false,
+    "smiles": "C(Cl)Cl",
+    "aliases": [
+      "methylene chloride",
+      "75-09-2",
+      "Methylene dichloride",
+      "Methane, dichloro-"
+    ]
+  },
+  {
+    "name": "diethyl azodicarboxylate",
+    "display_name": "DEAD",
+    "interpret_chemically": false,
+    "smiles": "CCOC(=O)/N=N/C(=O)OCC",
+    "aliases": [
+      "1972-28-7",
+      "Diethoxycarbonyldiazene",
+      "Ethyl azodicarboxylate",
+      "Diethyl azodiformate"
+    ]
+  },
+  {
+    "name": "3,4-Dihydropyran",
+    "display_name": "DHP",
+    "interpret_chemically": false,
+    "smiles": "C1CC=COC1",
+    "aliases": [
+      "3,4-Dihydro-2H-pyran",
+      "110-87-2",
+      "DIHYDROPYRAN",
+      "2,3-Dihydro-4H-pyran"
+    ]
+  },
+  {
+    "name": "Dess–Martin periodinane",
+    "display_name": "Dess–Martin",
+    "interpret_chemically": false,
+    "smiles": "CC(=O)OI1(C2=CC=CC=C2C(=O)O1)(OC(=O)C)OC(=O)C",
+    "aliases": [
+      "DMP",
+      "Dess-Martin periodinane",
+      "87413-09-0",
+      "TRIACETOXYPERIODINANE",
+      "dess-martin reagent",
+      "1,1,1-tris(acetyloxy)-1,1-dihydro-1,2-benziodoxol-3(1h)-one"
+    ]
+  },
+  {
+    "name": "diisopropyl azodicarboxylate",
+    "display_name": "DIAD",
+    "interpret_chemically": false,
+    "smiles": "CC(C)OC(=O)/N=N/C(=O)OC(C)C",
+    "aliases": [
+      "2446-83-5",
+      "Diisopropyl azodiformate",
+      "939987-56-1",
+      "Diisopropyl azodicarboxylate [MI]"
+    ]
+  },
+  {
+    "name": "N,N'-Diisopropylcarbodiimide",
+    "display_name": "diisopropylcarbodiimide",
+    "interpret_chemically": false,
+    "smiles": "CC(C)N=C=NC(C)C",
+    "aliases": [
+      "DIC",
+      "DIPC",
+      "693-13-0",
+      "1,3-Diisopropylcarbodiimide",
+      "2-Propanamine, N,N'-methanetetraylbis-"
+    ]
+  },
+  {
+    "name": "diisobutylaluminium hydride",
+    "display_name": "DIBAL-H",
+    "interpret_chemically": false,
+    "smiles": "CC(C)C[AlH]CC(C)C",
+    "aliases": [
+      "DIBAL",
+      "bis(2-methylpropyl)alumane",
+      "Diisobutylhydroaluminum",
+      "Al-Diisobutyl",
+      "Al-Alchili"
+    ]
+  },
+  {
+    "name": "1,4-dioxane",
+    "display_name": "dioxane",
+    "interpret_chemically": false,
+    "smiles": "C1COCCO1",
+    "aliases": [
+      "123-91-1",
+      "p-Dioxane",
+      "Diethylene ether"
+    ]
+  },
+  {
+    "name": "diisopropyl ether",
+    "display_name": "DIPE",
+    "interpret_chemically": false,
+    "smiles": "CC(C)OC(C)C",
+    "aliases": [
+      "ISOPROPYL ETHER",
+      "108-20-3",
+      "2-Isopropoxypropane",
+      "Propane, 2,2'-oxybis-"
+    ]
+  },
+  {
+    "name": "N,N-Diisopropylethylamine",
+    "display_name": "DIPEA",
+    "interpret_chemically": false,
+    "smiles": "CCN(C(C)C)C(C)C",
+    "aliases": [
+      "Hünig's base",
+      "Hunig's base",
+      "7087-68-5",
+      "Ethyldiisopropylamine",
+      "Diisopropylethylamine",
+      "N-Ethyldiisopropylamine"
+    ]
+  },
+  {
+    "name": "4-dimethylaminopyridine",
+    "display_name": "DMAP",
+    "interpret_chemically": false,
+    "smiles": "CN(C)C1=CC=NC=C1",
+    "aliases": [
+      "1122-58-3",
+      "N,N-Dimethylpyridin-4-amine",
+      "4-(Dimethylamino)pyridine"
+    ]
+  },
+  {
+    "name": "dimethoxyethane",
+    "display_name": "DME",
+    "interpret_chemically": false,
+    "smiles": "COCCOC",
+    "aliases": [
+      "1,2-DIMETHOXYETHANE",
+      "110-71-4",
+      "Monoglyme",
+      "Ethylene glycol dimethyl ether",
+      "Glyme"
+    ]
+  },
+  {
+    "name": "N,N-Dimethylformamide",
+    "display_name": "DMF",
+    "interpret_chemically": false,
+    "smiles": "CN(C)C=O",
+    "aliases": [
+      "dimethylformamide",
+      "68-12-2",
+      "Dimethyl formamide",
+      "N-Formyldimethylamine"
+    ]
+  },
+  {
+    "name": "Dimethylacetamide",
+    "display_name": "DMAc",
+    "interpret_chemically": false,
+    "smiles": "CC(=O)N(C)C",
+    "aliases": [
+      "DMA",
+      "N,N-DIMETHYLACETAMIDE",
+      "127-19-5",
+      "Acetamide, N,N-dimethyl-",
+      "Acetdimethylamide"
+    ]
+  },
+  {
+    "name": "dimethyl sulfoxide",
+    "display_name": "DMSO",
+    "interpret_chemically": false,
+    "smiles": "CS(=O)C",
+    "aliases": [
+      "67-68-5",
+      "Methylsulfinylmethane",
+      "Methyl sulfoxide"
+    ]
+  },
+  {
+    "name": "1,3-Bis(diphenylphosphino)propane",
+    "display_name": "DPPP",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C(C=C1)P(CCCP(C2=CC=CC=C2)C3=CC=CC=C3)C4=CC=CC=C4",
+    "aliases": [
+      "6737-42-4",
+      "Phosphine, 1,3-propanediylbis[diphenyl-",
+      "DPPP cpd",
+      "Phosphine, 1,3-propanediylbis(diphenyl-"
+    ]
+  },
+  {
+    "name": "1-ethyl-3-(3-dimethylaminopropyl)carbodiimide",
+    "display_name": "EDC",
+    "interpret_chemically": false,
+    "smiles": "CCN=C=NCCCN(C)C",
+    "aliases": [
+      "EDCI",
+      "EDC-HCl",
+      "1892-57-5",
+      "EDAC",
+      "ETHYLDIMETHYLAMINOPROPYL CARBODIIMIDE",
+      "RJ5OZG6I4A"
+    ]
+  },
+  {
+    "name": "EDTA",
+    "display_name": "EDTA",
+    "interpret_chemically": false,
+    "smiles": "C(CN(CC(=O)O)CC(=O)O)N(CC(=O)O)CC(=O)O",
+    "aliases": [
+      "ethylenediaminetetraacetic acid",
+      "Edetic acid",
+      "60-00-4",
+      "Edathamil"
+    ]
+  },
+  {
+    "name": "N,N-diethylaniline",
+    "display_name": "Et2NPh",
+    "interpret_chemically": true,
+    "smiles": "CCN(CC)C1=CC=CC=C1",
+    "aliases": [
+      "91-66-7",
+      "Diethylaniline",
+      "Diethylphenylamine",
+      "N,N-Diethylanilin"
+    ]
+  },
+  {
+    "name": "diethyl ether",
+    "display_name": "Et2O",
+    "interpret_chemically": true,
+    "smiles": "CCOCC",
+    "aliases": [
+      "ether",
+      "Ethyl ether",
+      "Ethoxyethane",
+      "60-29-7"
+    ]
+  },
+  {
+    "name": "ethyl acetoacetate",
+    "display_name": "ethyl acetoacetate",
+    "interpret_chemically": false,
+    "smiles": "CCOC(=O)CC(=O)C",
+    "aliases": [
+      "ethyl 3-oxobutanoate",
+      "141-97-9",
+      "ethyl acetylacetate",
+      "ethyl 3-oxobutyrate"
+    ]
+  },
+  {
+    "name": "iodoethane",
+    "display_name": "EtI",
+    "interpret_chemically": true,
+    "smiles": "CCI",
+    "aliases": [
+      "ethyl iodide",
+      "75-03-6",
+      "Ethane, iodo-",
+      "Monoiodoethane"
+    ]
+  },
+  {
+    "name": "ethyl acetate",
+    "display_name": "EtOAc",
+    "interpret_chemically": true,
+    "smiles": "CCOC(=O)C",
+    "aliases": [
+      "141-78-6",
+      "Ethyl ethanoate",
+      "Acetic acid ethyl ester",
+      "Vinegar naphtha"
+    ]
+  },
+  {
+    "name": "ethanol",
+    "display_name": "EtOH",
+    "interpret_chemically": true,
+    "smiles": "CCO",
+    "aliases": [
+      "ethyl alcohol",
+      "alcohol",
+      "64-17-5",
+      "grain alcohol"
+    ]
+  },
+  {
+    "name": "ethanolamine",
+    "display_name": "ethanolamine",
+    "interpret_chemically": false,
+    "smiles": "C(CO)N",
+    "aliases": [
+      "2-aminoethanol",
+      "monoethanolamine",
+      "141-43-5",
+      "Olamine"
+    ]
+  },
+  {
+    "name": "iron",
+    "display_name": "Fe",
+    "interpret_chemically": true,
+    "smiles": "[Fe]",
+    "aliases": [
+      "7439-89-6",
+      "Iron powder",
+      "Iron, elemental",
+      "ferrous iron"
+    ]
+  },
+  {
+    "name": "iron(III) chloride",
+    "display_name": "FeCl3",
+    "interpret_chemically": true,
+    "smiles": "Cl[Fe](Cl)Cl",
+    "aliases": [
+      "ferric chloride",
+      "7705-08-0",
+      "Iron trichloride",
+      "Iron chloride",
+      "Flores martis"
+    ]
+  },
+  {
+    "name": "fluorenylmethyloxycarbonyl chloride",
+    "display_name": "FmocCl",
+    "interpret_chemically": true,
+    "smiles": "C1C2=CC=CC=C2C3=CC=CC(=C31)COC(=O)Cl",
+    "aliases": [
+      "fluorenylmethyl chloroformate",
+      "fluorenylmethylchloroformate",
+      "fluorenylmethoxycarbonyl chloride",
+      "LQVMZVKOVPITOO-UHFFFAOYSA-N"
+    ]
+  },
+  {
+    "name": "hydrogen gas",
+    "display_name": "H2",
+    "interpret_chemically": true,
+    "smiles": "[HH]",
+    "aliases": [
+      "hydrogen",
+      "Molecular hydrogen",
+      "Dihydrogen",
+      "1333-74-0",
+      "Protium"
+    ]
+  },
+  {
+    "name": "hydrogen peroxide",
+    "display_name": "H2O2",
+    "interpret_chemically": true,
+    "smiles": "OO",
+    "aliases": [
+      "7722-84-1",
+      "oxydol",
+      "perhydrol",
+      "Superoxol"
+    ]
+  },
+  {
+    "name": "sulfuric acid",
+    "display_name": "H2SO4",
+    "interpret_chemically": true,
+    "smiles": "OS(=O)(=O)O",
+    "aliases": [
+      "sulphuric acid",
+      "7664-93-9",
+      "Dihydrogen sulfate",
+      "Dipping acid"
+    ]
+  },
+  {
+    "name": "phosphoric acid",
+    "display_name": "H3PO4",
+    "interpret_chemically": true,
+    "smiles": "OP(=O)(O)O",
+    "aliases": [
+      "7664-38-2",
+      "ORTHOPHOSPHORIC ACID",
+      "o-Phosphoric acid",
+      "Wc-reiniger"
+    ]
+  },
+  {
+    "name": "O-(7-azabenzotriazol-1-yl)-N,N,N',N'-tetramethyluronium hexafluorophosphate",
+    "display_name": "HATU",
+    "interpret_chemically": false,
+    "smiles": "CN(C)C(=[N+](C)C)N1C2=C(N=CC=C2)[N+](=N1)[O-].F[P-](F)(F)(F)(F)F",
+    "aliases": [
+      "B93RIH1T7E",
+      "N-HATU",
+      "1H-1,2,3-Triazolo(4,5-b)pyridinium, 1-(bis(dimethylamino)methylene)-, hexafluorophosphate(1-), 3-oxide",
+      "O-(7-AZOBENZOTRIAZOL-1-YL)-1,1,3,3-TETRAMETHYLURONIUM HEXAFLUOROPHOSPHATE",
+      "148893-10-1"
+    ]
+  },
+  {
+    "name": "hydrobromic acid",
+    "display_name": "HBr",
+    "interpret_chemically": true,
+    "smiles": "Br",
+    "aliases": [
+      "Hydrogen bromide",
+      "10035-10-6",
+      "bromane",
+      "Bromwasserstoff"
+    ]
+  },
+  {
+    "name": "trimethyl orthoformate",
+    "display_name": "HC(OMe)3",
+    "interpret_chemically": true,
+    "smiles": "COC(OC)OC",
+    "aliases": [
+      "tri(methoxy)methane",
+      "TMOF",
+      "Trimethoxymethane",
+      "149-73-5",
+      "Methyl orthoformate",
+      "Methane, trimethoxy-"
+    ]
+  },
+  {
+    "name": "hydrochloric acid",
+    "display_name": "HCl",
+    "interpret_chemically": true,
+    "smiles": "Cl",
+    "aliases": [
+      "hydrogen chloride",
+      "7647-01-0",
+      "Muriatic acid",
+      "chlorane"
+    ]
+  },
+  {
+    "name": "ethyl formate",
+    "display_name": "HCO2Et",
+    "interpret_chemically": true,
+    "smiles": "CCOC=O",
+    "aliases": [
+      "109-94-4",
+      "Areginal",
+      "Formic acid, ethyl ester",
+      "Ethyl methanoate"
+    ]
+  },
+  {
+    "name": "n-heptane",
+    "display_name": "n-heptane",
+    "interpret_chemically": false,
+    "smiles": "CCCCCCC",
+    "aliases": [
+      "heptane",
+      "142-82-5",
+      "Heptan",
+      "Heptyl hydride"
+    ]
+  },
+  {
+    "name": "hydroiodic acid",
+    "display_name": "HI",
+    "interpret_chemically": true,
+    "smiles": "I",
+    "aliases": [
+      "Hydriodic acid",
+      "HYDROGEN IODIDE",
+      "10034-85-2",
+      "iodane"
+    ]
+  },
+  {
+    "name": "hexamethylphosphoramide",
+    "display_name": "HMPA",
+    "interpret_chemically": false,
+    "smiles": "CN(C)P(=O)(N(C)C)N(C)C",
+    "aliases": [
+      "680-31-9",
+      "Hexamethylphosphoric triamide",
+      "Hexametapol"
+    ]
+  },
+  {
+    "name": "1-hydroxybenzotriazole",
+    "display_name": "HOBt",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C2C(=C1)N=NN2O",
+    "aliases": [
+      "2592-95-2",
+      "Benzazimidol",
+      "1H-Benzotriazole, 1-hydroxy-"
+    ]
+  },
+  {
+    "name": "1,4-dihydroxybenzene",
+    "display_name": "hydroquinone",
+    "interpret_chemically": false,
+    "smiles": "C1=CC(=CC=C1O)O",
+    "aliases": [
+      "123-31-9",
+      "Benzene-1,4-diol",
+      "1,4-benzenediol",
+      "Quinol"
+    ]
+  },
+  {
+    "name": "iodine",
+    "display_name": "I2",
+    "interpret_chemically": true,
+    "smiles": "II",
+    "aliases": [
+      "Molecular iodine",
+      "7553-56-2",
+      "Diiodine",
+      "Iodine crystals"
+    ]
+  },
+  {
+    "name": "imidazole",
+    "display_name": "imidazole",
+    "interpret_chemically": false,
+    "smiles": "C1=CN=CN1",
+    "aliases": [
+      "1H-Imidazole",
+      "288-32-4",
+      "Glyoxaline",
+      "Imidazol"
+    ]
+  },
+  {
+    "name": "isopropanol",
+    "display_name": "iPrOH",
+    "interpret_chemically": true,
+    "smiles": "CC(C)O",
+    "aliases": [
+      "isopropylalcohol",
+      "Isopropyl alcohol",
+      "2-Propanol",
+      "Propan-2-ol",
+      "67-63-0"
+    ]
+  },
+  {
+    "name": "Isopropylmagnesium chloride lithium chloride complex",
+    "display_name": "iPrMgCl.LiCl",
+    "interpret_chemically": true,
+    "smiles": "[Li+].C[CH-]C.[Mg+2].[Cl-].[Cl-]",
+    "aliases": [
+      "807329-97-1",
+      "677-757-4",
+      "695-413-1",
+      "745038-86-2"
+    ]
+  },
+  {
+    "name": "Isopropylamine",
+    "display_name": "iPrNH2",
+    "interpret_chemically": true,
+    "smiles": "CC(C)N",
+    "aliases": [
+      "propan-2-amine",
+      "2-Propanamine",
+      "75-31-0",
+      "2-Aminopropane"
+    ]
+  },
+  {
+    "name": "isopropyl acetate",
+    "display_name": "iPrOAc",
+    "interpret_chemically": true,
+    "smiles": "CC(C)OC(=O)C",
+    "aliases": [
+      "108-21-4",
+      "propan-2-yl acetate",
+      "2-Propyl acetate",
+      "2-Acetoxypropane"
+    ]
+  },
+  {
+    "name": "potassium carbonate",
+    "display_name": "K2CO3",
+    "interpret_chemically": true,
+    "smiles": "C(=O)([O-])[O-].[K+].[K+]",
+    "aliases": [
+      "584-08-7",
+      "Dipotassium carbonate",
+      "Carbonate of potash",
+      "Potassium carbonate, anhydrous"
+    ]
+  },
+  {
+    "name": "potassium dichromate",
+    "display_name": "K2Cr2O7",
+    "interpret_chemically": true,
+    "smiles": "[O-][Cr](=O)(=O)O[Cr](=O)(=O)[O-].[K+].[K+]",
+    "aliases": [
+      "7778-50-9",
+      "Potassium bichromate",
+      "Iopezite",
+      "Kaliumdichromat"
+    ]
+  },
+  {
+    "name": "tripotassium phosphate",
+    "display_name": "K3PO4",
+    "interpret_chemically": true,
+    "smiles": "[O-]P(=O)([O-])[O-].[K+].[K+].[K+]",
+    "aliases": [
+      "7778-53-2",
+      "Potassium phosphate tribasic",
+      "Tripotassium orthophosphate",
+      "Phosphoric acid, tripotassium salt"
+    ]
+  },
+  {
+    "name": "potassium bicarbonate",
+    "display_name": "KHCO3",
+    "interpret_chemically": true,
+    "smiles": "C(=O)(O)[O-].[K+]",
+    "aliases": [
+      "298-14-6",
+      "Potassium hydrogen carbonate",
+      "Potassium hydrogencarbonate",
+      "Potassium acid carbonate"
+    ]
+  },
+  {
+    "name": "dipotassium hydrogen phosphate trihydrate",
+    "display_name": "K2HPO4.3H2O",
+    "interpret_chemically": true,
+    "smiles": "O.O.O.OP(=O)([O-])[O-].[K+].[K+]",
+    "aliases": [
+      "16788-57-1",
+      "Potassium phosphate dibasic trihydrate",
+      "Potassium phosphate, dibasic, trihydrate",
+      "Phosphoric acid, dipotassium salt, trihydrate"
+    ]
+  },
+  {
+    "name": "potassium bromide",
+    "display_name": "KBr",
+    "interpret_chemically": true,
+    "smiles": "[K+].[Br-]",
+    "aliases": [
+      "7758-02-3",
+      "Bromide salt of potassium",
+      "Potassium bromide (KBr)",
+      "Bromure de potassium"
+    ]
+  },
+  {
+    "name": "potassium chloride",
+    "display_name": "KCl",
+    "interpret_chemically": true,
+    "smiles": "[Cl-].[K+]",
+    "aliases": [
+      "7447-40-7",
+      "Klotrix",
+      "Sylvite",
+      "Enseal"
+    ]
+  },
+  {
+    "name": "potassium cyanide",
+    "display_name": "KCN",
+    "interpret_chemically": true,
+    "smiles": "[C-]#N.[K+]",
+    "aliases": [
+      "151-50-8",
+      "Cyanide of potassium",
+      "kalium cyanid",
+      "Potassium cyanide (K(CN))"
+    ]
+  },
+  {
+    "name": "potassium iodide",
+    "display_name": "KI",
+    "interpret_chemically": true,
+    "smiles": "[K+].[I-]",
+    "aliases": [
+      "7681-11-0",
+      "Thyro-Block",
+      "Pima",
+      "Kali iodide"
+    ]
+  },
+  {
+    "name": "potassium permanganate",
+    "display_name": "KMnO4",
+    "interpret_chemically": true,
+    "smiles": "[O-][Mn](=O)(=O)=O.[K+]",
+    "aliases": [
+      "7722-64-7",
+      "Chameleon mineral",
+      "Condy's crystals",
+      "Permanganate of potash"
+    ]
+  },
+  {
+    "name": "Ketoreductase",
+    "display_name": "KRED",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "potassium nitrate",
+    "display_name": "KNO3",
+    "interpret_chemically": true,
+    "smiles": "[N+](=O)([O-])[O-].[K+]",
+    "aliases": [
+      "7757-79-1",
+      "Saltpeter",
+      "Nitre",
+      "Niter"
+    ]
+  },
+  {
+    "name": "potassium ethoxide",
+    "display_name": "KOEt",
+    "interpret_chemically": true,
+    "smiles": "CC[O-].[K+]",
+    "aliases": [
+      "917-58-8",
+      "EC 213-029-0",
+      "UN3206",
+      "Potassium ethanolate"
+    ]
+  },
+  {
+    "name": "potassium hydroxide",
+    "display_name": "KOH",
+    "interpret_chemically": true,
+    "smiles": "[OH-].[K+]",
+    "aliases": [
+      "1310-58-3",
+      "Caustic potash",
+      "Potash lye",
+      "Potassium hydrate"
+    ]
+  },
+  {
+    "name": "potassium methoxide",
+    "display_name": "KOMe",
+    "interpret_chemically": true,
+    "smiles": "C[O-].[K+]",
+    "aliases": [
+      "865-33-8",
+      "Potassium methanolate",
+      "Potassium methylate",
+      "Methanol, potassium salt"
+    ]
+  },
+  {
+    "name": "potassium pivalate",
+    "display_name": "KOPiv",
+    "interpret_chemically": true,
+    "smiles": "CC(C)(C)C(=O)[O-].[K+]",
+    "aliases": [
+      "potassium trimethylacetate",
+      "19455-23-3",
+      "842-247-4",
+      "potassium",
+      "2,2-dimethylpropanoate"
+    ]
+  },
+  {
+    "name": "potassium thiocyanate",
+    "display_name": "KSCN",
+    "interpret_chemically": true,
+    "smiles": "C(#N)[S-].[K+]",
+    "aliases": [
+      "333-20-0",
+      "Potassium rhodanate",
+      "Potassium sulfocyanate",
+      "Rodanca"
+    ]
+  },
+  {
+    "name": "lithium chloride",
+    "display_name": "LiCl",
+    "interpret_chemically": true,
+    "smiles": "[Li+].[Cl-]",
+    "aliases": [
+      "7447-41-8",
+      "chlorure de lithium",
+      "Chlorku litu",
+      "Lithium chloride (LiCl)"
+    ]
+  },
+  {
+    "name": "Lithium triethylborohydride",
+    "display_name": "LiBHEt3",
+    "interpret_chemically": true,
+    "smiles": "[Li+].[B-](CC)(CC)CC",
+    "aliases": [
+      "LiTEBH",
+      "22560-16-3",
+      "Lithium triethylhydroborate",
+      "Super-Hydride",
+      "Q1ML638JFD"
+    ]
+  },
+  {
+    "name": "lithium aluminium hydride",
+    "display_name": "LiAlH4",
+    "interpret_chemically": true,
+    "smiles": "[Li+].[AlH4-]",
+    "aliases": [
+      "LAH",
+      "Lithium aluminohydride",
+      "Lithium tetrahydroaluminate",
+      "Aluminum lithium hydride",
+      "Lithium alanate",
+      "LiAlD4"
+    ]
+  },
+  {
+    "name": "lithium hydroxide",
+    "display_name": "LiOH",
+    "interpret_chemically": true,
+    "smiles": "[Li+].[OH-]",
+    "aliases": [
+      "1310-65-2",
+      "Lithium hydrate",
+      "Lithium hydroxide anhydrous",
+      "Lithium hydroxide (Li(OH))"
+    ]
+  },
+  {
+    "name": "2-Amino-3-sulfanylpropanoic acid",
+    "display_name": "l-Cysteine",
+    "interpret_chemically": false,
+    "smiles": "C([C@@H](C(=O)O)N)S",
+    "aliases": [
+      "Cysteine",
+      "52-90-4",
+      "Cystein",
+      "Thioserine"
+    ]
+  },
+  {
+    "name": "meta-chloroperoxybenzoic acid",
+    "display_name": "mCPBA",
+    "interpret_chemically": false,
+    "smiles": "C1=CC(=CC(=C1)Cl)C(=O)OO",
+    "aliases": [
+      "3-Chloroperoxybenzoic acid",
+      "937-14-4",
+      "3-Chloroperbenzoic acid",
+      "M-Chloroperoxybenzoic acid",
+      "M-Chloroperbenzoic acid"
+    ]
+  },
+  {
+    "name": "acetonitrile",
+    "display_name": "MeCN",
+    "interpret_chemically": true,
+    "smiles": "CC#N",
+    "aliases": [
+      "ACN",
+      "75-05-8",
+      "Methyl cyanide",
+      "Cyanomethane",
+      "Ethanenitrile"
+    ]
+  },
+  {
+    "name": "methyl ethyl ketone",
+    "display_name": "MEK",
+    "interpret_chemically": false,
+    "smiles": "CCC(=O)C",
+    "aliases": [
+      "2-Butanone",
+      "Butan-2-one",
+      "Butanone",
+      "78-93-3"
+    ]
+  },
+  {
+    "name": "methylamine",
+    "display_name": "MeNH2",
+    "interpret_chemically": true,
+    "smiles": "CN",
+    "aliases": [
+      "Methanamine",
+      "Aminomethane",
+      "Monomethylamine",
+      "74-89-5"
+    ]
+  },
+  {
+    "name": "methylamine hydrochloride",
+    "display_name": "MeNH2.HCl",
+    "interpret_chemically": true,
+    "smiles": "CN.Cl",
+    "aliases": [
+      "methylamine HCl",
+      "593-51-1",
+      "Monomethylamine hydrochloride",
+      "Methylamine, hydrochloride",
+      "M439EX322K"
+    ]
+  },
+  {
+    "name": "methanol",
+    "display_name": "MeOH",
+    "interpret_chemically": true,
+    "smiles": "CO",
+    "aliases": [
+      "methyl alcohol",
+      "67-56-1",
+      "wood alcohol",
+      "Methylol"
+    ]
+  },
+  {
+    "name": "magnesium",
+    "display_name": "Mg",
+    "interpret_chemically": true,
+    "smiles": "[Mg]",
+    "aliases": [
+      "7439-95-4",
+      "Magnesium sheet",
+      "Magnesium powdered",
+      "Magnesium metallicum"
+    ]
+  },
+  {
+    "name": "magnesium chloride",
+    "display_name": "MgCl2",
+    "interpret_chemically": true,
+    "smiles": "[Mg+2].[Cl-].[Cl-]",
+    "aliases": [
+      "7786-30-3",
+      "Magnesium chloride anhydrous",
+      "Magnesium dichloride"
+    ]
+  },
+  {
+    "name": "magnesium sulfate",
+    "display_name": "MgSO4",
+    "interpret_chemically": true,
+    "smiles": "[O-]S(=O)(=O)[O-].[Mg+2]",
+    "aliases": [
+      "7487-88-9",
+      "Magnesium sulfate anhydrous",
+      "Magnesiumsulfat"
+    ]
+  },
+  {
+    "name": "methanesulfonyl chloride",
+    "display_name": "MsCl",
+    "interpret_chemically": true,
+    "smiles": "CS(=O)(=O)Cl",
+    "aliases": [
+      "mesyl chloride",
+      "124-63-0",
+      "Methanesulphonyl chloride",
+      "Methyl sulfochloride"
+    ]
+  },
+  {
+    "name": "methanesulfonic acid",
+    "display_name": "MsOH",
+    "interpret_chemically": true,
+    "smiles": "CS(=O)(=O)O",
+    "aliases": [
+      "mesylic acid",
+      "75-75-2",
+      "Methylsulfonic acid",
+      "Methanesulphonic acid",
+      "Kyselina methansulfonova"
+    ]
+  },
+  {
+    "name": "sodium carbonate",
+    "display_name": "Na2CO3",
+    "interpret_chemically": true,
+    "smiles": "C(=O)([O-])[O-].[Na+].[Na+]",
+    "aliases": [
+      "497-19-8",
+      "Soda Ash",
+      "Disodium carbonate",
+      "Carbonic acid disodium salt"
+    ]
+  },
+  {
+    "name": "sodium dichromate",
+    "display_name": "Na2Cr2O7",
+    "interpret_chemically": true,
+    "smiles": "[O-][Cr](=O)(=O)O[Cr](=O)(=O)[O-].[Na+].[Na+]",
+    "aliases": [
+      "Sodium bichromate",
+      "10588-01-9",
+      "Disodium dichromate",
+      "Bichromate of soda"
+    ]
+  },
+  {
+    "name": "sodium sulfide",
+    "display_name": "Na2S",
+    "interpret_chemically": true,
+    "smiles": "[Na+].[Na+].[S-2]",
+    "aliases": [
+      "Sodium sulphide",
+      "Sodium sulfuret",
+      "sodium sulfide anhydrous",
+      "sodium monosulphide",
+      "anh. sodium sulfide"
+    ]
+  },
+  {
+    "name": "sodium thiosulfate",
+    "display_name": "Na2S2O3",
+    "interpret_chemically": true,
+    "smiles": "[O-]S(=O)(=S)[O-].[Na+].[Na+]",
+    "aliases": [
+      "7772-98-7",
+      "Sodium thiosulphate",
+      "Disodium thiosulfate",
+      "Sodothiol"
+    ]
+  },
+  {
+    "name": "sodium dithionite",
+    "display_name": "Na2S2O4",
+    "interpret_chemically": true,
+    "smiles": "[O-]S(=O)S(=O)[O-].[Na+].[Na+]",
+    "aliases": [
+      "SODIUM HYDROSULFITE",
+      "7775-14-6",
+      "Sodium hydrosulphite",
+      "Vatrolite"
+    ]
+  },
+  {
+    "name": "sodium sulfate",
+    "display_name": "Na2SO4",
+    "interpret_chemically": true,
+    "smiles": "[O-]S(=O)(=O)[O-].[Na+].[Na+]",
+    "aliases": [
+      "7757-82-6",
+      "Disodium sulfate",
+      "Sodium sulfate anhydrous",
+      "Sodium sulfate, anhydrous"
+    ]
+  },
+  {
+    "name": "sodium triacetoxyborohydride",
+    "display_name": "NaBH(OAc)3",
+    "interpret_chemically": true,
+    "smiles": "[BH-](OC(=O)C)(OC(=O)C)OC(=O)C.[Na+]",
+    "aliases": [
+      "4VU0JE4YSK",
+      "611-401-0",
+      "56553-60-7",
+      "Borate(1-), tris(acetato-kappaO)hydro-, sodium, (T-4)-"
+    ]
+  },
+  {
+    "name": "sodium borohydride",
+    "display_name": "NaBH4",
+    "interpret_chemically": true,
+    "smiles": "[BH4-].[Na+]",
+    "aliases": [
+      "borohydrure de sodium",
+      "Sodium tetrahydridoborate(1-)",
+      "Sodium borohydride (Na(BH4))",
+      "241-004-4"
+    ]
+  },
+  {
+    "name": "sodium bromide",
+    "display_name": "NaBr",
+    "interpret_chemically": true,
+    "smiles": "[Na+].[Br-]",
+    "aliases": [
+      "7647-15-6",
+      "Sedoneural",
+      "Bromide salt of sodium",
+      "Bromnatrium"
+    ]
+  },
+  {
+    "name": "N-acetyl cysteine",
+    "display_name": "N-acetylcysteine",
+    "interpret_chemically": false,
+    "smiles": "CC(=O)N[C@@H](CS)C(=O)O",
+    "aliases": [
+      "N-Acetyl-L-cysteine",
+      "acetylcysteine",
+      "616-91-1",
+      "mercapturic acid"
+    ]
+  },
+  {
+    "name": "sodium chloride",
+    "display_name": "NaCl",
+    "interpret_chemically": true,
+    "smiles": "[Na+].[Cl-]",
+    "aliases": [
+      "7647-14-5",
+      "Table salt",
+      "Common salt",
+      "Sodium chloric"
+    ]
+  },
+  {
+    "name": "sodium cyanide",
+    "display_name": "NaCN",
+    "interpret_chemically": true,
+    "smiles": "[C-]#N.[Na+]",
+    "aliases": [
+      "143-33-9",
+      "Cymag",
+      "Cyanogran",
+      "Cyanide of sodium"
+    ]
+  },
+  {
+    "name": "sodium hydride",
+    "display_name": "NaH",
+    "interpret_chemically": true,
+    "smiles": "[H-].[Na+]",
+    "aliases": [
+      "7646-69-7",
+      "Sodiumhydride",
+      "15780-28-6",
+      "23J3BHR95O"
+    ]
+  },
+  {
+    "name": "sodium bicarbonate",
+    "display_name": "NaHCO3",
+    "interpret_chemically": true,
+    "smiles": "C(=O)(O)[O-].[Na+]",
+    "aliases": [
+      "144-55-8",
+      "Sodium hydrogen carbonate",
+      "Baking soda",
+      "Sodium hydrogencarbonate"
+    ]
+  },
+  {
+    "name": "sodium iodide",
+    "display_name": "NaI",
+    "interpret_chemically": true,
+    "smiles": "[Na+].[I-]",
+    "aliases": [
+      "7681-82-5",
+      "Sodium monoiodide",
+      "Ioduril",
+      "Soiodin"
+    ]
+  },
+  {
+    "name": "sodium periodate",
+    "display_name": "NaIO4",
+    "interpret_chemically": true,
+    "smiles": "[O-]I(=O)(=O)=O.[Na+]",
+    "aliases": [
+      "7790-28-5",
+      "Sodium metaperiodate",
+      "98W4A29X43",
+      "NaIO4 compound"
+    ]
+  },
+  {
+    "name": "sodium azide",
+    "display_name": "NaN3",
+    "interpret_chemically": true,
+    "smiles": "[N-]=[N+]=[N-].[Na+]",
+    "aliases": [
+      "26628-22-8",
+      "Azide, sodium",
+      "Natriumazid",
+      "Hydrazoic acid sodium salt"
+    ]
+  },
+  {
+    "name": "sodium nitrite",
+    "display_name": "NaNO2",
+    "interpret_chemically": true,
+    "smiles": "N(=O)[O-].[Na+]",
+    "aliases": [
+      "7632-00-0",
+      "Nitrous acid, sodium salt",
+      "Nitrite, sodium",
+      "Erinitrit"
+    ]
+  },
+  {
+    "name": "sodium nitrate",
+    "display_name": "NaNO3",
+    "interpret_chemically": true,
+    "smiles": "[N+](=O)([O-])[O-].[Na+]",
+    "aliases": [
+      "7631-99-4",
+      "Chile saltpeter",
+      "Cubic niter",
+      "Soda niter"
+    ]
+  },
+  {
+    "name": "sodium acetate",
+    "display_name": "NaOAc",
+    "interpret_chemically": true,
+    "smiles": "CC(=O)[O-].[Na+]",
+    "aliases": [
+      "127-09-3",
+      "Acetic acid, sodium salt",
+      "Sodium acetate anhydrous",
+      "Sodium acetate, anhydrous"
+    ]
+  },
+  {
+    "name": "sodium ethoxide",
+    "display_name": "NaOEt",
+    "interpret_chemically": true,
+    "smiles": "CC[O-].[Na+]",
+    "aliases": [
+      "141-52-6",
+      "Sodium ethylate",
+      "SODIUM ETHANOLATE",
+      "Ethoxysodium"
+    ]
+  },
+  {
+    "name": "sodium hydroxide",
+    "display_name": "NaOH",
+    "interpret_chemically": true,
+    "smiles": "[OH-].[Na+]",
+    "aliases": [
+      "1310-73-2",
+      "Caustic soda",
+      "Sodium hydrate",
+      "Aetznatron"
+    ]
+  },
+  {
+    "name": "sodium methoxide",
+    "display_name": "NaOMe",
+    "interpret_chemically": true,
+    "smiles": "C[O-].[Na+]",
+    "aliases": [
+      "Sodium methanolate",
+      "124-41-4",
+      "Sodium methylate",
+      "Methoxysodium"
+    ]
+  },
+  {
+    "name": "sodium tert-butoxide",
+    "display_name": "NaOtBu",
+    "interpret_chemically": true,
+    "smiles": "CC(C)(C)O.[Na]",
+    "aliases": [
+      "865-48-5",
+      "tert-Butanol (sodium)",
+      "sodium tert-butylate",
+      "sodium tert-butanol"
+    ]
+  },
+  {
+    "name": "hydrazine",
+    "display_name": "N2H4",
+    "interpret_chemically": true,
+    "smiles": "NN",
+    "aliases": [
+      "302-01-2",
+      "Levoxine",
+      "Hydrazine base",
+      "Oxytreat 35"
+    ]
+  },
+  {
+    "name": "sodium thiocyanate",
+    "display_name": "NaSCN",
+    "interpret_chemically": true,
+    "smiles": "C(#N)[S-].[Na+]",
+    "aliases": [
+      "540-72-7",
+      "Sodium rhodanate",
+      "Sodium rhodanide",
+      "Thiocyanate sodium"
+    ]
+  },
+  {
+    "name": "N-Bromosuccinimide",
+    "display_name": "NBS",
+    "interpret_chemically": false,
+    "smiles": "C1CC(=O)N(C1=O)Br",
+    "aliases": [
+      "n-bromobutanimide",
+      "128-08-5",
+      "1-Bromopyrrolidine-2,5-dione",
+      "Succinbromimide"
+    ]
+  },
+  {
+    "name": "N-chlorosuccinimide",
+    "display_name": "NCS",
+    "interpret_chemically": false,
+    "smiles": "C1CC(=O)N(C1=O)Cl",
+    "aliases": [
+      "128-09-6",
+      "1-chloropyrrolidine-2,5-dione",
+      "Succinchlorimide",
+      "Chlorosuccinimide"
+    ]
+  },
+  {
+    "name": "tert-Butyl carbamate",
+    "display_name": "NH2Boc",
+    "interpret_chemically": true,
+    "smiles": "CC(C)(C)OC(=O)N",
+    "aliases": [
+      "BocNH2",
+      "Carbamic acid, 1,1-dimethylethyl ester",
+      "LFKDJXLFVYVEFG-UHFFFAOYSA-",
+      "224-209-3",
+      "InChI=1/C5H11NO2/c1-5(2,3)8-4(6)7/h1-3H3,(H2,6,7)"
+    ]
+  },
+  {
+    "name": "hydroxylamine hydrochloride",
+    "display_name": "NH2OH.HCl",
+    "interpret_chemically": true,
+    "smiles": "NO.Cl",
+    "aliases": [
+      "5470-11-1",
+      "Hydroxylammonium chloride",
+      "Oxammonium hydrochloride",
+      "Hydroxyamine hydrochloride"
+    ]
+  },
+  {
+    "name": "sulfamic acid",
+    "display_name": "NH2SO3H",
+    "interpret_chemically": true,
+    "smiles": "NS(=O)(=O)O",
+    "aliases": [
+      "5329-14-6",
+      "Amidosulfonic acid",
+      "Sulphamic acid",
+      "Amidosulfuric acid"
+    ]
+  },
+  {
+    "name": "p-toluenesulfonamide",
+    "display_name": "NH2Ts",
+    "interpret_chemically": true,
+    "smiles": "CC1=CC=C(C=C1)S(=O)(=O)N",
+    "aliases": [
+      "tosylamide",
+      "4-Methylbenzenesulfonamide",
+      "70-55-3",
+      "4-Toluenesulfonamide"
+    ]
+  },
+  {
+    "name": "ammonium chloride",
+    "display_name": "NH4Cl",
+    "interpret_chemically": true,
+    "smiles": "[NH4+].[Cl-]",
+    "aliases": [
+      "12125-02-9",
+      "Ammonium muriate",
+      "Darammon",
+      "Ammoniumchlorid"
+    ]
+  },
+  {
+    "name": "ammonium acetate",
+    "display_name": "NH4OAc",
+    "interpret_chemically": true,
+    "smiles": "CC(=O)[O-].[NH4+]",
+    "aliases": [
+      "631-61-8",
+      "Acetic acid, ammonium salt",
+      "acetic acid ammonium salt",
+      "RRE756S6Q2"
+    ]
+  },
+  {
+    "name": "ammonium hydroxide",
+    "display_name": "NH4OH",
+    "interpret_chemically": true,
+    "smiles": "[NH4+].[OH-]",
+    "aliases": [
+      "1336-21-6",
+      "Ammonia water",
+      "Ammonia aqueous",
+      "Aquammonia"
+    ]
+  },
+  {
+    "name": "N-iodosuccinimide",
+    "display_name": "NIS",
+    "interpret_chemically": false,
+    "smiles": "C1CC(=O)N(C1=O)I",
+    "aliases": [
+      "516-12-1",
+      "1-Iodopyrrolidine-2,5-dione",
+      "Succiniodimide",
+      "2,5-Pyrrolidinedione, 1-iodo-"
+    ]
+  },
+  {
+    "name": "N-methylpiperidine",
+    "display_name": "N-MePiperidine",
+    "interpret_chemically": false,
+    "smiles": "CN1CCCCC1",
+    "aliases": [
+      "1-Methylpiperidine",
+      "626-67-5",
+      "Piperidine, 1-methyl-",
+      "617374QZN4"
+    ]
+  },
+  {
+    "name": "N-methylmorpholine",
+    "display_name": "NMM",
+    "interpret_chemically": false,
+    "smiles": "CN1CCOCC1",
+    "aliases": [
+      "4-Methylmorpholine",
+      "109-02-4",
+      "Morpholine, 4-methyl-",
+      "1-Methylmorpholine"
+    ]
+  },
+  {
+    "name": "N-methylmorpholine N-oxide",
+    "display_name": "NMO",
+    "interpret_chemically": false,
+    "smiles": "C[N+]1(CCOCC1)[O-]",
+    "aliases": [
+      "7529-22-8",
+      "4-Methylmorpholine 4-oxide",
+      "N-Methylmorpholine oxide",
+      "Morpholine, 4-methyl-, 4-oxide"
+    ]
+  },
+  {
+    "name": "ozone",
+    "display_name": "O3",
+    "interpret_chemically": true,
+    "smiles": "[O-][O+]=O",
+    "aliases": [
+      "Triatomic oxygen",
+      "10028-15-6",
+      "Ozon",
+      "Ozone heavy work"
+    ]
+  },
+  {
+    "name": "osmium tetroxide",
+    "display_name": "OsO4",
+    "interpret_chemically": true,
+    "smiles": "O=[Os](=O)(=O)=O",
+    "aliases": [
+      "20816-12-0",
+      "Osmium tetraoxide",
+      "Osmic acid",
+      "tetraoxoosmium"
+    ]
+  },
+  {
+    "name": "pyridinium chlorochromate",
+    "display_name": "PCC",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "phosphorus trichloride",
+    "display_name": "PCl3",
+    "interpret_chemically": true,
+    "smiles": "P(Cl)(Cl)Cl",
+    "aliases": [
+      "7719-12-2",
+      "Trichlorophosphine",
+      "Phosphorous trichloride",
+      "Phosphorous chloride"
+    ]
+  },
+  {
+    "name": "phosphorus pentachloride",
+    "display_name": "PCl5",
+    "interpret_chemically": true,
+    "smiles": "P(Cl)(Cl)(Cl)(Cl)Cl",
+    "aliases": [
+      "10026-13-8",
+      "Phosphorus(V) chloride",
+      "Pentachlorophosphorane",
+      "Phosphorane, pentachloro-"
+    ]
+  },
+  {
+    "name": "palladium(II) acetate",
+    "display_name": "Pd(OAc)2",
+    "interpret_chemically": true,
+    "smiles": "CC(=O)[O-].CC(=O)[O-].[Pd+2]",
+    "aliases": [
+      "palladium acetate",
+      "3375-31-3",
+      "Palladium diacetate",
+      "Diacetoxypalladium",
+      "Diacetatopalladium"
+    ]
+  },
+  {
+    "name": "palladium(II) chloride tris(triphenylphosphine)",
+    "display_name": "Pd(PPh3)3Cl2",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "palladium on carbon",
+    "display_name": "Pd/C",
+    "interpret_chemically": false,
+    "smiles": "[Pd]",
+    "aliases": [
+      "Pd-C",
+      "Pd-C catalyst",
+      "PALLADIUM",
+      "7440-05-3",
+      "Palladium element",
+      "paladio",
+      "PD"
+    ]
+  },
+  {
+    "name": "tetrakis(dibenzylideneacetone)dipalladium(0)",
+    "display_name": "Pd2(dba)3",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "methyl tert-butyl ether",
+    "display_name": "MTBE",
+    "interpret_chemically": false,
+    "smiles": "CC(C)(C)OC",
+    "aliases": [
+      "TMBE",
+      "tert-Butyl methyl ether",
+      "1634-04-4",
+      "2-Methoxy-2-methylpropane"
+    ]
+  },
+  {
+    "name": "pyridinium dichromate",
+    "display_name": "PDC",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=NC=C1.C1=CC=NC=C1.O[Cr](=O)(=O)O[Cr](=O)(=O)O",
+    "aliases": [
+      "Y7AV7UFN7K",
+      "((hydroxydioxochromio)oxy)chromiumoylol",
+      "bis(pyridine)",
+      "[(hydroxydioxochromio)oxy]chromiumoylol",
+      "bis(pyridine)",
+      "243-478-8",
+      "20039-37-6"
+    ]
+  },
+  {
+    "name": "diphenylamine",
+    "display_name": "Ph2NH",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)NC2=CC=CC=C2",
+    "aliases": [
+      "N-Phenylaniline",
+      "122-39-4",
+      "N,N-DIPHENYLAMINE",
+      "N-Phenylbenzenamine"
+    ]
+  },
+  {
+    "name": "triphenylbismuth oxide",
+    "display_name": "Ph3BiO",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "phenol",
+    "display_name": "phenol",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C(C=C1)O",
+    "aliases": [
+      "hydroxybenzene",
+      "108-95-2",
+      "carbolic acid",
+      "Phenic acid"
+    ]
+  },
+  {
+    "name": "phenyllithium",
+    "display_name": "PhLi",
+    "interpret_chemically": true,
+    "smiles": "[Li].C1=CC=[C]C=C1",
+    "aliases": [
+      "phenyl lithium",
+      "209-720-1",
+      "591-51-5",
+      "Lithium, phenyl-"
+    ]
+  },
+  {
+    "name": "phenyliodine(III) diacetate",
+    "display_name": "PIDA",
+    "interpret_chemically": false,
+    "smiles": "CC(=O)OI(C1=CC=CC=C1)OC(=O)C",
+    "aliases": [
+      "PhI(OAc)2",
+      "diacetoxyiodobenzene",
+      "(Diacetoxyiodo)benzene",
+      "Iodobenzene diacetate",
+      "3240-34-4",
+      "Iodosobenzene diacetate",
+      "Phenyliodo diacetate"
+    ]
+  },
+  {
+    "name": "phenyliodine(III) bis(trifluoroacetate)",
+    "display_name": "PIFA",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C(C=C1)I(OC(=O)C(F)(F)F)OC(=O)C(F)(F)F",
+    "aliases": [
+      "[Bis(trifluoroacetoxy)iodo]benzene",
+      "2712-78-9",
+      "(Bis(trifluoroacetoxy)iodo)benzene",
+      "BIS(TRIFLUOROACETOXY)IODOBENZENE",
+      "Bis(I,I-trifluoroacetoxy)iodobenzene"
+    ]
+  },
+  {
+    "name": "piperazine",
+    "display_name": "piperazine",
+    "interpret_chemically": false,
+    "smiles": "C1CNCCN1",
+    "aliases": [
+      "110-85-0",
+      "Diethylenediamine",
+      "1,4-Diazacyclohexane",
+      "Hexahydropyrazine"
+    ]
+  },
+  {
+    "name": "phosphoryl chloride",
+    "display_name": "POCl3",
+    "interpret_chemically": true,
+    "smiles": "O=P(Cl)(Cl)Cl",
+    "aliases": [
+      "PHOSPHORUS OXYCHLORIDE",
+      "10025-87-3",
+      "Phosphoryl trichloride",
+      "Phosphoric trichloride"
+    ]
+  },
+  {
+    "name": "triphenylphosphine",
+    "display_name": "PPh3",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)P(C2=CC=CC=C2)C3=CC=CC=C3",
+    "aliases": [
+      "603-35-0",
+      "Triphenylphosphane",
+      "Triphenyl phosphine",
+      "Phosphine, triphenyl-"
+    ]
+  },
+  {
+    "name": "triphenylphosphine hydrobromide",
+    "display_name": "PPh3.HBr",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)P(C2=CC=CC=C2)C3=CC=CC=C3.Br",
+    "aliases": [
+      "6399-81-1",
+      "Triphenylphosphonium bromide",
+      "229-012-6",
+      "triphenylphosphane",
+      "hydrobromide"
+    ]
+  },
+  {
+    "name": "triphenylphosphine hydrochloride",
+    "display_name": "PPh3.HCl",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)[PH+](C2=CC=CC=C2)C3=CC=CC=C3.[Cl-]",
+    "aliases": [
+      "15647-89-9",
+      "triphenylphosphonium chloride",
+      "triphenyl phosphonium chloride",
+      "triphenylphosphanium",
+      "chloride"
+    ]
+  },
+  {
+    "name": "propargylamine",
+    "display_name": "propargyl amine",
+    "interpret_chemically": false,
+    "smiles": "C#CCN",
+    "aliases": [
+      "prop-2-yn-1-amine",
+      "2450-71-7",
+      "2-Propyn-1-amine",
+      "propinylamine",
+      "219-513-8"
+    ]
+  },
+  {
+    "name": "1-iodopropane",
+    "display_name": "propyl iodide",
+    "interpret_chemically": false,
+    "smiles": "CCCI",
+    "aliases": [
+      "107-08-4",
+      "Propane, 1-iodo-",
+      "ND3629KE2K"
+    ]
+  },
+  {
+    "name": "platinum dioxide",
+    "display_name": "PtO2",
+    "interpret_chemically": true,
+    "smiles": "O=[Pt]=O",
+    "aliases": [
+      "Adams' catalyst",
+      "1314-15-4",
+      "dioxoplatinum",
+      "Platinic oxide"
+    ]
+  },
+  {
+    "name": "benzotriazol-1-yloxytripyrrolidinophosphonium hexafluorophosphate",
+    "display_name": "PyBOP",
+    "interpret_chemically": false,
+    "smiles": "C1CCN(C1)[P+](N2CCCC2)(N3CCCC3)ON4C5=CC=CC=C5N=N4.F[P-](F)(F)(F)(F)F",
+    "aliases": [
+      "128625-52-5",
+      "(Benzotriazol-1-yloxy)tripyrrolidinophosphonium hexafluorophosphate",
+      "((1H-Benzo[d][1,2,3]triazol-1-yl)oxy)tri(pyrrolidin-1-yl)phosphonium hexafluorophosphate(V)",
+      "Benzotriazole-1-yl-oxytripyrrolidinophosphonium hexafluorophosphate"
+    ]
+  },
+  {
+    "name": "pyridinium tetrafluoroborate",
+    "display_name": "Pyr.BF4",
+    "interpret_chemically": true,
+    "smiles": "[B-](F)(F)(F)F.C1=CC=[NH+]C=C1",
+    "aliases": [
+      "505-07-7",
+      "637-129-2",
+      "pyridiniumtetrafluoroborate",
+      "C5H6BF4N"
+    ]
+  },
+  {
+    "name": "pyridinium hydrochloride",
+    "display_name": "Pyr.HCl",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=[NH+]C=C1.Cl",
+    "aliases": [
+      "pyridinium HCl",
+      "pyridiniumhydrochloride",
+      "piridinium hydrochloride",
+      "pyridinium hydrogen chloride"
+    ]
+  },
+  {
+    "name": "pyridine",
+    "display_name": "pyridine",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=NC=C1",
+    "aliases": [
+      "110-86-1",
+      "Azabenzene",
+      "Azine",
+      "Pyridin"
+    ]
+  },
+  {
+    "name": "(R,R)-1,2-diaminocyclohexane",
+    "display_name": "R,R-Dach",
+    "interpret_chemically": false,
+    "smiles": "C1CC[C@H]([C@@H](C1)N)N",
+    "aliases": [
+      "(R,R)-DACH",
+      "(1R,2R)-(-)-1,2-Diaminocyclohexane",
+      "1121-22-8",
+      "trans-1,2-Diaminocyclohexane",
+      "1,2-Cyclohexanediamine, (1R,2R)-rel-",
+      "(-)-trans-1,2-Diaminocyclohexane"
+    ]
+  },
+  {
+    "name": "Raney nickel",
+    "display_name": "Raney Ni",
+    "interpret_chemically": false,
+    "smiles": "[Ni]",
+    "aliases": [
+      "NICKEL",
+      "7440-02-0",
+      "Metallic nickel",
+      "Fibrex",
+      "Nickel particles"
+    ]
+  },
+  {
+    "name": "1,3-dihydroxybenzene",
+    "display_name": "resorcinol",
+    "interpret_chemically": false,
+    "smiles": "C1=CC(=CC(=C1)O)O",
+    "aliases": [
+      "108-46-3",
+      "benzene-1,3-diol",
+      "1,3-Benzenediol"
+    ]
+  },
+  {
+    "name": "sulfur",
+    "display_name": "sulfur",
+    "interpret_chemically": false,
+    "smiles": "[S]",
+    "aliases": [
+      "Anacardium",
+      "Bioelements",
+      "Armarita",
+      "Celesty",
+      "Naturasil"
+    ]
+  },
+  {
+    "name": "selenium",
+    "display_name": "Se",
+    "interpret_chemically": true,
+    "smiles": "[Se]",
+    "aliases": [
+      "7782-49-2",
+      "Elemental selenium",
+      "Selenium elemental",
+      "Selenium, elemental"
+    ]
+  },
+  {
+    "name": "thionyl chloride",
+    "display_name": "SOCl2",
+    "interpret_chemically": true,
+    "smiles": "O=S(Cl)Cl",
+    "aliases": [
+      "Thionyl dichloride",
+      "7719-09-7",
+      "Sulfinyl chloride",
+      "Sulfurous dichloride"
+    ]
+  },
+  {
+    "name": "tetrabutylammonium bromide",
+    "display_name": "TBAB",
+    "interpret_chemically": false,
+    "smiles": "CCCC[N+](CCCC)(CCCC)CCCC.[Br-]",
+    "aliases": [
+      "1643-19-2",
+      "N,N,N-tributylbutan-1-aminium bromide",
+      "1-Butanaminium, N,N,N-tributyl-, bromide",
+      "VJZ168I98R"
+    ]
+  },
+  {
+    "name": "tetrabutylammonium fluoride",
+    "display_name": "TBAF",
+    "interpret_chemically": false,
+    "smiles": "CCCC[N+](CCCC)(CCCC)CCCC.[F-]",
+    "aliases": [
+      "429-41-4",
+      "TETRA-N-BUTYLAMMONIUM FLUORIDE",
+      "1-Butanaminium, N,N,N-tributyl-, fluoride"
+    ]
+  },
+  {
+    "name": "tetrabutylammonium fluoride trihydrate",
+    "display_name": "TBAF.3H2O",
+    "interpret_chemically": true,
+    "smiles": "CCCC[N+](CCCC)(CCCC)CCCC.O.O.O.[F-]",
+    "aliases": [
+      "tetra-n-butylammonium fluoride trihydrate",
+      "1-Butanaminium, N,N,N-tributyl-, fluoride, trihydrate",
+      "618-063-3",
+      "87749-50-6"
+    ]
+  },
+  {
+    "name": "tetrabutylammonium iodide",
+    "display_name": "TBAI",
+    "interpret_chemically": false,
+    "smiles": "CCCC[N+](CCCC)(CCCC)CCCC.[I-]",
+    "aliases": [
+      "311-28-4",
+      "1-Butanaminium, N,N,N-tributyl-, iodide",
+      "6M53DT4JNG",
+      "206-220-5"
+    ]
+  },
+  {
+    "name": "tert-butyldimethylsilyl triflate",
+    "display_name": "TBDMSOTf",
+    "interpret_chemically": false,
+    "smiles": "CC(C)(C)[Si](C)(C)OS(=O)(=O)C(F)(F)F",
+    "aliases": [
+      "tert-Butyldimethylsilyl trifluoromethanesulphonate",
+      "Methanesulfonic acid, trifluoro-, (1,1-dimethylethyl)dimethylsilyl ester",
+      "(1,1-Dimethylethyl)dimethylsilyl 1,1,1-trifluoromethanesulfonate",
+      "274-102-0",
+      "69739-34-0"
+    ]
+  },
+  {
+    "name": "tert-butyldimethylsilyl chloride",
+    "display_name": "TBSCl",
+    "interpret_chemically": false,
+    "smiles": "CC(C)(C)[Si](C)(C)Cl",
+    "aliases": [
+      "TBDMS-Cl",
+      "18162-48-6",
+      "tert-Butyldimethylchlorosilane",
+      "t-Butyldimethylchlorosilane",
+      "TBDMS chloride"
+    ]
+  },
+  {
+    "name": "tert-butanol",
+    "display_name": "tBuOH",
+    "interpret_chemically": true,
+    "smiles": "CC(C)(C)O",
+    "aliases": [
+      "tert-Butyl alcohol",
+      "75-65-0",
+      "2-Methyl-2-propanol",
+      "2-Methylpropan-2-ol"
+    ]
+  },
+  {
+    "name": "triethylamine",
+    "display_name": "TEA",
+    "interpret_chemically": false,
+    "smiles": "CCN(CC)CC",
+    "aliases": [
+      "121-44-8",
+      "N,N-Diethylethanamine",
+      "(Diethylamino)ethane",
+      "Ethanamine, N,N-diethyl-"
+    ]
+  },
+  {
+    "name": "triflic anhydride",
+    "display_name": "Tf2O",
+    "interpret_chemically": true,
+    "smiles": "C(F)(F)(F)S(=O)(=O)OS(=O)(=O)C(F)(F)F",
+    "aliases": [
+      "trifluoromethanesulfonic anhydride",
+      "358-23-6",
+      "Trifluoromethanesulphonic anhydride",
+      "8W034LHG1U"
+    ]
+  },
+  {
+    "name": "trifluoroacetic acid",
+    "display_name": "TFA",
+    "interpret_chemically": false,
+    "smiles": "C(=O)(C(F)(F)F)O",
+    "aliases": [
+      "76-05-1",
+      "Perfluoroacetic acid",
+      "2,2,2-trifluoroacetic acid",
+      "Trifluoracetic acid"
+    ]
+  },
+  {
+    "name": "trifluoroacetic anhydride",
+    "display_name": "TFAA",
+    "interpret_chemically": false,
+    "smiles": "C(=O)(C(F)(F)F)OC(=O)C(F)(F)F",
+    "aliases": [
+      "407-25-0",
+      "Trifluoroacetic acid anhydride",
+      "Bis(trifluoroacetic) anhydride",
+      "Perfluoroacetic anhydride"
+    ]
+  },
+  {
+    "name": "triflic acid",
+    "display_name": "TfOH",
+    "interpret_chemically": true,
+    "smiles": "C(F)(F)(F)S(=O)(=O)O",
+    "aliases": [
+      "trifluoromethanesulfonic acid",
+      "1493-13-6",
+      "Perfluoromethanesulfonic acid",
+      "Trifluoromethanesulphonic acid"
+    ]
+  },
+  {
+    "name": "tetrahydrofuran",
+    "display_name": "THF",
+    "interpret_chemically": false,
+    "smiles": "C1CCOC1",
+    "aliases": [
+      "Oxolane",
+      "109-99-9",
+      "Furanidine",
+      "Furan, tetrahydro-"
+    ]
+  },
+  {
+    "name": "thiourea",
+    "display_name": "thiourea",
+    "interpret_chemically": false,
+    "smiles": "C(=S)(N)N",
+    "aliases": [
+      "Thiocarbamide",
+      "62-56-6",
+      "Isothiourea",
+      "Sulfourea"
+    ]
+  },
+  {
+    "name": "titanium dioxide",
+    "display_name": "TiO2",
+    "interpret_chemically": true,
+    "smiles": "O=[Ti]=O",
+    "aliases": [
+      "13463-67-7",
+      "Titania",
+      "Titanium(IV) oxide",
+      "Titanium White"
+    ]
+  },
+  {
+    "name": "triisopropylsilyl chloride",
+    "display_name": "TIPSCl",
+    "interpret_chemically": false,
+    "smiles": "CC(C)[Si](C(C)C)(C(C)C)Cl",
+    "aliases": [
+      "13154-24-0",
+      "Triisopropylchlorosilane",
+      "Chlorotriisopropylsilane",
+      "silane, chlorotris(1-methylethyl)-"
+    ]
+  },
+  {
+    "name": "N,N,N',N'-Tetramethylethylenediamine",
+    "display_name": "TMEDA",
+    "interpret_chemically": false,
+    "smiles": "CN(C)CCN(C)C",
+    "aliases": [
+      "110-18-9",
+      "Temed",
+      "Tetramethylethylenediamine"
+    ]
+  },
+  {
+    "name": "1,1,3,3-tetramethylguanidine",
+    "display_name": "TMG",
+    "interpret_chemically": false,
+    "smiles": "CN(C)C(=N)N(C)C",
+    "aliases": [
+      "80-70-6",
+      "N,N,N',N'-Tetramethylguanidine",
+      "Guanidine, N,N,N',N'-tetramethyl-",
+      "VEZ101E7ZU"
+    ]
+  },
+  {
+    "name": "trimethylsilyl bromide",
+    "display_name": "TMSBr",
+    "interpret_chemically": true,
+    "smiles": "C[Si](C)(C)Br",
+    "aliases": [
+      "Bromotrimethylsilane",
+      "2857-97-8",
+      "Trimethylbromosilane",
+      "Silane, bromotrimethyl-"
+    ]
+  },
+  {
+    "name": "trimethylsilyl chloride",
+    "display_name": "TMSCl",
+    "interpret_chemically": true,
+    "smiles": "C[Si](C)(C)Cl",
+    "aliases": [
+      "Chlorotrimethylsilane",
+      "75-77-4",
+      "TRIMETHYLCHLOROSILANE",
+      "Silane, chlorotrimethyl-"
+    ]
+  },
+  {
+    "name": "trimethylsilyl iodide",
+    "display_name": "TMSI",
+    "interpret_chemically": true,
+    "smiles": "C[Si](C)(C)I",
+    "aliases": [
+      "Iodotrimethylsilane",
+      "16029-98-4",
+      "Trimethyliodosilane",
+      "iodo(trimethyl)silane"
+    ]
+  },
+  {
+    "name": "trimethylsilyl triflate",
+    "display_name": "TMSOTf",
+    "interpret_chemically": true,
+    "smiles": "C[Si](C)(C)OS(=O)(=O)C(F)(F)F",
+    "aliases": [
+      "Trimethylsilyl trifluoromethanesulfonate",
+      "27607-77-8",
+      "Trimethylsilyl trifluoromethanesulphonate",
+      "Trimethylsilyl trifluoromethylsulfonate"
+    ]
+  },
+  {
+    "name": "toluene",
+    "display_name": "toluene",
+    "interpret_chemically": false,
+    "smiles": "CC1=CC=CC=C1",
+    "aliases": [
+      "PhMe",
+      "methylbenzene",
+      "toluol",
+      "108-88-3",
+      "Phenylmethane"
+    ]
+  },
+  {
+    "name": "triphenylphosphine trisulfonate sodium salt",
+    "display_name": "TPPTS",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "triethyl orthoformate",
+    "display_name": "triethylorthoformate",
+    "interpret_chemically": false,
+    "smiles": "CCOC(OCC)OCC",
+    "aliases": [
+      "TEOF",
+      "122-51-0",
+      "Triethoxymethane",
+      "ETHYL ORTHOFORMATE",
+      "Aethon"
+    ]
+  },
+  {
+    "name": "tris-amino methane",
+    "display_name": "Tris",
+    "interpret_chemically": false,
+    "smiles": "C(C(CO)(CO)N)O",
+    "aliases": [
+      "tris(hydroxymethyl)aminomethane",
+      "Trometamol",
+      "TROMETHAMINE",
+      "77-86-1",
+      "Tham"
+    ]
+  },
+  {
+    "name": "p-toluenesulfonyl chloride",
+    "display_name": "TsCl",
+    "interpret_chemically": true,
+    "smiles": "CC1=CC=C(C=C1)S(=O)(=O)Cl",
+    "aliases": [
+      "tosyl chloride",
+      "4-Toluenesulfonyl chloride",
+      "98-59-9",
+      "4-Methylbenzenesulfonyl chloride"
+    ]
+  },
+  {
+    "name": "p-toluenesulfonic acid",
+    "display_name": "p-TsOH",
+    "interpret_chemically": true,
+    "smiles": "CC1=CC=C(C=C1)S(=O)(=O)O",
+    "aliases": [
+      "PTSA",
+      "4-Methylbenzenesulfonic acid",
+      "104-15-4",
+      "4-Toluenesulfonic acid",
+      "p-Toluenesulphonic acid"
+    ]
+  },
+  {
+    "name": "xantphos Pd precatalyst",
+    "display_name": "Xantphos Pd 3G",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "zinc",
+    "display_name": "Zn",
+    "interpret_chemically": true,
+    "smiles": "[Zn]",
+    "aliases": [
+      "7440-66-6",
+      "Blue powder",
+      "Rheinzink",
+      "Jasad",
+      "Granular zinc"
+    ]
+  },
+  {
+    "name": "zinc chloride",
+    "display_name": "ZnCl2",
+    "interpret_chemically": true,
+    "smiles": "Cl[Zn]Cl",
+    "aliases": [
+      "Dichlorozinc",
+      "Zinkchloride",
+      "Zintrace",
+      "Zinkchlorid",
+      "Zine dichloride"
+    ]
+  },
+  {
+    "name": "zinc oxide",
+    "display_name": "ZnO",
+    "interpret_chemically": true,
+    "smiles": "[O-2].[Zn+2]",
+    "aliases": [
+      "SOI2LOH54Z",
+      "CI 77947",
+      "C.I. 77947",
+      "215-222-5",
+      "Lassar's Paste"
+    ]
+  },
+  {
+    "name": "sodium methanethiolate",
+    "display_name": "NaSMe",
+    "interpret_chemically": true,
+    "smiles": "C[S-].[Na+]",
+    "aliases": [
+      "sodium thiomethoxide",
+      "5188-07-8",
+      "Sodium thiomethylate",
+      "LB29JWW8H7",
+      "225-969-9"
+    ]
+  },
+  {
+    "name": "tetrasodium ethylenediaminetetraacetate",
+    "display_name": "Na4EDTA",
+    "interpret_chemically": true,
+    "smiles": "C(CN(CC(=O)[O-])CC(=O)[O-])N(CC(=O)[O-])CC(=O)[O-].[Na+].[Na+].[Na+].[Na+]",
+    "aliases": [
+      "EDTA tetrasodium salt",
+      "Sodium edetate",
+      "Edetate sodium",
+      "EDTA tetrasodium",
+      "EDTA sodium",
+      "Sodium EDTA"
+    ]
+  },
+  {
+    "name": "nicotinamide adenine dinucleotide phosphate",
+    "display_name": "NADP",
+    "interpret_chemically": false,
+    "smiles": "C1=CC(=C[N+](=C1)[C@H]2[C@@H]([C@@H]([C@H](O2)COP(=O)([O-])OP(=O)([O-])OC[C@@H]3[C@H]([C@H]([C@@H](O3)N4C=NC5=C(N=CN=C54)N)OP(=O)([O-])[O-])O)O)O)C(=O)N",
+    "aliases": [
+      "tetrasodium",
+      "(2-adenin-9-yl-5-((((5-(3-carbamoyl-4H-pyridin-1-yl)-3,4-dihydroxy-tetrahydrofuran-2-yl)methoxy-oxido-phosphoryl)oxy-oxido-phosphoryl)oxymethyl)-4-hydroxy-tetrahydrofuran-3-yl) phosphate",
+      "tetrasodium",
+      "[2-adenin-9-yl-5-[[[[5-(3-carbamoyl-4H-pyridin-1-yl)-3,4-dihydroxy-tetrahydrofuran-2-yl]methoxy-oxido-phosphoryl]oxy-oxido-phosphoryl]oxymethyl]-4-hydroxy-tetrahydrofuran-3-yl] phosphate",
+      "NADP(3-)",
+      "NADP(+)"
+    ]
+  },
+  {
+    "name": "sodium bis(trimethylsilyl)amide",
+    "display_name": "NaHMDS",
+    "interpret_chemically": false,
+    "smiles": "C[Si](C)(C)[N-][Si](C)(C)C.[Na+]",
+    "aliases": [
+      "sodium hexamethyldisilazide",
+      "N-Sodiohexamethyldisilazane",
+      "Silanamine, 1,1,1-trimethyl-N-(trimethylsilyl)-, sodium salt",
+      "EC 213-983-8",
+      "NSodiohexamethyldisilazane"
+    ]
+  },
+  {
+    "name": "sodium bisulfite",
+    "display_name": "NaHSO3",
+    "interpret_chemically": true,
+    "smiles": "OS(=O)[O-].[Na+]",
+    "aliases": [
+      "sodium hydrogen sulfite",
+      "7631-90-5",
+      "sodium hydrogensulfite",
+      "Sodium bisulphite"
+    ]
+  },
+  {
+    "name": "sodium mesylate",
+    "display_name": "NaSO2Me",
+    "interpret_chemically": true,
+    "smiles": "CS(=O)(=O)[O-].[Na+]",
+    "aliases": [
+      "sodium methanesulfinate",
+      "Sodium methanesulfonate",
+      "2386-57-4",
+      "Methanesulfonic acid, sodium salt",
+      "Methanesulfonic acid sodium salt",
+      "Sodium methyl sulfonate"
+    ]
+  },
+  {
+    "name": "n-butyl lithium",
+    "display_name": "n-BuLi",
+    "interpret_chemically": true,
+    "smiles": "[Li+].CCC[CH2-]",
+    "aliases": [
+      "butyllithium",
+      "lithium",
+      "butane",
+      "C4H9Li",
+      "LiBu",
+      "n-butyllitium"
+    ]
+  },
+  {
+    "name": "n-butanol",
+    "display_name": "n-BuOH",
+    "interpret_chemically": true,
+    "smiles": "CCCCO",
+    "aliases": [
+      "1-butanol",
+      "Butan-1-ol",
+      "71-36-3",
+      "Butyl alcohol"
+    ]
+  },
+  {
+    "name": "ammonia",
+    "display_name": "NH3",
+    "interpret_chemically": true,
+    "smiles": "N",
+    "aliases": [
+      "azane",
+      "7664-41-7",
+      "Ammonia gas",
+      "Nitro-sil"
+    ]
+  },
+  {
+    "name": "nickel(II) acetate tetrahydrate",
+    "display_name": "Ni(OAc)2.4H2O",
+    "interpret_chemically": true,
+    "smiles": "CC(=O)[O-].CC(=O)[O-].O.O.O.O.[Ni+2]",
+    "aliases": [
+      "6018-89-9",
+      "NICKEL ACETATE TETRAHYDRATE",
+      "Nickel diacetate tetrahydrate",
+      "6SOA8L0560"
+    ]
+  },
+  {
+    "name": "nickel(II) bromide trihydrate",
+    "display_name": "NiBr2.3H2O",
+    "interpret_chemically": true,
+    "smiles": "O.O.O.[Ni+2].[Br-].[Br-]",
+    "aliases": [
+      "7789-49-3",
+      "Nickel bromide (NiBr2), trihydrate",
+      "677-463-6",
+      "nickel(2+)",
+      "dibromide",
+      "trihydrate"
+    ]
+  },
+  {
+    "name": "N-Methyl-2-pyrrolidone",
+    "display_name": "NMP",
+    "interpret_chemically": false,
+    "smiles": "CN1CCCC1=O",
+    "aliases": [
+      "N-methylpyrrolidone",
+      "1-METHYL-2-PYRROLIDINONE",
+      "872-50-4",
+      "N-Methyl-2-pyrrolidinone"
+    ]
+  },
+  {
+    "name": "oxygen",
+    "display_name": "O2",
+    "interpret_chemically": true,
+    "smiles": "O=O",
+    "aliases": [
+      "Molecular oxygen",
+      "oxygen molecule",
+      "Dioxygen",
+      "7782-44-7"
+    ]
+  },
+  {
+    "name": "palladium(II) dichloride complex with dppf",
+    "display_name": "Pd(dppf)Cl2",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "bis(triphenylphosphine)palladium(II) dichloride",
+    "display_name": "Pd(PPh3)2Cl2",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)P(C2=CC=CC=C2)C3=CC=CC=C3.C1=CC=C(C=C1)P(C2=CC=CC=C2)C3=CC=CC=C3.[Cl-].[Cl-].[Pd+2]",
+    "aliases": [
+      "bis(triphenylphosphine)palladium(ii) chloride",
+      "28966-81-6",
+      "bis(triphenylphosphine)palladium(ii)chloride",
+      "Bis(triphenylphosphine)palladium chloride"
+    ]
+  },
+  {
+    "name": "palladium triphenylphosphine chloride",
+    "display_name": "Pd(PPh3)Cl2",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "Pd-132",
+    "display_name": "Pd-132",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "chlorobenzene",
+    "display_name": "PhCl",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)Cl",
+    "aliases": [
+      "108-90-7",
+      "Monochlorobenzene",
+      "Phenyl chloride",
+      "Benzene chloride"
+    ]
+  },
+  {
+    "name": "phthalic dioxime",
+    "display_name": "phthaloxime",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "pinacol",
+    "display_name": "pinacol",
+    "interpret_chemically": false,
+    "smiles": "CC(C)(C(C)(C)O)O",
+    "aliases": [
+      "2,3-dimethyl-2,3-butanediol",
+      "76-09-5",
+      "2,3-Dimethylbutane-2,3-diol",
+      "Pinacone"
+    ]
+  },
+  {
+    "name": "pyridoxal phosphate",
+    "display_name": "PLP",
+    "interpret_chemically": false,
+    "smiles": "CC1=NC=C(C(=C1O)C=O)COP(=O)(O)O",
+    "aliases": [
+      "pyridoxal-5'-phosphate",
+      "54-47-7",
+      "Codecarboxylase",
+      "pyridoxal 5-phosphate",
+      "pyridoxal 5'-phosphate"
+    ]
+  },
+  {
+    "name": "phenyl phosphorodichloridate",
+    "display_name": "PO(OPh)Cl2",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)OP(=O)(Cl)Cl",
+    "aliases": [
+      "PHENYL DICHLOROPHOSPHATE",
+      "770-12-7",
+      "Phosphorodichloridic acid, phenyl ester",
+      "Dichlorophenoxyphosphine oxide"
+    ]
+  },
+  {
+    "name": "platinum on carbon",
+    "display_name": "Pt/VC",
+    "interpret_chemically": false,
+    "smiles": "[Pt]",
+    "aliases": [
+      "Pt-C",
+      "PLATINUM",
+      "7440-06-4",
+      "Platinum Black",
+      "Platinum sponge",
+      "Platin"
+    ]
+  },
+  {
+    "name": "p-toluenesulfonic acid monohydrate",
+    "display_name": "p-TsOH.H2O",
+    "interpret_chemically": true,
+    "smiles": "CC1=CC=C(C=C1)S(=O)(=O)O.O",
+    "aliases": [
+      "6192-52-5",
+      "4-methylbenzenesulfonic acid hydrate",
+      "Benzenesulfonic acid, 4-methyl-, monohydrate",
+      "4-toluenesulfonic acid monohydrate"
+    ]
+  },
+  {
+    "name": "sec-butanol",
+    "display_name": "s-BuOH",
+    "interpret_chemically": true,
+    "smiles": "CCC(C)O",
+    "aliases": [
+      "2-butanol",
+      "Butan-2-ol",
+      "78-92-2",
+      "SEC-BUTYL ALCOHOL"
+    ]
+  },
+  {
+    "name": "SiliaMetS metal scavenger",
+    "display_name": "SiliaMetS (scavenger)",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "SPM-32",
+    "display_name": "SPM-32",
+    "interpret_chemically": false,
+    "smiles": null,
+    "aliases": [
+      "metal scavenger"
+    ]
+  },
+  {
+    "name": "succinic acid",
+    "display_name": "succinic acid",
+    "interpret_chemically": false,
+    "smiles": "C(CC(=O)O)C(=O)O",
+    "aliases": [
+      "butanedioic acid",
+      "110-15-6",
+      "Amber acid",
+      "Asuccin"
+    ]
+  },
+  {
+    "name": "propylphosphonic anhydride",
+    "display_name": "T3P",
+    "interpret_chemically": false,
+    "smiles": "CCCP1(=O)OP(=O)(OP(=O)(O1)CCC)CCC",
+    "aliases": [
+      "T3P reagent",
+      "68957-94-8",
+      "1,3,5,2,4,6-Trioxatriphosphorinane, 2,4,6-tripropyl-, 2,4,6-trioxide",
+      "I6EGD8839N",
+      "Propanephosphonic acid cyclic anhydride"
+    ]
+  },
+  {
+    "name": "potassium tert-butoxide",
+    "display_name": "t-BuOK",
+    "interpret_chemically": true,
+    "smiles": "CC(C)(C)[O-].[K+]",
+    "aliases": [
+      "865-47-4",
+      "Potassium T-butoxide",
+      "VR838VHE0V",
+      "Potassium tert-butanolate"
+    ]
+  },
+  {
+    "name": "triphenylphosphine oxide",
+    "display_name": "TPPO",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C(C=C1)P(=O)(C2=CC=CC=C2)C3=CC=CC=C3",
+    "aliases": [
+      "791-28-6",
+      "Phosphine oxide, triphenyl-",
+      "Triphenyl phosphine oxide",
+      "Triphenyl phosphorus oxide"
+    ]
+  },
+  {
+    "name": "xinafoic acid",
+    "display_name": "xinafoic acid",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C2C(=C1)C=CC(=C2O)C(=O)O",
+    "aliases": [
+      "1-Hydroxy-2-naphthoic acid",
+      "86-48-6",
+      "1-hydroxynaphthalene-2-carboxylic acid",
+      "1-Naphthol-2-carboxylic acid",
+      "2-Carboxy-1-naphthol"
+    ]
+  },
+  {
+    "name": "Water",
+    "display_name": "water",
+    "interpret_chemically": false,
+    "smiles": "O",
+    "aliases": [
+      "7732-18-5",
+      "Distilled water",
+      "Dihydrogen oxide",
+      "Purified water"
+    ]
+  },
+  {
+    "name": "Acetone",
+    "display_name": "acetone",
+    "interpret_chemically": false,
+    "smiles": "CC(=O)C",
+    "aliases": [
+      "propanone",
+      "2-propanone",
+      "67-64-1",
+      "propan-2-one"
+    ]
+  },
+  {
+    "name": "Benzene",
+    "display_name": "benzene",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=CC=C1",
+    "aliases": [
+      "71-43-2",
+      "benzol",
+      "Cyclohexatriene",
+      "benzole"
+    ]
+  },
+  {
+    "name": "n-Hexane",
+    "display_name": "n-hexane",
+    "interpret_chemically": false,
+    "smiles": "CCCCCC",
+    "aliases": [
+      "HEXANE",
+      "110-54-3",
+      "Skellysolve B",
+      "Esani"
+    ]
+  },
+  {
+    "name": "Chloroform",
+    "display_name": "chloroform",
+    "interpret_chemically": false,
+    "smiles": "C(Cl)(Cl)Cl",
+    "aliases": [
+      "trichloromethane",
+      "67-66-3",
+      "Trichlormethan",
+      "Trichloroform"
+    ]
+  },
+  {
+    "name": "Calcium carbonate",
+    "display_name": "CaCO3",
+    "interpret_chemically": true,
+    "smiles": "C(=O)([O-])[O-].[Ca+2]",
+    "aliases": [
+      "471-34-1",
+      "Aeromatt",
+      "Calofort U",
+      "Albaglos"
+    ]
+  },
+  {
+    "name": "Sodium hypochlorite",
+    "display_name": "NaOCl",
+    "interpret_chemically": true,
+    "smiles": "[O-]Cl.[Na+]",
+    "aliases": [
+      "bleach",
+      "7681-52-9",
+      "Antiformin",
+      "Clorox",
+      "Hypochlorous acid, sodium salt"
+    ]
+  },
+  {
+    "name": "Silver nitrate",
+    "display_name": "AgNO3",
+    "interpret_chemically": true,
+    "smiles": "[N+](=O)([O-])[O-].[Ag+]",
+    "aliases": [
+      "7761-88-8",
+      "Argenti nitras",
+      "Lunar caustic",
+      "Nitrate d'argent"
+    ]
+  },
+  {
+    "name": "Iron(II) chloride",
+    "display_name": "FeCl2",
+    "interpret_chemically": true,
+    "smiles": "Cl[Fe]Cl",
+    "aliases": [
+      "Ferrous chloride",
+      "Iron dichloride",
+      "Ferrous dichloride",
+      "Iron(2+) chloride"
+    ]
+  },
+  {
+    "name": "Iron(II) nitrate",
+    "display_name": "Fe(NO3)2",
+    "interpret_chemically": true,
+    "smiles": "[N+](=O)([O-])[O-].[N+](=O)([O-])[O-].[Fe+2]",
+    "aliases": [
+      "Ferrous nitrate",
+      "14013-86-6",
+      "iron(2+)",
+      "dinitrate",
+      "Iron(II) nitrate."
+    ]
+  },
+  {
+    "name": "Iron(III) nitrate",
+    "display_name": "Fe(NO3)3",
+    "interpret_chemically": true,
+    "smiles": "[N+](=O)([O-])[O-].[N+](=O)([O-])[O-].[N+](=O)([O-])[O-].[Fe+3]",
+    "aliases": [
+      "Ferric nitrate",
+      "Iron trinitrate",
+      "10421-48-4",
+      "Iron(III) nitrate, anhydrous",
+      "Iron nitrate (Fe(NO3)3)"
+    ]
+  },
+  {
+    "name": "Boric acid",
+    "display_name": "B(OH)3",
+    "interpret_chemically": true,
+    "smiles": "B(O)(O)O",
+    "aliases": [
+      "Orthoboric acid",
+      "10043-35-3",
+      "Boracic acid",
+      "Borofax"
+    ]
+  },
+  {
+    "name": "Silica gel",
+    "display_name": "SiO2",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "Aluminium oxide",
+    "display_name": "Al2O3",
+    "interpret_chemically": true,
+    "smiles": "[O-2].[O-2].[O-2].[Al+3].[Al+3]",
+    "aliases": [
+      "ALUMINUM OXIDE",
+      "1344-28-1",
+      "Aloxite",
+      "gamma-Alumina"
+    ]
+  },
+  {
+    "name": "Copper chromite",
+    "display_name": "CuCr2O4",
+    "interpret_chemically": true,
+    "smiles": "O=[Cr]O[Cr]=O.O=[Cu].O=[Cu]",
+    "aliases": [
+      "Copperchromium oxide",
+      "Copper Chromite Catalyst",
+      "oxo((oxochromio)oxy)chromium",
+      "bis(oxocopper)",
+      "oxo[(oxochromio)oxy]chromium",
+      "bis(oxocopper)",
+      "CHROMIUM (III) COPPER (II) OXIDE"
+    ]
+  },
+  {
+    "name": "Chromium oxide",
+    "display_name": "Cr2O3",
+    "interpret_chemically": true,
+    "smiles": null,
+    "aliases": []
+  },
+  {
+    "name": "Manganese dioxide",
+    "display_name": "MnO2",
+    "interpret_chemically": true,
+    "smiles": "O=[Mn]=O",
+    "aliases": [
+      "Manganese peroxide",
+      "Manganese binoxide",
+      "Mangandioxid",
+      "Manganese superoxide"
+    ]
+  },
+  {
+    "name": "Sodium metabisulfite",
+    "display_name": "Na2S2O5",
+    "interpret_chemically": true,
+    "smiles": "[O-]S(=O)S(=O)(=O)[O-].[Na+].[Na+]",
+    "aliases": [
+      "7681-57-4",
+      "Sodium pyrosulfite",
+      "Sodium disulfite",
+      "Disodium pyrosulfite"
+    ]
+  },
+  {
+    "name": "Aniline",
+    "display_name": "aniline",
+    "interpret_chemically": false,
+    "smiles": "C1=CC=C(C=C1)N",
+    "aliases": [
+      "phenylamine",
+      "Benzenamine",
+      "62-53-3",
+      "Aminobenzene"
+    ]
+  },
+  {
+    "name": "Triethyloxonium tetrafluoroborate",
+    "display_name": "Et3OBF4",
+    "interpret_chemically": true,
+    "smiles": "[B-](F)(F)(F)F.CC[O+](CC)CC",
+    "aliases": [
+      "Meerwein reagent (alkylation)",
+      "368-39-8",
+      "Z0B19DD36J",
+      "Oxonium, triethyl-, tetrafluoroborate(1-)",
+      "triethyloxonium, tetrafluoroborate(1-)"
+    ]
+  },
+  {
+    "name": "Lithium diisopropylamide",
+    "display_name": "LDA",
+    "interpret_chemically": false,
+    "smiles": "[Li+].CC(C)[N-]C(C)C",
+    "aliases": [
+      "Lithium N-(propan-2-yl)propan-2-aminide",
+      "4111-54-0",
+      "lithiodiisopropylamine",
+      "2-Propanamine, N-(1-methylethyl)-, lithium salt",
+      "EC 223-893-0"
+    ]
+  },
+  {
+    "name": "Methyl iodide",
+    "display_name": "MeI",
+    "interpret_chemically": true,
+    "smiles": "CI",
+    "aliases": [
+      "iodomethane",
+      "74-88-4",
+      "Monoiodomethane",
+      "Methane, iodo-"
+    ]
+  },
+  {
+    "name": "Sodium methylate",
+    "display_name": "NaOCH3",
+    "interpret_chemically": true,
+    "smiles": "C[O-].[Na+]",
+    "aliases": [
+      "sodium methoxide",
+      "Sodium methanolate",
+      "124-41-4",
+      "Methoxysodium"
+    ]
+  },
+  {
+    "name": "Calcium chloride",
+    "display_name": "CaCl2",
+    "interpret_chemically": true,
+    "smiles": "[Cl-].[Cl-].[Ca+2]",
+    "aliases": [
+      "10043-52-4",
+      "Calcium chloride anhydrous",
+      "Calcium dichloride"
+    ]
+  },
+  {
+    "name": "Tetrakis(triphenylphosphine)palladium(0)",
+    "display_name": "Pd(PPh3)4",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)P(C2=CC=CC=C2)C3=CC=CC=C3.C1=CC=C(C=C1)P(C2=CC=CC=C2)C3=CC=CC=C3.C1=CC=C(C=C1)P(C2=CC=CC=C2)C3=CC=CC=C3.C1=CC=C(C=C1)P(C2=CC=CC=C2)C3=CC=CC=C3.[Pd]",
+    "aliases": [
+      "Tetrakis(triphenylphosphine)palladium",
+      "Palladium, tetrakis(triphenylphosphine)-, (T-4)-",
+      "Tetra(triphenylphosphine)palladium",
+      "N9O1RWZ93J"
+    ]
+  },
+  {
+    "name": "Copper(I) iodide",
+    "display_name": "CuI",
+    "interpret_chemically": true,
+    "smiles": "[Cu+].[I-]",
+    "aliases": [
+      "Copper(1+) iodide",
+      "Marshite",
+      "Hydro-Giene",
+      "Copper iodide (cui)",
+      "7DE9CA6IL2"
+    ]
+  },
+  {
+    "name": "Copper(II) iodide",
+    "display_name": "CuI2",
+    "interpret_chemically": true,
+    "smiles": "[Cu](I)I",
+    "aliases": [
+      "cupric iodide",
+      "Copper iodide (CuI2)",
+      "13767-71-0",
+      "copper diiodide"
+    ]
+  },
+  {
+    "name": "Tin(II) chloride",
+    "display_name": "SnCl2",
+    "interpret_chemically": true,
+    "smiles": "Cl[Sn]Cl",
+    "aliases": [
+      "stannous chloride",
+      "7772-99-8",
+      "Dichlorotin",
+      "Stannous dichloride",
+      "Tin (II) chloride"
+    ]
+  },
+  {
+    "name": "Sodium borate",
+    "display_name": "Na2B4O7",
+    "interpret_chemically": true,
+    "smiles": "B1(OB2OB(OB(O1)O2)[O-])[O-].O.O.O.O.O.O.O.O.O.O.[Na+].[Na+]",
+    "aliases": [
+      "borax",
+      "1303-96-4",
+      "Borax (B4Na2O7.10H2O)",
+      "Sodium borate decahydrate",
+      "Sodium pyroborate decahydrate"
+    ]
+  },
+  {
+    "name": "Sodium acetate trihydrate",
+    "display_name": "NaOAc·3H2O",
+    "interpret_chemically": true,
+    "smiles": "CC(=O)[O-].O.O.O.[Na+]",
+    "aliases": [
+      "6131-90-4",
+      "Acetic acid, sodium salt, trihydrate",
+      "Tutofusin",
+      "612-115-9"
+    ]
+  },
+  {
+    "name": "Carbon disulfide",
+    "display_name": "CS2",
+    "interpret_chemically": true,
+    "smiles": "C(=S)=S",
+    "aliases": [
+      "Carbon disulphide",
+      "75-15-0",
+      "Carbon bisulfide",
+      "Dithiocarbonic anhydride"
+    ]
+  },
+  {
+    "name": "Tetrahydrofurfuryl alcohol",
+    "display_name": "THFA",
+    "interpret_chemically": false,
+    "smiles": "C1CC(OC1)CO",
+    "aliases": [
+      "97-99-4",
+      "Tetrahydro-2-furanmethanol",
+      "Tetrahydro-2-furanylmethanol"
+    ]
+  },
+  {
+    "name": "Formylhydrazine",
+    "display_name": "formylhydrazide",
+    "interpret_chemically": false,
+    "smiles": "C(=O)NN",
+    "aliases": [
+      "methane hydrazide",
+      "624-84-0",
+      "Hydrazinecarboxaldehyde",
+      "V1D8X13QFN",
+      "210-867-9"
+    ]
+  },
+  {
+    "name": "Ceric ammonium nitrate",
+    "display_name": "CAN",
+    "interpret_chemically": false,
+    "smiles": "[NH4+].[NH4+].[N+](=O)([O-])[O-].[N+](=O)([O-])[O-].[N+](=O)([O-])[O-].[N+](=O)([O-])[O-].[N+](=O)([O-])[O-].[N+](=O)([O-])[O-].[Ce+4]",
+    "aliases": [
+      "Cerium ammonium nitrate",
+      "Diammonium hexanitratocerate",
+      "10139-51-2",
+      "U99S55ED6B",
+      "lambda4-cerium(4+) ion bis(nitric acid) diamine tetranitrate"
+    ]
+  },
+  {
+    "name": "Nitric acid",
+    "display_name": "HNO3",
+    "interpret_chemically": true,
+    "smiles": "[N+](=O)(O)[O-]",
+    "aliases": [
+      "azotic acid",
+      "aqua fortis",
+      "7697-37-2",
+      "Salpetersaeure"
+    ]
+  },
+  {
+    "name": "cumene",
+    "display_name": "cumene",
+    "interpret_chemically": false,
+    "smiles": "CC(C)C1=CC=CC=C1",
+    "aliases": [
+      "isopropylbenzene",
+      "98-82-8",
+      "2-Phenylpropane",
+      "(1-Methylethyl)benzene"
+    ]
+  },
+  {
+    "name": "Ethyleneglycol",
+    "display_name": "Ethyleneglycol",
+    "interpret_chemically": false,
+    "smiles": "C(CO)O",
+    "aliases": [
+      "Ethane-1,2-diol",
+      "ETHYLENE GLYCOL",
+      "107-21-1",
+      "1,2-ethanediol",
+      "glycol"
+    ]
+  },
+  {
+    "name": "platinum",
+    "display_name": "Pt",
+    "interpret_chemically": false,
+    "smiles": "[Pt]",
+    "aliases": [
+      "7440-06-4",
+      "Platinum Black",
+      "Platinum sponge",
+      "Platin"
+    ]
+  },
+  {
+    "name": "ascorbic acid",
+    "display_name": "ascorbic acid",
+    "interpret_chemically": false,
+    "smiles": "C([C@@H]([C@@H]1C(=C(C(=O)O1)O)O)O)O",
+    "aliases": [
+      "Vitamin C",
+      "l-ascorbic acid",
+      "50-81-7",
+      "L(+)-Ascorbic acid"
+    ]
+  },
+  {
+    "name": "tetrabutylammonium chloride",
+    "display_name": "TBAC",
+    "interpret_chemically": false,
+    "smiles": "CCCC[N+](CCCC)(CCCC)CCCC.[Cl-]",
+    "aliases": [
+      "1112-67-0",
+      "Tetra-N-butylammonium chloride",
+      "1-Butanaminium, N,N,N-tributyl-, chloride",
+      "DDT9H3MSD3"
+    ]
+  },
+  {
+    "name": "benzonitrile",
+    "display_name": "PhCN",
+    "interpret_chemically": true,
+    "smiles": "C1=CC=C(C=C1)C#N",
+    "aliases": [
+      "100-47-0",
+      "Phenyl cyanide",
+      "Cyanobenzene",
+      "Benzenenitrile"
+    ]
+  },
+  {
+    "name": "Platinum on carbon",
+    "display_name": "Pt/C",
+    "interpret_chemically": false,
+    "smiles": "[Pt]",
+    "aliases": [
+      "PLATINUM",
+      "7440-06-4",
+      "Platinum Black",
+      "Platinum sponge",
+      "Platin"
+    ]
+  },
+  {
+    "name": "sodium tetraborate decahydrate",
+    "display_name": "Na2B4O7.10H2O",
+    "interpret_chemically": true,
+    "smiles": "B1(OB2OB(OB(O1)O2)[O-])[O-].O.O.O.O.O.O.O.O.O.O.[Na+].[Na+]",
+    "aliases": [
+      "1303-96-4",
+      "BORAX",
+      "Borax (B4Na2O7.10H2O)",
+      "Sodium borate decahydrate",
+      "Sodium pyroborate decahydrate"
+    ]
+  },
+  {
+    "name": "Formic acid",
+    "display_name": "HCO2H",
+    "interpret_chemically": false,
+    "smiles": "C(=O)O",
+    "aliases": [
+      "methanoic acid",
+      "64-18-6",
+      "Formylic acid",
+      "Aminic acid"
+    ]
+  },
+  {
+    "name": "tributylmethylammonium methyl sulfate",
+    "display_name": "MTBS",
+    "interpret_chemically": false,
+    "smiles": "CCCC[N+](C)(CCCC)CCCC.COS(=O)(=O)[O-]",
+    "aliases": [
+      "13106-24-6",
+      "T895DNZ4FX",
+      "1-Butanaminium, N,N-dibutyl-N-methyl-, methyl sulfate",
+      "N,N-Dibutyl-N-methylbutan-1-aminium methyl sulfate"
+    ]
+  },
+  {
+    "name": "Cesium carbonate",
+    "display_name": "CsCO3",
+    "interpret_chemically": true,
+    "smiles": "C(=O)([O-])[O-].[Cs+].[Cs+]",
+    "aliases": [
+      "534-17-8",
+      "Dicesium carbonate",
+      "QQI20A14P4",
+      "208-591-9"
+    ]
+  },
+  {
+    "name": "propan-1-ol",
+    "display_name": "n-PrOH",
+    "interpret_chemically": true,
+    "smiles": "CCCO",
+    "aliases": [
+      "1-propanol",
+      "propanol",
+      "n-propyl alcohol",
+      "Propyl alcohol",
+      "n-propanol"
+    ]
+  },
+  {
+    "name": "tartaric acid",
+    "display_name": "L-(+)-Tartaric acid",
+    "interpret_chemically": false,
+    "smiles": "[C@@H]([C@H](C(=O)O)O)(C(=O)O)O",
+    "aliases": [
+      "L-Threaric acid",
+      "(2R,3R)-(+)-Tartaric acid",
+      "L-tartaric acid",
+      "87-69-4",
+      "(2R,3R)-2,3-dihydroxysuccinic acid"
+    ]
+  }
+]

@@ -38,6 +38,7 @@ from ..operations.component_salt_operations import (
 )
 from ..operations.counterion_operations import (
     add_counterion_alias,
+    counterion_alias_counts,
     create_counterion,
     delete_counterion,
     list_counterions,
@@ -64,6 +65,7 @@ from ..operations.material_operations import (
     get_material_by_id,
     get_material_by_search,
     list_materials,
+    material_alias_counts,
     update_material,
 )
 from ..operations.ncrm_library_operations import (
@@ -72,6 +74,7 @@ from ..operations.ncrm_library_operations import (
     delete_ncrm_library_entry,
     get_ncrm_by_display_name,
     list_ncrm_library,
+    ncrm_alias_counts,
     update_ncrm_library_entry,
 )
 from ..operations.project_operations import (
@@ -113,7 +116,7 @@ from ..repl.renderers.component_renderer import (
     gather_component_sections,
     render_component_screen,
 )
-from ..repl.renderers.library_renderer import render_library_screen
+from ..repl.renderers.library_renderer import library_targets, render_library_screen
 from ..repl.renderers.project_renderer import render_project_screen
 from ..repl.renderers.risk_renderer import render_risk_table
 from ..repl.renderers.route_renderer import render_route_screen
@@ -763,6 +766,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._activate_stage_row(item.item_id)
         if self.ctx.current.track == "component_focus":
             return await self._activate_component_row(item.item_id)
+        if self.ctx.current.track == "library":
+            return await self._activate_library_row(item.item_id)
         return await self.render_current()
 
     async def _activate_component_row(self, item_id: str) -> list[str]:
@@ -1275,17 +1280,35 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         sub_mode = self.ctx.current.library_sub or "select"
         if key == CTRL_A:
             return self._start_library_add_prompt(sub_mode)
-        if key == CTRL_E:
-            return await self._start_library_edit_picker(sub_mode)
-        if key == CTRL_X:
-            return await self._start_library_delete_picker(sub_mode)
-        if key == CTRL_O:
-            return await self._start_library_show_picker(sub_mode)
         if key == CTRL_F:
             return self._start_library_filter_chooser(sub_mode)
         if key == CTRL_L:
             return await self._render_library(sub_mode)
+        if key in {CTRL_E, CTRL_X, CTRL_O}:
+            return await self._library_selection_action(sub_mode, key)
         return None
+
+    async def _library_selection_action(self, sub_mode: str, key: str) -> list[str]:
+        """Run edit/delete/show against the caret-selected library row.
+
+        Edit (``^E``), delete (``^X``) and show (``^O``) all act on the row the
+        navigator currently highlights, so no chooser is needed.
+        """
+        selected = self.list_navigator.selected if self.list_navigator else None
+        if selected is None:
+            return await self._refresh_with_notice("No item selected.", "warning")
+        item = await self._find_library_item_by_id(sub_mode, selected.item_id)
+        if item is None:
+            return await self._refresh_with_notice("Item not found.", "error")
+        if key == CTRL_E:
+            return self._library_edit_form(sub_mode, item)
+        if key == CTRL_X:
+            label = str(item.get("name") or item.get("display_name") or "item")
+            return self._start_confirm(
+                f"Delete '{label}'",
+                lambda: self._delete_library_entry(sub_mode, item),
+            )
+        return self._show_library_entry(sub_mode, item)
 
     async def _hotkey_admin(self, key: str) -> list[str] | None:
         if key == CTRL_A:
@@ -1868,46 +1891,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             lambda **payload: self._handle_stage_list(stage, payload["list"]),
         )
 
-    async def _library_item_picker_items(self, sub_mode: str) -> list[ListItem]:
-        names = [
-            str(item.get("name") or item.get("display_name") or "")
-            for item in await self._library_items(sub_mode)
-        ]
-        return [ListItem(label=name, item_id=name) for name in names if name]
-
-    async def _start_library_edit_picker(self, sub_mode: str) -> list[str]:
-        items = await self._library_item_picker_items(sub_mode)
-        if not items:
-            return [f"No {sub_mode} items to edit."]
-        return self.start_picker(
-            f"Edit {sub_mode} item",
-            items,
-            lambda item: self._start_library_edit_prompt(sub_mode, item.item_id),
-        )
-
-    async def _start_library_delete_picker(self, sub_mode: str) -> list[str]:
-        items = await self._library_item_picker_items(sub_mode)
-        if not items:
-            return [f"No {sub_mode} items to delete."]
-        return self.start_picker(
-            f"Delete {sub_mode} item",
-            items,
-            lambda item: self._start_confirm(
-                f"Delete '{item.item_id}'",
-                lambda: self._delete_library_item(sub_mode, item.item_id),
-            ),
-        )
-
-    async def _start_library_show_picker(self, sub_mode: str) -> list[str]:
-        items = await self._library_item_picker_items(sub_mode)
-        if not items:
-            return [f"No {sub_mode} items to show."]
-        return self.start_picker(
-            f"Show {sub_mode} item",
-            items,
-            lambda item: self._show_library_item(sub_mode, item.item_id),
-        )
-
     def _start_library_filter_chooser(self, sub_mode: str) -> list[str]:
         return self.start_prompt(
             [
@@ -2205,7 +2188,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             items = [item for item in items if item.get("smiles")]
         if filter_mode == "no-smiles":
             items = [item for item in items if not item.get("smiles")]
-        return await render_library_screen(sub_mode, items)
+        navigator = self._rebuild_list_navigator([], library_targets(items))
+        selected_id = navigator.selected.item_id if navigator.selected is not None else None
+        return await render_library_screen(sub_mode, items, selected_id=selected_id)
 
     async def _render_risk_mode(  # pylint: disable=too-many-return-statements  # one return per risk scope
         self,
@@ -2521,8 +2506,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         lowered = name.lower()
         for item in items:
             if _library_item_matches(item, lowered):
-                return [f"{sub_mode} item", "", *[f"{key}: {value}" for key, value in item.items()]]
+                return self._show_library_entry(sub_mode, item)
         return [f"No {sub_mode} item matched '{name}'."]
+
+    @staticmethod
+    def _show_library_entry(sub_mode: str, item: dict[str, Any]) -> list[str]:
+        """Return the field dump for an already-resolved library *item*."""
+        return [f"{sub_mode} item", "", *[f"{key}: {value}" for key, value in item.items()]]
 
     def _start_library_add_prompt(self, sub_mode: str) -> list[str]:
         # Each add flow is a three-step chain: collect the lead name, offer to
@@ -2697,6 +2687,22 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         item = await self._find_library_item(sub_mode, name)
         if item is None:
             return [f"No {sub_mode} item matched '{name}'."]
+        return self._library_edit_form(sub_mode, item)
+
+    async def _activate_library_row(self, item_id: str) -> list[str]:
+        """Open the inline edit form for the caret-selected library row.
+
+        The library screen's navigator carries the entry id; Enter (and ``^E``)
+        edit the highlighted row directly rather than via a chooser.
+        """
+        sub_mode = self.ctx.current.library_sub or "select"
+        item = await self._find_library_item_by_id(sub_mode, item_id)
+        if item is None:
+            return await self._refresh_with_notice("Item not found.", "error")
+        return self._library_edit_form(sub_mode, item)
+
+    def _library_edit_form(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
+        """Start the edit form for an already-resolved library *item*."""
         if sub_mode == "materials":
             return self.start_prompt(
                 [
@@ -2749,6 +2755,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         item = await self._find_library_item(sub_mode, name)
         if item is None:
             return [f"No {sub_mode} item matched '{name}'."]
+        return await self._delete_library_entry(sub_mode, item)
+
+    async def _delete_library_entry(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
+        """Delete an already-resolved library *item* and refresh the screen."""
         item_uuid = UUID(str(item["id"]))
         if sub_mode == "materials":
             success = await delete_material(item_uuid, self.env)
@@ -3880,45 +3890,49 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return None
 
     async def _library_items(self, sub_mode: str) -> list[dict[str, Any]]:
+        """Return library rows as dicts, alphabetised by name with alias counts.
+
+        Each dict carries ``id``, ``name``, ``display_name``,
+        ``interpret_chemically``, ``smiles`` and ``alias_count``. Rows are sorted
+        case-insensitively by name so the rendered table reads alphabetically.
+        """
+        entities: list[Any]
+        counts: dict[str, int]
         if sub_mode == "materials":
-            return [
-                {
-                    "id": item.id,
-                    "name": item.name,
-                    "display_name": item.display_name,
-                    "interpret_chemically": item.interpret_chemically,
-                    "smiles": item.smiles,
-                }
-                for item in await list_materials(self.env)
-            ]
-        if sub_mode == "ncrm":
-            return [
-                {
-                    "id": item.id,
-                    "display_name": item.display_name,
-                    "name": item.name,
-                    "interpret_chemically": item.interpret_chemically,
-                    "smiles": item.smiles,
-                }
-                for item in await list_ncrm_library(self.env)
-            ]
-        if sub_mode == "counterions":
-            return [
-                {
-                    "id": item.id,
-                    "name": item.name,
-                    "display_name": item.display_name,
-                    "interpret_chemically": item.interpret_chemically,
-                    "smiles": item.smiles,
-                }
-                for item in await list_counterions(self.env)
-            ]
-        return []
+            entities = await list_materials(self.env)
+            counts = await material_alias_counts(self.env)
+        elif sub_mode == "ncrm":
+            entities = await list_ncrm_library(self.env)
+            counts = await ncrm_alias_counts(self.env)
+        elif sub_mode == "counterions":
+            entities = await list_counterions(self.env)
+            counts = await counterion_alias_counts(self.env)
+        else:
+            return []
+        items = [
+            {
+                "id": entity.id,
+                "name": entity.name,
+                "display_name": entity.display_name,
+                "interpret_chemically": entity.interpret_chemically,
+                "smiles": entity.smiles,
+                "alias_count": counts.get(str(entity.id), 0),
+            }
+            for entity in entities
+        ]
+        items.sort(key=lambda item: str(item["name"]).casefold())
+        return items
 
     async def _find_library_item(self, sub_mode: str, name: str) -> dict[str, Any] | None:
         lowered = name.lower()
         for item in await self._library_items(sub_mode):
             if _library_item_matches(item, lowered):
+                return item
+        return None
+
+    async def _find_library_item_by_id(self, sub_mode: str, item_id: str) -> dict[str, Any] | None:
+        for item in await self._library_items(sub_mode):
+            if str(item.get("id")) == item_id:
                 return item
         return None
 
@@ -4151,7 +4165,16 @@ HELP_TOPICS: dict[str, list[str]] = {
         "^R risks",
         "^C back",
     ],
-    "library": ["^A add", "^E edit", "^X delete", "^O show", "^F filter", "/ search", "^C back"],
+    "library": [
+        "↑↓ navigate",
+        "↵ edit",
+        "^A add",
+        "^X delete",
+        "^O show",
+        "^F filter",
+        "/ search",
+        "^C back",
+    ],
     "admin": ["^A action", "^C back"],
     "risk_mode": ["^A add", "^E edit", "^L refresh", "^C back"],
 }

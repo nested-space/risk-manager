@@ -6,6 +6,7 @@ All functions are ``async def`` and open their own database sessions via
 ``print_error`` and return ``None`` / ``[]`` / ``False``.
 """
 
+from collections import Counter
 from uuid import UUID
 
 from ..config.settings import Environment
@@ -127,6 +128,29 @@ async def list_counterions(
     except Exception as exc:  # pylint: disable=broad-except
         print_error(f"Failed to list counterions: {exc}")
         return []
+
+
+async def counterion_alias_counts(
+    env: Environment = Environment.DEV,
+    verbose: bool = False,
+) -> dict[str, int]:
+    """Return a mapping of counterion id to its alias count.
+
+    Args:
+        env: Database environment.
+        verbose: If ``True``, prints the database path.
+
+    Returns:
+        A ``dict`` keyed by counterion id string; counterions with no aliases
+        are absent. Empty ``dict`` on error.
+    """
+    try:
+        async with get_db_session(env, verbose) as session:
+            aliases = await CounterionAlias.get_all(session)
+            return dict(Counter(str(alias.counterion_id) for alias in aliases))
+    except Exception as exc:  # pylint: disable=broad-except
+        print_error(f"Failed to count counterion aliases: {exc}")
+        return {}
 
 
 async def update_counterion(
