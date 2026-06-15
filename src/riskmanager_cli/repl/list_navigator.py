@@ -52,6 +52,20 @@ class ListNavigator:
             return
         self._selected_index = (self._selected_index + 1) % len(self._items)
 
+    def move(self, delta: int) -> None:
+        """Move the cursor by *delta* items, clamped to the list ends.
+
+        Unlike :meth:`move_up`/:meth:`move_down`, this does not wrap: it is used
+        for paging (PgUp/PgDn), where overshooting should land on the first or
+        last item rather than jumping to the opposite end. No-op on an empty list.
+
+        Args:
+            delta: Signed number of items to move; positive moves downward.
+        """
+        if not self._items:
+            return
+        self._selected_index = max(0, min(self._selected_index + delta, len(self._items) - 1))
+
     @property
     def selected(self) -> ListItem | None:
         """Return the currently selected item, if any."""

@@ -210,6 +210,33 @@ async def material_alias_counts(
         return {}
 
 
+async def list_material_aliases(
+    material_id: UUID,
+    env: Environment = Environment.DEV,
+    verbose: bool = False,
+) -> list[str]:
+    """Return the aliases of a single material, sorted case-insensitively.
+
+    Args:
+        material_id: UUID of the material whose aliases to list.
+        env: Database environment.
+        verbose: If ``True``, prints the database path.
+
+    Returns:
+        The alias strings in case-insensitive order; empty on error or when the
+        material has none.
+    """
+    try:
+        async with get_db_session(env, verbose) as session:
+            aliases = await MaterialAlias.get_where(
+                session, MaterialAlias.material_id == str(material_id)
+            )
+            return sorted((alias.alias for alias in aliases), key=str.casefold)
+    except Exception as exc:  # pylint: disable=broad-except
+        print_error(f"Failed to list material aliases: {exc}")
+        return []
+
+
 async def update_material(
     material_id: UUID,
     data: MaterialUpdate,

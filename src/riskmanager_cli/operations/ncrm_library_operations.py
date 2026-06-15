@@ -150,6 +150,33 @@ async def ncrm_alias_counts(
         return {}
 
 
+async def list_ncrm_aliases(
+    ncrm_library_id: UUID,
+    env: Environment = Environment.DEV,
+    verbose: bool = False,
+) -> list[str]:
+    """Return the aliases of a single NCRM library entry, sorted case-insensitively.
+
+    Args:
+        ncrm_library_id: UUID of the NCRM entry whose aliases to list.
+        env: Database environment.
+        verbose: If ``True``, prints the database path.
+
+    Returns:
+        The alias strings in case-insensitive order; empty on error or when the
+        entry has none.
+    """
+    try:
+        async with get_db_session(env, verbose) as session:
+            aliases = await NcrmLibraryAlias.get_where(
+                session, NcrmLibraryAlias.ncrm_library_id == str(ncrm_library_id)
+            )
+            return sorted((alias.alias for alias in aliases), key=str.casefold)
+    except Exception as exc:  # pylint: disable=broad-except
+        print_error(f"Failed to list NCRM aliases: {exc}")
+        return []
+
+
 async def update_ncrm_library_entry(
     ncrm_id: UUID,
     data: NcrmLibraryUpdate,

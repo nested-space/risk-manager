@@ -41,6 +41,7 @@ from ..operations.counterion_operations import (
     counterion_alias_counts,
     create_counterion,
     delete_counterion,
+    list_counterion_aliases,
     list_counterions,
     update_counterion,
 )
@@ -64,6 +65,7 @@ from ..operations.material_operations import (
     delete_material,
     get_material_by_id,
     get_material_by_search,
+    list_material_aliases,
     list_materials,
     material_alias_counts,
     update_material,
@@ -73,6 +75,7 @@ from ..operations.ncrm_library_operations import (
     create_ncrm_library_entry,
     delete_ncrm_library_entry,
     get_ncrm_by_display_name,
+    list_ncrm_aliases,
     list_ncrm_library,
     ncrm_alias_counts,
     update_ncrm_library_entry,
@@ -116,7 +119,11 @@ from ..repl.renderers.component_renderer import (
     gather_component_sections,
     render_component_screen,
 )
-from ..repl.renderers.library_renderer import library_targets, render_library_screen
+from ..repl.renderers.library_renderer import (
+    library_targets,
+    render_library_detail,
+    render_library_screen,
+)
 from ..repl.renderers.project_renderer import render_project_screen
 from ..repl.renderers.risk_renderer import render_risk_table
 from ..repl.renderers.route_renderer import render_route_screen
@@ -850,6 +857,11 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._render_component_focus()
         if track == "library":
             return await self._render_library(self.ctx.current.library_sub or "select")
+        if track == "library_detail":
+            return await self._render_library_detail(
+                self.ctx.current.library_sub or "select",
+                self.ctx.current.library_detail_id or "",
+            )
         if track == "admin":
             return render_admin_screen()
         if track == "risk_mode":
@@ -1175,6 +1187,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             "stage_focus": self._hotkey_stage_focus,
             "component_focus": self._hotkey_component_focus,
             "library": self._hotkey_library,
+            "library_detail": self._hotkey_library_detail,
             "admin": self._hotkey_admin,
             "risk_mode": self._hotkey_risk_mode,
         }.get(track)
@@ -1284,15 +1297,31 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self._start_library_filter_chooser(sub_mode)
         if key == CTRL_L:
             return await self._render_library(sub_mode)
-        if key in {CTRL_E, CTRL_X, CTRL_O}:
+        if key in {CTRL_E, CTRL_X}:
             return await self._library_selection_action(sub_mode, key)
         return None
 
-    async def _library_selection_action(self, sub_mode: str, key: str) -> list[str]:
-        """Run edit/delete/show against the caret-selected library row.
+    async def _hotkey_library_detail(self, key: str) -> list[str] | None:
+        """Handle hotkeys on the library detail (show) screen.
 
-        Edit (``^E``), delete (``^X``) and show (``^O``) all act on the row the
-        navigator currently highlights, so no chooser is needed.
+        Only ``^E`` is active: it opens the inline edit form for the shown entry;
+        ``^C`` (back to the list) is handled generically by the REPL loop.
+        """
+        if key != CTRL_E:
+            return None
+        sub_mode = self.ctx.current.library_sub or "select"
+        item_id = self.ctx.current.library_detail_id or ""
+        item = await self._find_library_item_by_id(sub_mode, item_id)
+        if item is None:
+            return await self._refresh_with_notice("Item not found.", "error")
+        return self._library_edit_form(sub_mode, item)
+
+    async def _library_selection_action(self, sub_mode: str, key: str) -> list[str]:
+        """Run edit/delete against the caret-selected library row.
+
+        Edit (``^E``) and delete (``^X``) act on the row the navigator currently
+        highlights, so no chooser is needed. (Enter opens the detail/show screen
+        via :meth:`_activate_library_row`.)
         """
         selected = self.list_navigator.selected if self.list_navigator else None
         if selected is None:
@@ -1302,13 +1331,11 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._refresh_with_notice("Item not found.", "error")
         if key == CTRL_E:
             return self._library_edit_form(sub_mode, item)
-        if key == CTRL_X:
-            label = str(item.get("name") or item.get("display_name") or "item")
-            return self._start_confirm(
-                f"Delete '{label}'",
-                lambda: self._delete_library_entry(sub_mode, item),
-            )
-        return self._show_library_entry(sub_mode, item)
+        label = str(item.get("name") or item.get("display_name") or "item")
+        return self._start_confirm(
+            f"Delete '{label}'",
+            lambda: self._delete_library_entry(sub_mode, item),
+        )
 
     async def _hotkey_admin(self, key: str) -> list[str] | None:
         if key == CTRL_A:
@@ -2514,13 +2541,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         lowered = name.lower()
         for item in items:
             if _library_item_matches(item, lowered):
-                return self._show_library_entry(sub_mode, item)
+                return await self._show_library_entry(sub_mode, item)
         return [f"No {sub_mode} item matched '{name}'."]
 
-    @staticmethod
-    def _show_library_entry(sub_mode: str, item: dict[str, Any]) -> list[str]:
-        """Return the field dump for an already-resolved library *item*."""
-        return [f"{sub_mode} item", "", *[f"{key}: {value}" for key, value in item.items()]]
+    async def _show_library_entry(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
+        """Return the sectioned detail page for an already-resolved library *item*."""
+        aliases = await self._library_item_aliases(sub_mode, str(item["id"]))
+        return render_library_detail(item, aliases, width=self.screen.width)
 
     def _start_library_add_prompt(self, sub_mode: str) -> list[str]:
         # Each add flow is a three-step chain: collect the lead name, offer to
@@ -2696,16 +2723,48 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return self._library_edit_form(sub_mode, item)
 
     async def _activate_library_row(self, item_id: str) -> list[str]:
-        """Open the inline edit form for the caret-selected library row.
+        """Open the detail (show) screen for the caret-selected library row.
 
-        The library screen's navigator carries the entry id; Enter (and ``^E``)
-        edit the highlighted row directly rather than via a chooser.
+        The library screen's navigator carries the entry id; Enter opens its
+        detail page on a new ``library_detail`` frame so ``^C`` returns to the
+        list. (``^E`` still edits the highlighted row directly.)
         """
         sub_mode = self.ctx.current.library_sub or "select"
         item = await self._find_library_item_by_id(sub_mode, item_id)
         if item is None:
             return await self._refresh_with_notice("Item not found.", "error")
-        return self._library_edit_form(sub_mode, item)
+        self.ctx.push(
+            ContextFrame(
+                track="library_detail",
+                library_sub=sub_mode,
+                library_detail_id=item_id,
+            )
+        )
+        return await self._render_library_detail(sub_mode, item_id)
+
+    async def _render_library_detail(self, sub_mode: str, item_id: str) -> list[str]:
+        """Render the detail (show) page for one library entry, with its aliases.
+
+        The detail page is not a list screen, so the navigator is cleared (arrow
+        keys scroll the page rather than walking a caret).
+        """
+        self._list_navigator = None
+        item = await self._find_library_item_by_id(sub_mode, item_id)
+        if item is None:
+            return await self._refresh_with_notice("Item not found.", "error")
+        aliases = await self._library_item_aliases(sub_mode, item_id)
+        return render_library_detail(item, aliases, width=self.screen.width)
+
+    async def _library_item_aliases(self, sub_mode: str, item_id: str) -> list[str]:
+        """Return the aliases of one library entry for its subsection."""
+        entry_id = UUID(item_id)
+        if sub_mode == "materials":
+            return await list_material_aliases(entry_id, self.env)
+        if sub_mode == "ncrm":
+            return await list_ncrm_aliases(entry_id, self.env)
+        if sub_mode == "counterions":
+            return await list_counterion_aliases(entry_id, self.env)
+        return []
 
     def _library_edit_form(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
         """Start the edit form for an already-resolved library *item*."""
@@ -4168,15 +4227,15 @@ HELP_TOPICS: dict[str, list[str]] = {
         "^C back",
     ],
     "library": [
-        "↑↓ navigate",
-        "↵ edit",
+        "↵ show",
+        "^E edit",
         "^A add",
         "^X delete",
-        "^O show",
         "^F filter",
         "/ search",
         "^C back",
     ],
+    "library_detail": ["^E edit", "^C back"],
     "admin": ["^A action", "^C back"],
     "risk_mode": ["^A add", "^E edit", "^L refresh", "^C back"],
 }

@@ -6,6 +6,7 @@ import pytest
 
 from riskmanager_cli.repl.renderers.library_renderer import (
     library_targets,
+    render_library_detail,
     render_library_screen,
 )
 
@@ -95,3 +96,33 @@ def test_library_targets_label_and_id() -> None:
     assert len(targets) == 1
     assert targets[0].item_id == "x"
     assert targets[0].label == "xylene"
+
+
+@pytest.mark.unit
+def test_render_library_detail_has_details_table_and_aliases() -> None:
+    """The detail page renders a Property/Value table and a bulleted alias list."""
+    lines = render_library_detail(_item(), ["propanone", "2-propanone"])
+    assert lines[0] == "acetone"
+    assert any("Property" in line and "Value" in line for line in lines)
+    assert any("Display name" in line for line in lines)
+    assert any("SMILES" in line for line in lines)
+    assert any("Aliases (2)" in line for line in lines)
+    assert any("• propanone" in line for line in lines)
+    assert any("• 2-propanone" in line for line in lines)
+
+
+@pytest.mark.unit
+def test_render_library_detail_no_aliases_shows_placeholder() -> None:
+    """An entry with no aliases renders the count zero and a placeholder."""
+    lines = render_library_detail(_item(), [])
+    assert any("Aliases (0)" in line for line in lines)
+    assert any("(no aliases)" in line for line in lines)
+
+
+@pytest.mark.unit
+def test_render_library_detail_chemically_renders_display_name() -> None:
+    """interpret_chemically display names are subscripted in the Details table."""
+    item = _item(name="sulfate", display_name="H2SO4", interpret_chemically=True)
+    lines = render_library_detail(item, [])
+    assert any("H₂SO₄" in line for line in lines)
+    assert not any("H2SO4" in line for line in lines)

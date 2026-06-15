@@ -293,6 +293,23 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
 
             # View-mode content scrolling, available on every screen.
             if _is_scroll_key(key_name, key_text):
+                is_page = key_name in {"KEY_PGUP", "KEY_PGDOWN"}
+                if is_page and _in_list_mode(ctx) and dispatcher.list_navigator is not None:
+                    # In a list, PgUp/PgDn move the selection by a screenful of
+                    # items (clamped to the ends) while holding the caret at its
+                    # current vertical position; the viewport follows it.
+                    selected_before = _selected_line_index(current_output_lines)
+                    caret_row = None if selected_before is None else selected_before - scroll_offset
+                    step = screen.output_height
+                    dispatcher.list_navigator.move(step if key_name == "KEY_PGDOWN" else -step)
+                    current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
+                    selected_after = _selected_line_index(current_output_lines)
+                    if selected_after is not None and caret_row is not None:
+                        scroll_offset = _follow_selection(
+                            current_output_lines, selected_after - caret_row, screen.output_height
+                        )
+                    redraw()
+                    continue
                 page = max(screen.output_height - 1, 1)  # keep one line of overlap
                 if key_name == "KEY_PGUP":
                     scroll_offset -= page

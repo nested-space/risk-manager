@@ -15,7 +15,7 @@ from typing import Any
 
 from ...utils.formula_parser import render_chemical_formula
 from ..list_navigator import ListItem
-from .tables import Column, render_table
+from .tables import Column, render_table, section_rule, section_width
 
 _BODY_INDENT = "  "
 _CARET = "> "
@@ -26,6 +26,8 @@ _COLUMNS = [
     Column("Aliases", align="right"),
     Column("SMILES"),
 ]
+
+_DETAIL_COLUMNS = [Column("Property"), Column("Value")]
 
 
 @dataclass
@@ -121,4 +123,49 @@ async def render_library_screen(
         item_id = rows[index - data_start].item_id if is_data else None
         gutter = _CARET if item_id is not None and item_id == selected_id else _BODY_INDENT
         lines.append(f"{gutter}{line}")
+    return lines
+
+
+def render_library_detail(
+    item: dict[str, Any],
+    aliases: list[str],
+    *,
+    width: int = 80,
+) -> list[str]:
+    """Return display lines for a single library entry's detail (show) page.
+
+    Drawn in the same sectioned style as the component- and stage-focus screens:
+    an entry title with an underline, a box-drawn ``Details`` table, and an
+    ``Aliases`` section rendered as a simple bulleted list.
+
+    Args:
+        item: The resolved library row dict (``id``/``name``/``display_name``/
+            ``interpret_chemically``/``smiles``/``alias_count``).
+        aliases: The entry's aliases, already in display order.
+        width: Terminal width; the table and section rules are sized to fit it.
+
+    Returns:
+        Renderable lines: the entry name and underline at column zero, then a
+        two-space-indented ``Details`` table and an ``Aliases`` list.
+    """
+    name = str(item.get("name") or item.get("display_name") or item.get("id") or "")
+    lines = [name, "─" * len(name)]
+
+    detail_rows = [
+        ["Name", name],
+        ["Display name", _display_cell(item)],
+        ["Interpret chemically", "yes" if item.get("interpret_chemically") else "no"],
+        ["SMILES", str(item.get("smiles") or "-")],
+    ]
+    lines += ["", section_rule("Details", section_width(width)), ""]
+    lines += [
+        f"{_BODY_INDENT}{line}"
+        for line in render_table(_DETAIL_COLUMNS, detail_rows, max_width=width - 4)
+    ]
+
+    lines += ["", section_rule(f"Aliases ({len(aliases)})", section_width(width)), ""]
+    if aliases:
+        lines += [f"{_BODY_INDENT}• {alias}" for alias in aliases]
+    else:
+        lines.append(f"{_BODY_INDENT}(no aliases)")
     return lines

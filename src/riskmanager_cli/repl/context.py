@@ -20,6 +20,8 @@ class ContextFrame:  # pylint: disable=too-many-instance-attributes  # navigatio
         component_id: Current component UUID.
         component_name: Current component display name.
         library_sub: Active library subsection.
+        library_detail_id: Id of the library entry shown on the detail (show)
+            screen; set only on the ``library_detail`` track.
         risk_scope: Scope label for risk mode.
     """
 
@@ -33,6 +35,7 @@ class ContextFrame:  # pylint: disable=too-many-instance-attributes  # navigatio
     component_id: str | None = None
     component_name: str | None = None
     library_sub: str | None = None
+    library_detail_id: str | None = None
     risk_scope: str | None = None
 
 
@@ -106,6 +109,8 @@ class ContextManager:
                 )
             case "library":
                 label = f"[ Library: {library_sub} ]"
+            case "library_detail":
+                label = f"[ Library: {library_sub} ]  ›  [ Detail ]"
             case "admin":
                 label = "[ Admin ]"
             case _:

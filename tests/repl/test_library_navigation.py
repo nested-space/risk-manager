@@ -16,7 +16,7 @@ from riskmanager_cli.operations.counterion_operations import (
     create_counterion,
     list_counterions,
 )
-from riskmanager_cli.repl.commands import CTRL_E, CTRL_X, CommandDispatcher
+from riskmanager_cli.repl.commands import CTRL_E, CTRL_O, CTRL_X, CommandDispatcher
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
 from riskmanager_cli.repl.session_state import SessionState
 from riskmanager_cli.schema.create import CounterionAliasCreate, CounterionCreate
@@ -120,3 +120,66 @@ async def test_library_ctrl_e_without_items_notifies(temp_env: Environment) -> N
     await dispatcher.handle_hotkey(CTRL_E)
 
     assert dispatcher.take_notice() == ("No item selected.", "warning")
+
+
+@pytest.mark.integration
+async def test_library_enter_shows_detail_with_all_aliases(temp_env: Environment) -> None:
+    """Enter opens the detail screen on a library_detail frame, listing aliases."""
+    await _seed_counterions(temp_env)
+    dispatcher = _library_dispatcher(temp_env)
+    await dispatcher.render_current()
+
+    dispatcher.list_navigator.move_down()  # type: ignore[union-attr]  # chloride (has alias Cl-)
+    selected = dispatcher.list_navigator.selected  # type: ignore[union-attr]
+    lines = await dispatcher.activate_list_selection(selected)  # type: ignore[arg-type]
+
+    assert dispatcher.ctx.current.track == "library_detail"
+    assert dispatcher.ctx.current.library_detail_id == selected.item_id  # type: ignore[union-attr]
+    assert lines[0] == "chloride"
+    assert any("Aliases (1)" in line for line in lines)
+    assert any("• Cl-" in line for line in lines)
+    # The detail page is not a list screen, so the navigator is cleared.
+    assert dispatcher.list_navigator is None
+
+
+@pytest.mark.integration
+async def test_library_detail_back_returns_to_list_not_home(temp_env: Environment) -> None:
+    """Leaving the detail screen pops to the library list, not all the way home."""
+    await _seed_counterions(temp_env)
+    dispatcher = _library_dispatcher(temp_env)
+    await dispatcher.render_current()
+    selected = dispatcher.list_navigator.selected  # type: ignore[union-attr]
+    await dispatcher.activate_list_selection(selected)  # type: ignore[arg-type]
+
+    popped = dispatcher.ctx.pop()  # what ^C does in the loop
+
+    assert popped is not None
+    assert dispatcher.ctx.current.track == "library"
+    lines = await dispatcher.render_current()
+    assert any(line.startswith("> ") and "acetate" in line for line in lines)
+
+
+@pytest.mark.integration
+async def test_library_detail_ctrl_e_opens_edit_form(temp_env: Environment) -> None:
+    """^E on the detail screen opens the edit form for the shown entry."""
+    await _seed_counterions(temp_env)
+    dispatcher = _library_dispatcher(temp_env)
+    await dispatcher.render_current()
+    selected = dispatcher.list_navigator.selected  # type: ignore[union-attr]  # acetate
+    await dispatcher.activate_list_selection(selected)  # type: ignore[arg-type]
+
+    await dispatcher.handle_hotkey(CTRL_E)
+
+    assert dispatcher.prompt_state is not None
+    assert dispatcher.prompt_state.title == "Edit counterion"
+    assert dispatcher.prompt_state.fields[0].default == "acetate"
+
+
+@pytest.mark.integration
+async def test_library_ctrl_o_is_no_longer_bound(temp_env: Environment) -> None:
+    """^O does nothing on the library list (Enter now owns 'show')."""
+    await _seed_counterions(temp_env)
+    dispatcher = _library_dispatcher(temp_env)
+    await dispatcher.render_current()
+
+    assert await dispatcher.handle_hotkey(CTRL_O) is None
