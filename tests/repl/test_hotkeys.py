@@ -295,9 +295,7 @@ async def test_edit_form_prefills_text_then_blanks_select(temp_env: Environment)
     """
     project_id, _ = await _seed_route(temp_env)
     dispatcher = _make_dispatcher(temp_env)
-    dispatcher.ctx.push(
-        ContextFrame(track="project", project_id=project_id, project_name="Alpha")
-    )
+    dispatcher.ctx.push(ContextFrame(track="project", project_id=project_id, project_name="Alpha"))
 
     await dispatcher.handle_hotkey(CTRL_E)
     assert dispatcher.prompt_state is not None

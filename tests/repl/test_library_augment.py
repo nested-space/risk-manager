@@ -49,7 +49,10 @@ class _StubScreen:
 def _make_dispatcher(env: Environment) -> CommandDispatcher:
     """Build a dispatcher wired to a fresh context, session and stub screen."""
     return CommandDispatcher(
-        ContextManager(), SessionState(), _StubScreen(), env  # type: ignore[arg-type]
+        ContextManager(),
+        SessionState(),
+        _StubScreen(),
+        env,  # type: ignore[arg-type]
     )
 
 

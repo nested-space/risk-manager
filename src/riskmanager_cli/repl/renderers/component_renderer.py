@@ -129,9 +129,7 @@ def render_component_screen(
     body: list[tuple[str, str | None]] = []
     body += _section_body("Details", _DETAIL_COLUMNS, sections.details, body_width, "(none)")
     body += _section_body("Salts", _SALT_COLUMNS, sections.salts, body_width, "(no salts)")
-    body += _section_body(
-        "Risks", _RISK_COLUMNS, sections.risks, body_width, "(no risks recorded)"
-    )
+    body += _section_body("Risks", _RISK_COLUMNS, sections.risks, body_width, "(no risks recorded)")
 
     for text, item_id in body:
         if not text:

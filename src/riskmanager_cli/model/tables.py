@@ -148,9 +148,7 @@ class Material(SQLModel, CRUDMixin, table=True):
     )
     name: str = Field(sa_column=Column(Text, nullable=False, unique=True))
     display_name: str = Field(sa_column=Column(Text, nullable=False))
-    interpret_chemically: bool = Field(
-        sa_column=Column(Boolean, nullable=False, default=False)
-    )
+    interpret_chemically: bool = Field(sa_column=Column(Boolean, nullable=False, default=False))
     smiles: str | None = Field(default=None, sa_column=Column(Text, unique=True))
     created_at: datetime | None = Field(
         default_factory=_now,
@@ -459,9 +457,7 @@ class Counterion(SQLModel, CRUDMixin, table=True):
     )
     name: str = Field(sa_column=Column(Text, nullable=False, unique=True))
     display_name: str = Field(sa_column=Column(Text, nullable=False))
-    interpret_chemically: bool = Field(
-        sa_column=Column(Boolean, nullable=False, default=False)
-    )
+    interpret_chemically: bool = Field(sa_column=Column(Boolean, nullable=False, default=False))
     smiles: str | None = Field(default=None, sa_column=Column(Text, unique=True))
     created_at: datetime | None = Field(
         default_factory=_now,

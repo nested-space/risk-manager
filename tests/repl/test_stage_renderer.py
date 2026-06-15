@@ -54,9 +54,7 @@ async def _new_component(env: Environment, process_id: str, name: str) -> str:
 
 async def _seed_links(env: Environment, process_id: str, stage_id: str) -> None:
     """Link two reactants, one product, and one NCRM to *stage_id*."""
-    components = {
-        name: await _new_component(env, process_id, name) for name in ("A", "B", "C")
-    }
+    components = {name: await _new_component(env, process_id, name) for name in ("A", "B", "C")}
     for name, role in [
         ("C", "product"),  # added first to prove reactants sort ahead
         ("A", "reactant"),
@@ -77,9 +75,7 @@ async def _seed_links(env: Environment, process_id: str, stage_id: str) -> None:
     )
     assert ncrm is not None
     ncrm_link = await create_stage_ncrm(
-        StageNcrmCreate(
-            ncrm_id=UUID(str(ncrm.id)), stage_id=UUID(stage_id), role=NcrmRole.SOLVENT
-        ),
+        StageNcrmCreate(ncrm_id=UUID(str(ncrm.id)), stage_id=UUID(stage_id), role=NcrmRole.SOLVENT),
         env=env,
     )
     assert ncrm_link is not None

@@ -157,8 +157,10 @@ class ScreenManager:
             notice: Pre-styled status notice, right-aligned on the same row.
         """
         row = max(self._term.height - 2, 0)
-        out = self._term.move_xy(0, row) + self._term.clear_eol + self._with_notice(
-            f"{prompt}{text}", notice
+        out = (
+            self._term.move_xy(0, row)
+            + self._term.clear_eol
+            + self._with_notice(f"{prompt}{text}", notice)
         )
         sys.stdout.write(out)
         sys.stdout.flush()

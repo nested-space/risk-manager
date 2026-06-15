@@ -108,9 +108,7 @@ def render_stage_screen(
         "Components", _COMPONENT_COLUMNS, sections.components, body_width, "(none)"
     )
     body += _section_body("NCRMs", _NCRM_COLUMNS, sections.ncrms, body_width, "(none)")
-    body += _section_body(
-        "Risks", _RISK_COLUMNS, sections.risks, body_width, "(no risks recorded)"
-    )
+    body += _section_body("Risks", _RISK_COLUMNS, sections.risks, body_width, "(no risks recorded)")
 
     for text, item_id in body:
         if not text:

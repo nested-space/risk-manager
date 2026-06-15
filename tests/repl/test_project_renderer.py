@@ -104,9 +104,7 @@ async def test_render_project_screen_places_routes_under_the_routes_rule(
     """Pre-rendered route lines appear (indented) beneath the Routes rule."""
     project = await _seed_project(temp_env, with_risk=False)
 
-    lines = await render_project_screen(
-        project, temp_env, route_lines=["▶ Route 1 Process 1"]
-    )
+    lines = await render_project_screen(project, temp_env, route_lines=["▶ Route 1 Process 1"])
 
     routes_index = next(i for i, line in enumerate(lines) if "─ Routes " in line)
     route_line = next(line for line in lines[routes_index:] if "Route 1 Process 1" in line)

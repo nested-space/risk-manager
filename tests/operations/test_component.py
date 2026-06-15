@@ -116,9 +116,7 @@ async def test_list_components_for_process_returns_items(temp_env: Environment) 
         ("A", [(2, "B"), (0.5, "C")], "A·2B·0.5C"),
     ],
 )
-def test_format_salt_form(
-    base: str, salts: list[tuple[float | None, str]], expected: str
-) -> None:
+def test_format_salt_form(base: str, salts: list[tuple[float | None, str]], expected: str) -> None:
     """Salt-form names chain salts and omit a stoichiometry of 1 or None."""
     assert format_salt_form(base, salts) == expected
 

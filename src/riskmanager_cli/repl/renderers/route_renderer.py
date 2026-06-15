@@ -131,9 +131,7 @@ async def _diagram_lines(
     return ["(no stages defined yet)"]
 
 
-def _stage_list_lines(
-    stages: list[StageInput], components: list[ComponentInput]
-) -> list[str]:
+def _stage_list_lines(stages: list[StageInput], components: list[ComponentInput]) -> list[str]:
     """Render the stages as a table of #, name, starting materials, and products.
 
     Used when the component graph can't be laid out as a single DAG (still being

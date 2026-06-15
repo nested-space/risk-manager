@@ -262,9 +262,7 @@ def test_render_lines_styles_and_aligns_subtitles() -> None:
             ListItem(label="A (Intermediate)", subtitle="unassigned", item_id="2"),
         ],
     )
-    lines = navigator.render_lines(
-        80, show_sections=False, subtitle_style=lambda text: f"<{text}>"
-    )
+    lines = navigator.render_lines(80, show_sections=False, subtitle_style=lambda text: f"<{text}>")
 
     assert lines[0].startswith("▶ A (RSM)")
     assert lines[0].endswith("<Stage 1 reactant>")
@@ -276,9 +274,7 @@ def test_render_lines_styles_and_aligns_subtitles() -> None:
 @pytest.mark.unit
 def test_render_lines_without_styler_appends_plain_subtitle() -> None:
     """The legacy path leaves subtitles unstyled and space-appended."""
-    navigator = ListNavigator(
-        [], [ListItem(label="Acme", subtitle="(recent)", item_id="1")]
-    )
+    navigator = ListNavigator([], [ListItem(label="Acme", subtitle="(recent)", item_id="1")])
 
     lines = navigator.render_lines(80, show_sections=False)
 

@@ -1373,9 +1373,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             if process is None:
                 return ["Route not found."]
             process_risks = await list_risks_for_process(UUID(str(process.id)), self.env)
-            return self._start_risk_edit_picker(
-                process_risks, self._start_process_risk_edit_form
-            )
+            return self._start_risk_edit_picker(process_risks, self._start_process_risk_edit_form)
         if scope == "stage":
             stage = await self._current_stage()
             if stage is None:
@@ -2676,9 +2674,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     default="false",
                 ),
             ],
-            lambda **payload: handler(
-                name, {**payload, "smiles": result.smiles}, result.aliases
-            ),
+            lambda **payload: handler(name, {**payload, "smiles": result.smiles}, result.aliases),
             title=self._LIBRARY_ADD_TITLES[sub_mode],
             info_section=info,
         )
@@ -3190,9 +3186,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._refresh_with_notice("Failed to create component risk.", "error")
         return await self._refresh_with_notice("Component risk created.")
 
-    async def _start_stage_component_link_picker(
-        self, process: ManufacturingProcess
-    ) -> list[str]:
+    async def _start_stage_component_link_picker(self, process: ManufacturingProcess) -> list[str]:
         """Begin the stage → component → type typeahead chain for a link.
 
         Args:
@@ -3261,9 +3255,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         entries = await list_ncrm_library(self.env)
         if not entries:
             return ["Add an NCRM first via /library ncrm."]
-        items = [
-            ListItem(label=entry.display_name, item_id=str(entry.id)) for entry in entries
-        ]
+        items = [ListItem(label=entry.display_name, item_id=str(entry.id)) for entry in entries]
         return self.start_picker(
             "Assign NCRM to stage",
             items,

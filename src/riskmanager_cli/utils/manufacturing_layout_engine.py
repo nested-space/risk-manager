@@ -18,9 +18,7 @@ RiskDict = dict[str, str | int | float | bool | None]
 
 
 # Risk level → uppercase display label, derived from the shared 1-5 scale.
-_LEVEL_LABELS: dict[int, str] = {
-    level: name.upper() for level, name in SEVERITY_BY_LEVEL.items()
-}
+_LEVEL_LABELS: dict[int, str] = {level: name.upper() for level, name in SEVERITY_BY_LEVEL.items()}
 
 
 def _risk_level(risk: RiskDict) -> int:

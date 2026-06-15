@@ -225,9 +225,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             if dispatcher.prompt_state is not None:
                 if dispatcher.prompt_state.is_select_field:
                     if _is_enter(key_name, key_text):
-                        set_output(
-                            _coerce_lines(run_async(dispatcher.submit_prompt_selection()))
-                        )
+                        set_output(_coerce_lines(run_async(dispatcher.submit_prompt_selection())))
                         input_buffer = ""
                         consume_notice()
                     elif key_name in {"KEY_UP", "KEY_DOWN"}:

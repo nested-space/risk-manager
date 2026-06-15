@@ -92,9 +92,7 @@ async def test_admin_import_ncrm_loads_aliases_and_boolean(
 
     assert "created=2" in result[0]
     async with get_db_session(temp_env) as session:
-        entries = await NcrmLibrary.get_where(
-            session, NcrmLibrary.display_name == "(COCl)2"
-        )
+        entries = await NcrmLibrary.get_where(session, NcrmLibrary.display_name == "(COCl)2")
         assert entries and entries[0].interpret_chemically is True
         aliases = await NcrmLibraryAlias.get_where(
             session, NcrmLibraryAlias.ncrm_library_id == entries[0].id
