@@ -8,11 +8,9 @@ sequences); callers that need styling should apply it after layout.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
 
+from .geometry import HAlign
 from .responsive import fit_widths, select_columns
-
-Align = Literal["left", "center", "right"]
 
 # Every screen sizes its section headings through ``section_width`` so they read
 # as one consistent length: a fixed column count, capped so it never dominates a
@@ -73,12 +71,12 @@ class Column:
     """
 
     header: str
-    align: Align = "left"
+    align: HAlign = "left"
     min_width: int = _DEFAULT_MIN_WIDTH
     priority: int | None = None
 
 
-def _align(text: str, width: int, align: Align) -> str:
+def _align(text: str, width: int, align: HAlign) -> str:
     if align == "right":
         return text.rjust(width)
     if align == "center":
@@ -148,15 +146,15 @@ def render_table(
     def border(left: str, mid: str, right: str) -> str:
         return left + mid.join("─" * (width + 2) for width in widths) + right
 
-    def body(cells: list[str], aligns: list[Align]) -> str:
+    def body(cells: list[str], aligns: list[HAlign]) -> str:
         padded = (
             f" {_align(_clip(cell, widths[index]), widths[index], aligns[index])} "
             for index, cell in enumerate(cells)
         )
         return "│" + "│".join(padded) + "│"
 
-    header_aligns: list[Align] = ["left"] * len(columns)
-    cell_aligns: list[Align] = [column.align for column in columns]
+    header_aligns: list[HAlign] = ["left"] * len(columns)
+    cell_aligns: list[HAlign] = [column.align for column in columns]
 
     lines = [
         border("┌", "┬", "┐"),

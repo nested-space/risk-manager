@@ -344,6 +344,7 @@ class _StubScreen:
     """Minimal screen stand-in exposing the styling hooks rendering touches."""
 
     width = 80
+    output_height = 40
 
     @staticmethod
     def dim(text: str) -> str:

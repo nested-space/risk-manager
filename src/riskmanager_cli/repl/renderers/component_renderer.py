@@ -3,7 +3,7 @@
 Renders a single component in the same style as the Stage Focus screen (see
 ``renderers/stage_renderer.py``): a component title followed by three sections —
 ``Details``, ``Salts``, and ``Risks`` — each a section-title rule above a
-box-drawn table (see ``renderers/tables.py``). The whole body is indented two
+box-drawn table (see ``renderers/layout/table.py``). The whole body is indented two
 columns so a ``>`` caret can occupy the left gutter.
 
 ``Details`` rows are display-only; ``Salts`` and ``Risks`` rows are selectable so
@@ -26,7 +26,7 @@ from ...operations.component_risks_operations import list_risks_for_component
 from ...operations.component_salt_operations import list_salts_for_component
 from ...operations.counterion_operations import get_counterion_by_id
 from ..list_navigator import ListItem
-from .tables import Column, render_table, section_rule, section_width
+from .layout import Column, render_table, section_rule, section_width
 
 _BODY_INDENT = "  "
 _CARET = "> "

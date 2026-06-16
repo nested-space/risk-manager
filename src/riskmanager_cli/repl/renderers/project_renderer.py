@@ -3,7 +3,7 @@
 Renders a project as a sectioned page in the same style as the Stage Focus
 screen (see ``renderers/stage_renderer.py``): a section-title rule above an
 indented body, built from the shared ``section_rule`` / ``render_table``
-primitives in ``renderers/tables.py``. The page has three sections — ``Project
+primitives in ``renderers/layout/table.py``. The page has three sections — ``Project
 Details`` and ``Risks`` as static box tables, and ``Routes`` as the navigable
 pick-list rendered by the caller.
 """
@@ -18,7 +18,7 @@ from ...model.tables import Project
 from ...operations.manufacturing_process_operations import list_processes_for_project
 from ...operations.manufacturing_process_risk_operations import list_risks_for_process
 from ...operations.material_operations import get_material_by_id
-from .tables import Column, render_table, section_rule, section_width
+from .layout import Column, render_table, section_rule, section_width
 
 _BODY_INDENT = "  "
 

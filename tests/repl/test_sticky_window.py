@@ -2,8 +2,7 @@
 
 import pytest
 
-from riskmanager_cli.repl.renderers.box import render_box
-from riskmanager_cli.repl.renderers.tables import Column, render_table
+from riskmanager_cli.repl.renderers.layout import Column, render_box, render_table
 from riskmanager_cli.repl.sticky_window import index_tables, pinned_window, reserved_top
 
 

@@ -2,7 +2,7 @@
 
 Frames a block of pre-rendered lines in a ``┌─┐ │ └─┘`` box that spans a given
 visible width, with configurable interior padding and block alignment. Unlike
-``tables.py`` (which assumes plain text), this widget is ANSI-aware: content
+``table.py`` (which assumes plain text), this widget is ANSI-aware: content
 lines may carry styling escape sequences (e.g. ``dim`` stage labels in the route
 diagram), so width is measured by *printable* length when centering and padding.
 
@@ -11,29 +11,18 @@ The box is screen-agnostic — any screen can frame content the same way.
 
 from __future__ import annotations
 
-import re
-
-from .tables import Align
-
-# Matches CSI/SGR escape sequences (e.g. those emitted by ``Terminal.dim``) so
-# alignment and padding count only printable columns.
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+from .geometry import HAlign, visible_len
 
 _TOP_LEFT, _TOP_RIGHT = "┌", "┐"
 _BOTTOM_LEFT, _BOTTOM_RIGHT = "└", "┘"
 _HORIZONTAL, _VERTICAL = "─", "│"
 
 
-def _visible_len(text: str) -> int:
-    """Return the printable column width of *text*, ignoring ANSI escapes."""
-    return len(_ANSI_RE.sub("", text))
-
-
 def render_box(
     content: list[str],
     width: int,
     *,
-    align: Align = "center",
+    align: HAlign = "center",
     pad_x: int = 2,
     pad_y: int = 1,
 ) -> list[str]:
@@ -48,7 +37,7 @@ def render_box(
     content line sets the block width and a single uniform left margin is applied
     to every line, so multi-line art (arrows, lanes) keeps its internal
     alignment. Lines may contain ANSI styling; their visible width is measured
-    with :func:`_visible_len`.
+    with :func:`~.geometry.visible_len`.
 
     Args:
         content: Pre-rendered lines to frame (may be empty or styled).
@@ -63,7 +52,7 @@ def render_box(
     inner = max(width - 2, 0)
     field = max(inner - 2 * pad_x, 0)
 
-    block_width = min(max((_visible_len(line) for line in content), default=0), field)
+    block_width = min(max((visible_len(line) for line in content), default=0), field)
     if align == "right":
         left = field - block_width
     elif align == "center":
@@ -75,7 +64,7 @@ def render_box(
         return f"{_VERTICAL}{' ' * pad_x}{cells}{' ' * pad_x}{_VERTICAL}"
 
     def content_row(line: str) -> str:
-        pad = field - _visible_len(line)
+        pad = field - visible_len(line)
         rendered = f"{' ' * left}{line}{' ' * (max(pad, 0) - left)}"
         return interior(rendered)
 

@@ -116,6 +116,9 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             parts.append("↑↓ navigate · Enter select")
         if dispatcher.supports_search():
             parts.append("/ search")
+        tab_hint = dispatcher.current_spec().tab_hint
+        if tab_hint:
+            parts.append(tab_hint)
         parts.extend([": command", "? help"])
         return "  ·  ".join(parts)
 
@@ -367,6 +370,15 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                 else:  # KEY_CTRL_DOWN / "\x1b[1;5B"
                     scroll_offset += 1
                 redraw()  # redraw() clamps scroll_offset
+                continue
+
+            # Tab cycles a tabbed screen's active tab (Shift-Tab reverses); the
+            # new tab's content replaces the pane, so reset the scroll position.
+            if key_text == "\t" or key_name in {"KEY_TAB", "KEY_BTAB"}:
+                if dispatcher.tab_count() > 0:
+                    dispatcher.cycle_active_tab(-1 if key_name == "KEY_BTAB" else 1)
+                    set_output(_coerce_lines(run_async(dispatcher.render_current())))
+                    redraw()
                 continue
 
             # View mode: arrow/Enter list navigation, then "/", ":", "?", and hotkeys.

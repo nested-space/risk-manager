@@ -1,6 +1,6 @@
 """Render library track screens for materials, NCRM, and counterions.
 
-Each subsection is drawn as a single box-drawn table (see ``renderers/tables.py``)
+Each subsection is drawn as a single box-drawn table (see ``renderers/layout/table.py``)
 whose body is indented two columns so a ``>`` caret can occupy the left gutter on
 the selected row — the same selectable-table pattern as the stage- and
 component-focus screens. ``library_targets`` flattens the rows into selectable
@@ -15,7 +15,7 @@ from typing import Any
 
 from ...utils.formula_parser import render_chemical_formula
 from ..list_navigator import ListItem
-from .tables import Column, render_table, section_rule, section_width
+from .layout import Column, render_table, section_rule, section_width
 
 _BODY_INDENT = "  "
 _CARET = "> "

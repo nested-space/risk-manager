@@ -2,7 +2,7 @@
 
 import pytest
 
-from riskmanager_cli.repl.renderers.responsive import (
+from riskmanager_cli.repl.renderers.layout import (
     RowPlan,
     fit_widths,
     lay_out_row,

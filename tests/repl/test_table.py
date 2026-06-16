@@ -2,7 +2,7 @@
 
 import pytest
 
-from riskmanager_cli.repl.renderers.tables import Column, render_table, section_rule
+from riskmanager_cli.repl.renderers.layout import Column, render_table, section_rule
 
 
 @pytest.mark.unit

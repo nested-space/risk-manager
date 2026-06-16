@@ -26,6 +26,7 @@ class _StubScreen:
     """Minimal screen stand-in exposing the width and styling used by rendering."""
 
     width = 80
+    output_height = 40
 
     @staticmethod
     def dim(text: str) -> str:
@@ -183,3 +184,48 @@ async def test_library_ctrl_o_is_no_longer_bound(temp_env: Environment) -> None:
     await dispatcher.render_current()
 
     assert await dispatcher.handle_hotkey(CTRL_O) is None
+
+
+def _library_home_dispatcher(env: Environment) -> CommandDispatcher:
+    """Build a dispatcher on the Library home (the tabbed landing page)."""
+    ctx = ContextManager()
+    ctx.push(ContextFrame(track="library", library_sub="select"))
+    return CommandDispatcher(ctx, SessionState(), _StubScreen(), env)  # type: ignore[arg-type]
+
+
+@pytest.mark.integration
+async def test_library_home_tab_toggles_content_and_navigability(temp_env: Environment) -> None:
+    """Tab switches the home pane between the navigable Libraries and Information tabs."""
+    dispatcher = _library_home_dispatcher(temp_env)
+    assert dispatcher.tab_count() == 2
+
+    # Libraries tab: navigable cards, with a live navigator.
+    libraries = "\n".join(await dispatcher.render_current())
+    assert dispatcher.active_tab() == 0
+    assert dispatcher.is_navigable()
+    assert dispatcher.list_navigator is not None
+    assert "Libraries" in libraries and "Information" in libraries
+
+    # Tab → Information: capability cards, not navigable, no navigator.
+    dispatcher.cycle_active_tab(1)
+    information = "\n".join(await dispatcher.render_current())
+    assert dispatcher.active_tab() == 1
+    assert not dispatcher.is_navigable()
+    assert dispatcher.list_navigator is None
+    assert "Currently Supported" in information
+
+    # Tab wraps back to the Libraries tab.
+    dispatcher.cycle_active_tab(1)
+    assert dispatcher.active_tab() == 0
+
+
+@pytest.mark.integration
+async def test_library_home_active_tab_resets_on_navigation(temp_env: Environment) -> None:
+    """Leaving the Library home resets its active tab to the first."""
+    dispatcher = _library_home_dispatcher(temp_env)
+    dispatcher.cycle_active_tab(1)
+    assert dispatcher.active_tab() == 1
+
+    # Navigating into a subsection changes the screen key; the tab resets.
+    dispatcher.ctx.current.library_sub = "counterions"
+    assert dispatcher.active_tab() == 0

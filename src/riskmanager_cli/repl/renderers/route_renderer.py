@@ -20,8 +20,7 @@ from ...utils.component_graph_layout import (
     split_for_width,
 )
 from ...utils.manufacturing_layout_engine import RiskDict, render_risk_summary
-from .box import render_box
-from .tables import Column, render_table, section_rule, section_width
+from .layout import Column, render_box, render_table, section_rule, section_width
 
 # Box chrome consumed before the graph: two reserved screen margins, two box
 # borders, and ``2 * _PAD_X`` interior padding columns.

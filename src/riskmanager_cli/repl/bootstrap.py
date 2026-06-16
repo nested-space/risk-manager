@@ -35,7 +35,7 @@ from ..operations.seed_operations import (
     seed_counterions,
     seed_ncrm,
 )
-from .renderers.box import render_box
+from .renderers.layout import render_box
 
 _CONTENT_WIDTH = 46
 _BOX_WIDTH = _CONTENT_WIDTH + 6  # + 2 borders + 2*pad_x (pad_x defaults to 2)

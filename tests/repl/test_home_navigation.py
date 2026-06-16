@@ -39,6 +39,7 @@ class _StubScreen:
     """Minimal screen stand-in exposing the ``width``/``bold``/``dim`` used by rendering."""
 
     width = 80
+    output_height = 40
 
     @staticmethod
     def dim(text: str) -> str:
@@ -132,7 +133,7 @@ async def test_home_enter_on_library_card_enters_library_home(temp_env: Environm
     )
     assert dispatcher.ctx.current.track == "library"
     assert dispatcher.ctx.current.library_sub == "select"
-    assert any("Database Overview" in line for line in lines)
+    assert any("Risk Manager Library" in line for line in lines)
 
 
 @pytest.mark.integration

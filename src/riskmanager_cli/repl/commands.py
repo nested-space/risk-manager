@@ -113,7 +113,6 @@ from ..operations.stage_risk_operations import (
     update_stage_risk,
 )
 from ..repl.renderers.admin_renderer import render_admin_screen
-from ..repl.renderers.box import render_box
 from ..repl.renderers.component_renderer import (
     component_targets,
     gather_component_sections,
@@ -121,7 +120,12 @@ from ..repl.renderers.component_renderer import (
 )
 from ..repl.renderers.home_renderer import CARDS as HOME_CARDS
 from ..repl.renderers.home_renderer import render_home as render_home_screen
-from ..repl.renderers.library_home_renderer import OVERVIEW_CARDS, render_library_home
+from ..repl.renderers.layout import render_box, section_rule, section_width
+from ..repl.renderers.library_home_renderer import (
+    LIBRARY_HOME_TABS,
+    OVERVIEW_CARDS,
+    render_library_home,
+)
 from ..repl.renderers.library_renderer import (
     library_targets,
     render_library_detail,
@@ -135,7 +139,6 @@ from ..repl.renderers.stage_renderer import (
     render_stage_screen,
     stage_targets,
 )
-from ..repl.renderers.tables import section_rule, section_width
 from ..schema.create import (
     ComponentCreate,
     ComponentRiskCreate,
@@ -492,6 +495,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         self._picker_state: PickerState | None = None
         self._notice: tuple[str, str] | None = None
         self._quit_requested = False
+        # Active tab index for the current tabbed screen, with the screen key it
+        # applies to so it auto-resets when navigation changes screens.
+        self._active_tab = 0
+        self._active_tab_key: str | None = None
 
     @property
     def quit_requested(self) -> bool:
@@ -2101,12 +2108,41 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return SCREEN_SPECS.get(self.current_screen_key(), _DEFAULT_SPEC)
 
     def is_navigable(self) -> bool:
-        """Return ``True`` when the current screen has ``↑↓``/``Enter`` navigation."""
+        """Return ``True`` when the current screen has ``↑↓``/``Enter`` navigation.
+
+        The Library home's navigation belongs to its ``Libraries`` tab only; the
+        ``Information`` tab has no cards, so it reports as non-navigable.
+        """
+        if self.current_screen_key() == "library_home" and self.active_tab() != 0:
+            return False
         return self.current_spec().navigable
 
     def supports_search(self) -> bool:
         """Return ``True`` when the current screen has an incremental "/" search."""
         return self.current_spec().searchable
+
+    def tab_count(self) -> int:
+        """Return the number of tabs on the current screen (0 when untabbed)."""
+        return len(LIBRARY_HOME_TABS) if self.current_screen_key() == "library_home" else 0
+
+    def active_tab(self) -> int:
+        """Return the active tab index for the current screen.
+
+        Resets to the first tab whenever the screen key changes, so navigating
+        away and back to a tabbed screen starts on its first tab.
+        """
+        key = self.current_screen_key()
+        if self._active_tab_key != key:
+            self._active_tab = 0
+            self._active_tab_key = key
+        return self._active_tab
+
+    def cycle_active_tab(self, step: int) -> None:
+        """Advance the active tab by *step* (wrapping) on the current screen."""
+        count = self.tab_count()
+        if count <= 0:
+            return
+        self._active_tab = (self.active_tab() + step) % count
 
     async def search(  # pylint: disable=too-many-return-statements  # one return per searchable track
         self, query: str
@@ -2186,7 +2222,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         items = [ListItem(label=title, item_id=key) for key, title, _hotkey in HOME_CARDS]
         navigator = self._rebuild_list_navigator([], items)
         return render_home_screen(
-            navigator.selected_index, width=self.screen.width, bold=self.screen.bold
+            navigator.selected_index,
+            width=self.screen.width,
+            height=self.screen.output_height,
+            bold=self.screen.bold,
         )
 
     async def _render_project_select(self, query: str | None = None) -> list[str]:
@@ -2320,17 +2359,29 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         }
 
     async def _render_library_home(self) -> list[str]:
-        """Render the Library landing page with its navigable overview cards.
+        """Render the Library landing page: a tabbed overview/information pane.
 
-        The three overview cards are backed by a fixed navigator (matching
+        On the ``Libraries`` tab the three overview cards are backed by a fixed
+        navigator (matching
         :data:`~.renderers.library_home_renderer.OVERVIEW_CARDS`) so arrow keys
-        and Enter pick a subsection exactly like any other list screen.
+        and Enter pick a subsection exactly like any other list screen. The
+        ``Information`` tab has no cards, so its navigator is cleared.
         """
         counts = await self._library_counts()
-        items = [ListItem(label=title, item_id=key) for key, title in OVERVIEW_CARDS]
-        navigator = self._rebuild_list_navigator([], items)
+        active = self.active_tab()
+        if active == 0:
+            items = [ListItem(label=title, item_id=key) for key, title in OVERVIEW_CARDS]
+            navigator = self._rebuild_list_navigator([], items)
+            selected_index = navigator.selected_index
+        else:
+            self._list_navigator = None
+            selected_index = -1
         return render_library_home(
-            counts, navigator.selected_index, width=self.screen.width, bold=self.screen.bold
+            counts,
+            selected_index,
+            active_tab=active,
+            width=self.screen.width,
+            bold=self.screen.bold,
         )
 
     async def _render_library(
@@ -4354,12 +4405,15 @@ class ScreenSpec:
         searchable: Whether incremental "/" search applies.
         actions: Info-line Ctrl-hotkey entries, e.g. ``("^A add", "^E edit")``.
         back: Trailing info-line entry (``"^C back"`` or ``"^C quit"``).
+        tab_hint: Nav-line grammar hint for a tabbed screen (e.g. ``"Tab switch
+            tabs"``), or ``None`` when the screen has no tabs.
     """
 
     navigable: bool
     searchable: bool
     actions: tuple[str, ...]
     back: str = "^C back"
+    tab_hint: str | None = None
 
 
 # Per-screen capability + hint registry. Keyed by screen key (see
@@ -4380,7 +4434,7 @@ SCREEN_SPECS: dict[str, ScreenSpec] = {
     "component_focus": ScreenSpec(
         True, False, ("^A assign salt", "^E edit", "^U unassign", "^X delete", "^R risks")
     ),
-    "library_home": ScreenSpec(True, False, ()),
+    "library_home": ScreenSpec(True, False, (), tab_hint="Tab switch tabs"),
     "library_list": ScreenSpec(True, True, ("^E edit", "^A add", "^X delete", "^F filter")),
     "library_detail": ScreenSpec(False, False, ("^E edit",)),
     "admin": ScreenSpec(False, False, ("^A action",)),
@@ -4403,6 +4457,8 @@ def _screen_controls(spec: ScreenSpec) -> list[str]:
         grammar += ["↑↓ navigate", "Enter select"]
     if spec.searchable:
         grammar.append("/ search")
+    if spec.tab_hint:
+        grammar.append(spec.tab_hint)
     grammar += [": command", "? help"]
     return [*grammar, *spec.actions, spec.back]
 

@@ -14,9 +14,15 @@ def _identity(text: str) -> str:
     return text
 
 
-def _render(selected_index: int = -1, *, width: int, bold: Callable[[str], str] = _identity):
+def _render(
+    selected_index: int = -1,
+    *,
+    width: int,
+    height: int = 24,
+    bold: Callable[[str], str] = _identity,
+):
     """Render the home screen and return the clean (tag-stripped) display lines."""
-    return parse(render_home(selected_index, width=width, bold=bold)).lines
+    return parse(render_home(selected_index, width=width, height=height, bold=bold)).lines
 
 
 @pytest.mark.unit
@@ -88,7 +94,9 @@ def test_render_home_bolds_only_the_selected_card() -> None:
 @pytest.mark.unit
 def test_render_home_pins_banner_and_marks_selected_card() -> None:
     """The banner is sticky and the focused card is the tagged selection."""
-    view = parse(render_home(2, width=45, bold=_identity))
+    # A short pane forces the top-anchored layout, where the banner is pinned and
+    # the cards scroll under it (vertical centring only applies when it all fits).
+    view = parse(render_home(2, width=45, height=8, bold=_identity))
     assert view.sticky_count > 0  # banner pinned
     # The selection range covers the ADMIN card, not PROJECT/LIBRARY.
     assert view.selected is not None
@@ -96,3 +104,24 @@ def test_render_home_pins_banner_and_marks_selected_card() -> None:
     selected_text = "\n".join(view.lines[start : end + 1])
     assert "A D M I N" in selected_text
     assert "P R O J E C T" not in selected_text
+
+
+@pytest.mark.unit
+def test_render_home_centres_box_vertically_when_it_fits() -> None:
+    """In a tall pane the banner+cards box is centred, with blank rows above it."""
+    height = 40
+    view = parse(render_home(0, width=100, height=height, bold=_identity))
+    # The pane is filled to its full height, padded above and below the box.
+    assert len(view.lines) == height
+    banner_at = next(i for i, line in enumerate(view.lines) if "█" in line)
+    assert banner_at > 0  # leading blank rows push the box down
+    assert all(line.strip() == "" for line in view.lines[:banner_at])
+    # Centred content fits and does not scroll, so nothing is pinned.
+    assert view.sticky_count == 0
+    # Roughly balanced: the leading and trailing blank runs are within one row.
+    trailing = 0
+    for line in reversed(view.lines):
+        if line.strip() != "":
+            break
+        trailing += 1
+    assert abs(banner_at - trailing) <= 1

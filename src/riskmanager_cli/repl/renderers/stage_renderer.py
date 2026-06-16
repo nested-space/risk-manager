@@ -2,7 +2,7 @@
 
 Renders a single stage as a stage title followed by three sections —
 ``Components``, ``NCRMs``, and ``Risks`` — each a section-title rule above a
-box-drawn table (see ``renderers/tables.py``). The whole body is indented two
+box-drawn table (see ``renderers/layout/table.py``). The whole body is indented two
 columns so a ``>`` caret can occupy the left gutter; a single unified selection
 moves through every data row across the three tables in render order.
 
@@ -25,7 +25,7 @@ from ...operations.stage_component_operations import list_stage_components
 from ...operations.stage_ncrm_operations import list_ncrms_for_stage
 from ...operations.stage_risk_operations import list_risks_for_stage
 from ..list_navigator import ListItem
-from .tables import Column, render_table, section_rule, section_width
+from .layout import Column, render_table, section_rule, section_width
 
 _BODY_INDENT = "  "
 _CARET = "> "
