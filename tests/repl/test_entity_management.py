@@ -74,6 +74,7 @@ async def test_add_project_creates_project_via_picker(temp_env: Environment) -> 
     await create_material(MaterialCreate(name="Caffeine"), env=temp_env)
     dispatcher = _make_dispatcher(temp_env)
 
+    await dispatcher.dispatch("/project")
     await dispatcher.dispatch("/add project")
     await dispatcher.advance_prompt("AlphaProject")
     await dispatcher.advance_prompt(TA.ONCOLOGY.value)
@@ -94,6 +95,7 @@ async def test_add_project_with_no_materials_reports_guidance(temp_env: Environm
     """`/add project` aborts with guidance when no materials exist to link."""
     dispatcher = _make_dispatcher(temp_env)
 
+    await dispatcher.dispatch("/project")
     await dispatcher.dispatch("/add project")
     await dispatcher.advance_prompt("AlphaProject")
     result = await dispatcher.advance_prompt(TA.ONCOLOGY.value)
@@ -257,6 +259,7 @@ async def test_cancel_picker_restores_current_screen_with_notice(temp_env: Envir
     await create_material(MaterialCreate(name="Caffeine"), env=temp_env)
     dispatcher = _make_dispatcher(temp_env)
 
+    await dispatcher.dispatch("/project")
     await dispatcher.dispatch("/add project")
     await dispatcher.advance_prompt("AlphaProject")
     await dispatcher.advance_prompt(TA.ONCOLOGY.value)

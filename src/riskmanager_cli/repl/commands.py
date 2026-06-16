@@ -119,6 +119,8 @@ from ..repl.renderers.component_renderer import (
     gather_component_sections,
     render_component_screen,
 )
+from ..repl.renderers.home_renderer import CARDS as HOME_CARDS
+from ..repl.renderers.home_renderer import render_home as render_home_screen
 from ..repl.renderers.library_renderer import (
     library_targets,
     render_library_detail,
@@ -221,6 +223,9 @@ COMPONENT_TYPE_OPTIONS: list[tuple[str, str]] = [
 #: No/Yes options for confirmation prompts, defaulting to the safe "No" choice.
 CONFIRM_OPTIONS: list[tuple[str, str]] = [("No", "no"), ("Yes", "yes")]
 
+#: Yes/No options for the home quit confirmation, defaulting to "Yes".
+QUIT_OPTIONS: list[tuple[str, str]] = [("Yes", "yes"), ("No", "no")]
+
 # Control-character hotkeys (``str(key)`` for Ctrl-<letter> in the blessed loop).
 # Terminal-reserved combos are avoided: Ctrl-C/D (interrupt/EOF, handled in the
 # loop), Ctrl-S/Q (flow control), Ctrl-Z (suspend), Ctrl-H/I/J/M (backspace, tab,
@@ -233,6 +238,7 @@ CTRL_G = "\x07"  # go home
 CTRL_L = "\x0c"  # list
 CTRL_N = "\x0e"  # admin
 CTRL_O = "\x0f"  # open / show
+CTRL_P = "\x10"  # project (project list)
 CTRL_R = "\x12"  # risks
 CTRL_T = "\x14"  # routes
 CTRL_U = "\x15"  # unassign
@@ -484,6 +490,18 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         self._list_navigator: ListNavigator | None = None
         self._picker_state: PickerState | None = None
         self._notice: tuple[str, str] | None = None
+        self._quit_requested = False
+
+    @property
+    def quit_requested(self) -> bool:
+        """Return ``True`` once the home-screen quit confirmation is accepted.
+
+        The REPL loop polls this to break out of its event loop; routing the
+        quit through the standard prompt machinery (rather than a sentinel
+        return value) keeps :meth:`submit_prompt_selection` returning plain
+        lines like every other prompt.
+        """
+        return self._quit_requested
 
     @property
     def prompt_state(self) -> PromptState | None:
@@ -723,6 +741,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         track = self.ctx.current.track
         if track == "home":
             return await self._dispatch_home(verb, args)
+        if track == "project_select":
+            return await self._dispatch_project_select(verb, args)
         if track == "project":
             return await self._dispatch_project(verb, args)
         if track == "route_select":
@@ -741,7 +761,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._dispatch_risk_mode(verb, args)
         return [f"Unknown command: {verb}. Type /help for commands."]
 
-    async def activate_list_selection(  # pylint: disable=too-many-return-statements  # one return per list-driven track
+    async def activate_list_selection(  # pylint: disable=too-many-return-statements,too-many-branches  # one return per list-driven track
         self, item: ListItem
     ) -> list[str]:
         """Open the currently selected list item for list-driven screens.
@@ -753,6 +773,14 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             Rendered lines for the activated screen.
         """
         if self.ctx.current.track == "home":
+            if item.item_id == "project":
+                return await self._enter_project_select()
+            if item.item_id == "library":
+                return self._start_library_chooser()
+            if item.item_id == "admin":
+                return self._enter_admin()
+            return await self.render_current()
+        if self.ctx.current.track == "project_select":
             project = await self._project_from_id(item.item_id)
             if project is None:
                 return ["Project not found."]
@@ -830,13 +858,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         self._notice = (message, level)
         return await self.render_current()
 
-    async def render_current(  # pylint: disable=too-many-return-statements  # one render path per navigation track
+    async def render_current(  # pylint: disable=too-many-return-statements,too-many-branches  # one render path per navigation track
         self,
     ) -> list[str]:
         """Render the screen matching the current navigation context."""
         track = self.ctx.current.track
         if track == "home":
             return await self._render_home()
+        if track == "project_select":
+            return await self._render_project_select()
         if track == "project":
             project = await self._current_project()
             if project is None:
@@ -886,24 +916,38 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._render_home()
         if verb == "/help":
             return self._help_lines(args[0] if args else None)
-        if verb == "/library":
-            sub_mode = args[0].lower() if args else "select"
-            if sub_mode not in {"materials", "ncrm", "counterions", "select"}:
-                return ["Usage: /library [materials|ncrm|counterions]"]
-            self.ctx.push(ContextFrame(track="library", library_sub=sub_mode))
-            self.session.update_context(track="library")
-            return await self._render_library(sub_mode)
         if verb == "/admin" and not args:
             if self.ctx.current.track != "home":
                 return ["/admin is only available from home."]
-            self.ctx.push(ContextFrame(track="admin"))
-            self.session.update_context(track="admin")
-            return render_admin_screen()
+            return self._enter_admin()
         if verb == "/admin" and args:
             return await self._dispatch_admin(verb, args)
         return None
 
+    def _enter_admin(self) -> list[str]:
+        """Push the admin track and render it."""
+        self.ctx.push(ContextFrame(track="admin"))
+        self.session.update_context(track="admin")
+        return render_admin_screen()
+
     async def _dispatch_home(self, verb: str, args: list[str]) -> list[str]:
+        """Dispatch commands available from the landing screen.
+
+        The three top-level tracks are reachable only from here: ``/project``
+        opens the project picker, ``/library`` the library track, and ``/admin``
+        (handled in :meth:`_dispatch_global`) the admin track.
+        """
+        if verb == "/project":
+            return await self._enter_project_select()
+        if verb == "/library":
+            sub_mode = args[0].lower() if args else "select"
+            if sub_mode not in {"materials", "ncrm", "counterions", "select"}:
+                return ["Usage: /library [materials|ncrm|counterions]"]
+            return await self._enter_library(sub_mode)
+        return [f"Unknown command: {verb}. Type /help for commands."]
+
+    async def _dispatch_project_select(self, verb: str, args: list[str]) -> list[str]:
+        """Dispatch commands on the project picker (the former home screen)."""
         if verb == "/select" and args:
             query = " ".join(args)
             projects = await search_projects(query, self.env)
@@ -911,7 +955,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 return [f"No project matched '{query}'."]
             return await self._open_project(projects[0])
         if verb == "/search" and args:
-            return await self._render_home(" ".join(args))
+            return await self._render_project_select(" ".join(args))
         if verb == "/add" and args and args[0].lower() == "project":
             return self.start_prompt(
                 [
@@ -926,6 +970,23 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 title="Add project",
             )
         return [f"Unknown command: {verb}. Type /help for commands."]
+
+    async def _enter_project_select(self) -> list[str]:
+        """Push the project-picker track and render it."""
+        self.ctx.push(ContextFrame(track="project_select"))
+        self._list_navigator = None
+        self.session.update_context(track="project_select")
+        return await self._render_project_select()
+
+    async def _enter_library(self, sub_mode: str) -> list[str]:
+        """Push the library track for *sub_mode* and render it.
+
+        Args:
+            sub_mode: One of ``materials``/``ncrm``/``counterions``/``select``.
+        """
+        self.ctx.push(ContextFrame(track="library", library_sub=sub_mode))
+        self.session.update_context(track="library")
+        return await self._render_library(sub_mode)
 
     async def _dispatch_project(  # pylint: disable=too-many-return-statements  # one return per command verb
         self, verb: str, args: list[str]
@@ -1181,6 +1242,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._dispatch_global("/home", [])
         handler = {
             "home": self._hotkey_home,
+            "project_select": self._hotkey_project_select,
             "project": self._hotkey_project,
             "route_select": self._hotkey_route_select,
             "route": self._hotkey_route,
@@ -1196,12 +1258,17 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return await handler(key_text)
 
     async def _hotkey_home(self, key: str) -> list[str] | str | None:
-        if key == CTRL_A:
-            return await self._dispatch_home("/add", ["project"])
+        if key == CTRL_P:
+            return await self._enter_project_select()
         if key == CTRL_B:
             return self._start_library_chooser()
         if key == CTRL_N:
-            return await self._dispatch_global("/admin", [])
+            return self._enter_admin()
+        return None
+
+    async def _hotkey_project_select(self, key: str) -> list[str] | None:
+        if key == CTRL_A:
+            return await self._dispatch_project_select("/add", ["project"])
         return None
 
     async def _hotkey_project(self, key: str) -> list[str] | None:
@@ -1458,6 +1525,22 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self._coerce_lines(await result)
         return self._coerce_lines(result)
 
+    def start_quit_confirm(self) -> list[str]:
+        """Open the home-screen ``Quit?`` confirmation, defaulting to ``Yes``.
+
+        Accepting sets :attr:`quit_requested` (which the REPL loop polls to exit);
+        declining re-renders the landing screen.
+        """
+        return self.start_prompt(
+            [FieldSpec("Quit?", field_type="select", options=QUIT_OPTIONS, default="yes")],
+            lambda **payload: self._resolve_quit(payload[_field_key("Quit?")]),
+        )
+
+    async def _resolve_quit(self, answer: str | None) -> list[str]:
+        if answer == "yes":
+            self._quit_requested = True
+        return await self._render_home()
+
     def _start_library_chooser(self) -> list[str]:
         return self.start_prompt(
             [
@@ -1471,7 +1554,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                     ],
                 )
             ],
-            lambda **payload: self._dispatch_global("/library", [payload["library"]]),
+            lambda **payload: self._enter_library(payload["library"]),
         )
 
     def _start_route_add_chooser(self, process: ManufacturingProcess) -> list[str]:
@@ -2010,7 +2093,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
     def supports_search(self) -> bool:
         """Return ``True`` when the current track has an incremental "/" search."""
-        return self.ctx.current.track in {"home", "route_select", "route", "library"}
+        return self.ctx.current.track in {"project_select", "route_select", "route", "library"}
 
     async def search(  # pylint: disable=too-many-return-statements  # one return per searchable track
         self, query: str
@@ -2025,8 +2108,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """
         track = self.ctx.current.track
         cleaned = query.strip() or None
-        if track == "home":
-            return await self._render_home(cleaned)
+        if track == "project_select":
+            return await self._render_project_select(cleaned)
         if track == "route_select":
             return await self._render_route_select(cleaned)
         if track == "library":
@@ -2075,7 +2158,20 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         self._list_navigator = navigator
         return navigator
 
-    async def _render_home(self, query: str | None = None) -> list[str]:
+    async def _render_home(self) -> list[str]:
+        """Render the landing screen: the banner and the three track cards.
+
+        The cards are backed by a fixed three-item navigator (matching
+        :data:`~.renderers.home_renderer.CARDS`) so arrow keys and Enter select
+        a track exactly like any other list screen.
+        """
+        items = [ListItem(label=title, item_id=key) for key, title, _hotkey in HOME_CARDS]
+        navigator = self._rebuild_list_navigator([], items)
+        return render_home_screen(
+            navigator.selected_index, width=self.screen.width, bold=self.screen.bold
+        )
+
+    async def _render_project_select(self, query: str | None = None) -> list[str]:
         projects = await list_projects(self.env)
         if query:
             lowered = query.lower()
@@ -4196,7 +4292,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 # combinations (rendered ``^X``) plus the always-available "/" search, "?" help,
 # and ":" command line. ``handle_hotkey`` is the source of truth these describe.
 HELP_TOPICS: dict[str, list[str]] = {
-    "home": ["^A add project", "^B library", "^N admin", "/ search", "? help", "^D quit"],
+    "home": ["^P project", "^B library", "^N admin", "↑↓ Enter select", "? help", "^C quit"],
+    "project_select": ["↑↓ Enter open", "^A add project", "/ search", "^C back"],
     "project": ["^T routes", "^R risks", "^A add process", "^E edit", "^C back"],
     "route_select": ["↑↓ Enter open", "/ search", "^C back"],
     "route": [

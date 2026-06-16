@@ -91,6 +91,8 @@ class ContextManager:
         component_name = frame.component_name or "Unknown"
         library_sub = frame.library_sub or "select"
         match frame.track:
+            case "project_select":
+                label = "[ Project ]"
             case "project":
                 label = f"[ Project: {project_name} ]"
             case "route_select":

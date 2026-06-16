@@ -73,6 +73,11 @@ class ListNavigator:
             return None
         return self._items[self._selected_index]
 
+    @property
+    def selected_index(self) -> int:
+        """Return the index of the highlighted item, or ``-1`` when empty."""
+        return self._selected_index
+
     def select_item_id(self, item_id: str) -> None:
         """Highlight the item whose ``item_id`` matches *item_id*, if present.
 
@@ -150,10 +155,10 @@ class ListNavigator:
         Returns:
             The selected item when Enter is pressed; otherwise ``None``.
         """
-        if key in {"KEY_UP", "k", "\x1b[A"}:
+        if key in {"KEY_UP", "KEY_LEFT", "k", "\x1b[A"}:
             self.move_up()
             return None
-        if key in {"KEY_DOWN", "j", "\x1b[B"}:
+        if key in {"KEY_DOWN", "KEY_RIGHT", "j", "\x1b[B"}:
             self.move_down()
             return None
         if key in {"KEY_ENTER", "\n", "\r"}:

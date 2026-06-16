@@ -35,6 +35,7 @@ from riskmanager_cli.repl.commands import (
     CTRL_A,
     CTRL_E,
     CTRL_F,
+    CTRL_P,
     CTRL_R,
     CTRL_X,
     CommandDispatcher,
@@ -109,10 +110,13 @@ def _push_route(dispatcher: CommandDispatcher, project_id: str, process_id: str)
 
 
 @pytest.mark.integration
-async def test_home_add_hotkey_opens_project_prompt(temp_env: Environment) -> None:
-    """Ctrl-A on home starts the `/add project` guided prompt + material picker."""
+async def test_project_select_add_hotkey_opens_project_prompt(temp_env: Environment) -> None:
+    """Ctrl-P opens the project picker; Ctrl-A there starts the `/add project` flow."""
     await create_material(MaterialCreate(name="Caffeine"), env=temp_env)
     dispatcher = _make_dispatcher(temp_env)
+
+    await dispatcher.handle_hotkey(CTRL_P)
+    assert dispatcher.ctx.current.track == "project_select"
 
     await dispatcher.handle_hotkey(CTRL_A)
     assert dispatcher.prompt_state is not None

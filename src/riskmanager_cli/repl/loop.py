@@ -197,13 +197,19 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
     signal.signal(signal.SIGWINCH, handle_resize)
     redraw()
 
+    def request_quit() -> None:
+        """Open the home-screen quit confirmation in place of an immediate exit."""
+        set_output(_coerce_lines(dispatcher.start_quit_confirm()))
+
     try:  # pylint: disable=too-many-nested-blocks  # blessed inkey loop; prompt/picker/list branches require deep nesting
         while True:
+            if dispatcher.quit_requested:
+                break
             try:
                 key = term.inkey()
             except KeyboardInterrupt:
                 if handle_back(quit_at_home=True):
-                    break
+                    request_quit()
                 redraw()
                 continue
             if not key:
@@ -215,7 +221,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                 break
             if key_text == "\x03":
                 if handle_back(quit_at_home=True):
-                    break
+                    request_quit()
                 redraw()
                 continue
             if key_name == "KEY_ESCAPE":
@@ -333,7 +339,10 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                     consume_notice()
                     redraw()
                     continue
-                if key_name in {"KEY_UP", "KEY_DOWN"} or key_text in {"j", "k"}:
+                if key_name in {"KEY_UP", "KEY_DOWN", "KEY_LEFT", "KEY_RIGHT"} or key_text in {
+                    "j",
+                    "k",
+                }:
                     # Same-screen re-render: preserve scroll and keep the caret visible.
                     current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
                     scroll_offset = _follow_selection(
@@ -373,6 +382,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
 def _in_list_mode(ctx: ContextManager) -> bool:
     return ctx.current.track in {
         "home",
+        "project_select",
         "project",
         "route_select",
         "stage_focus",
