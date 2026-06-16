@@ -9,15 +9,12 @@ caller supplies the highlighted index (driven by arrow-key navigation) and a
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 
-from ..viewport import tag_selected, tag_sticky
+from ..viewport import tag_sticky
+from .blocks import card_row, center_block
 from .box import render_box
 from .responsive import lay_out_row, widest_fitting
-
-# Matches CSI/SGR escape sequences so block widths count only printable columns.
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 #: "RISK MANAGER" in the ANSI Shadow block font.
 _BANNER: list[str] = [
@@ -76,47 +73,6 @@ _CARD_GAP = 4
 _CARD_MIN_WIDTH = 19
 
 
-def _visible_len(text: str) -> int:
-    """Return the printable column width of *text*, ignoring ANSI escapes."""
-    return len(_ANSI_RE.sub("", text))
-
-
-def _block_width(lines: list[str]) -> int:
-    """Return the widest visible line width in a block."""
-    return max((_visible_len(line) for line in lines), default=0)
-
-
-def _center_block(lines: list[str], width: int) -> list[str]:
-    """Indent every line by a shared left margin so the block is centred in *width*."""
-    margin = max((width - _block_width(lines)) // 2, 0)
-    pad = " " * margin
-    return [f"{pad}{line}" for line in lines]
-
-
-def _join_horizontal(blocks: list[list[str]], gap: int) -> list[str]:
-    """Concatenate equal-or-ragged box blocks side by side with a *gap* between them.
-
-    Each block is padded to the tallest block's height and to its own widest
-    visible line, so a uniform spacer keeps the columns aligned even when blocks
-    carry ANSI styling.
-
-    Args:
-        blocks: One list of display lines per column.
-        gap: Number of blank columns between adjacent blocks.
-
-    Returns:
-        The merged rows spanning all blocks.
-    """
-    height = max((len(block) for block in blocks), default=0)
-    padded: list[list[str]] = []
-    for block in blocks:
-        block_width = _block_width(block)
-        rows = [*block, *([""] * (height - len(block)))]
-        padded.append([line + " " * (block_width - _visible_len(line)) for line in rows])
-    spacer = " " * gap
-    return [spacer.join(parts) for parts in zip(*padded)]
-
-
 def render_home(selected_index: int, *, width: int, bold: Callable[[str], str]) -> list[str]:
     """Render the landing screen: the banner above the three track cards.
 
@@ -139,7 +95,7 @@ def render_home(selected_index: int, *, width: int, bold: Callable[[str], str]) 
     banner = widest_fitting([_BANNER, _BANNER_MEDIUM, _BANNER_COMPACT, [_FALLBACK_TITLE]], inner)
     # The banner is pinned to the top of the pane so it stays visible while the
     # cards scroll under it on a short terminal (see :mod:`~.repl.viewport`).
-    lines = tag_sticky(_center_block(banner, inner))
+    lines = tag_sticky(center_block(banner, inner))
     lines.extend(["", ""])
 
     plan = lay_out_row(
@@ -156,15 +112,13 @@ def render_home(selected_index: int, *, width: int, bold: Callable[[str], str]) 
             box = [bold(line) for line in box]
         cards.append(box)
 
-    has_selection = 0 <= selected_index < len(cards)
-    if plan.stacked:
-        for index, box in enumerate(cards):
-            if index:
-                lines.append("")
-            centred = _center_block(box, inner)
-            lines.extend(tag_selected(centred) if index == selected_index else centred)
-    else:
-        # Cards share these rows, so the selection follow-target is the whole row.
-        row = _center_block(_join_horizontal(cards, _CARD_GAP), inner)
-        lines.extend(tag_selected(row) if has_selection else row)
+    lines.extend(
+        card_row(
+            cards,
+            width=inner,
+            gap=_CARD_GAP,
+            selected_index=selected_index,
+            stacked=plan.stacked,
+        )
+    )
     return lines

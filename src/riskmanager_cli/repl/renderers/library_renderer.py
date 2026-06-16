@@ -90,8 +90,9 @@ async def render_library_screen(
     """Return display lines for the Library track.
 
     Args:
-        sub_mode: Active library sub-mode (``materials``/``ncrm``/``counterions``
-            or ``select`` for the subsection chooser).
+        sub_mode: Active library sub-mode (``materials``/``ncrm``/``counterions``).
+            The ``select`` landing page is rendered separately by
+            :func:`library_home_renderer.render_library_home`.
         items: Library rows already converted to dictionaries, in display order.
         width: Terminal width; the table is shrunk to fit it.
         selected_id: ``item_id`` of the caret-selected row, if any.
@@ -100,16 +101,6 @@ async def render_library_screen(
         Renderable output lines: a title at column zero, then a two-space-indented
         table with a ``>`` caret on the selected row.
     """
-    if sub_mode == "select":
-        return [
-            "Library",
-            "",
-            "Choose a subsection:",
-            "  /library materials",
-            "  /library ncrm",
-            "  /library counterions",
-        ]
-
     title = f"Library · {sub_mode}"
     lines = [title, ""]
     rows = _rows(items)

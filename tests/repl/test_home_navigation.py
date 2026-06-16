@@ -97,11 +97,14 @@ async def test_home_project_hotkey_enters_project_select(temp_env: Environment) 
 
 
 @pytest.mark.integration
-async def test_home_library_hotkey_opens_chooser(temp_env: Environment) -> None:
-    """Ctrl-B opens the library sub-mode chooser prompt."""
+async def test_home_library_hotkey_enters_library_home(temp_env: Environment) -> None:
+    """Ctrl-B opens the library home page (its select track), not a chooser prompt."""
     dispatcher = _make_dispatcher(temp_env)
-    await dispatcher.handle_hotkey(CTRL_B)
-    assert dispatcher.prompt_state is not None
+    lines = await dispatcher.handle_hotkey(CTRL_B)
+    assert dispatcher.prompt_state is None
+    assert dispatcher.ctx.current.track == "library"
+    assert dispatcher.ctx.current.library_sub == "select"
+    assert any("Risk Manager Library" in line for line in lines)
 
 
 @pytest.mark.integration
@@ -118,6 +121,31 @@ async def test_home_enter_on_project_card_enters_project_select(temp_env: Enviro
     dispatcher = _make_dispatcher(temp_env)
     await dispatcher.activate_list_selection(ListItem(label="P R O J E C T", item_id="project"))
     assert dispatcher.ctx.current.track == "project_select"
+
+
+@pytest.mark.integration
+async def test_home_enter_on_library_card_enters_library_home(temp_env: Environment) -> None:
+    """Selecting the LIBRARY card with Enter opens the library home page."""
+    dispatcher = _make_dispatcher(temp_env)
+    lines = await dispatcher.activate_list_selection(
+        ListItem(label="L I B R A R Y", item_id="library")
+    )
+    assert dispatcher.ctx.current.track == "library"
+    assert dispatcher.ctx.current.library_sub == "select"
+    assert any("Database Overview" in line for line in lines)
+
+
+@pytest.mark.integration
+async def test_library_home_card_enter_opens_subsection(temp_env: Environment) -> None:
+    """Enter on an overview card opens that subsection's table (the picker role)."""
+    dispatcher = _make_dispatcher(temp_env)
+    await dispatcher.handle_hotkey(CTRL_B)  # land on the library home
+
+    selected = dispatcher.list_navigator.selected  # type: ignore[union-attr]  # first card: ncrm
+    await dispatcher.activate_list_selection(selected)  # type: ignore[arg-type]
+
+    assert dispatcher.ctx.current.track == "library"
+    assert dispatcher.ctx.current.library_sub == "ncrm"
 
 
 @pytest.mark.integration

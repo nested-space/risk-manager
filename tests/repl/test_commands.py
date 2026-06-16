@@ -3,7 +3,7 @@
 import pytest
 
 from riskmanager_cli.repl.commands import (
-    HELP_TOPICS,
+    SCREEN_SPECS,
     CommandDispatcher,
     FieldSpec,
     PickerState,
@@ -281,39 +281,61 @@ def test_render_lines_without_styler_appends_plain_subtitle() -> None:
     assert lines == ["▶ Acme (recent)"]
 
 
-def _hints_dispatcher(track: str) -> CommandDispatcher:
-    """Build a dispatcher whose context points at *track* for hint tests.
+# Maps a screen key to the context frame that produces it, so hint tests can
+# exercise the library sub-modes (which share the ``library`` track).
+_SCREEN_KEY_FRAMES: dict[str, ContextFrame] = {
+    "library_home": ContextFrame(track="library", library_sub="select"),
+    "library_list": ContextFrame(track="library", library_sub="materials"),
+}
 
-    ``command_hints`` only reads ``self.ctx`` and ``HELP_TOPICS``, so the
+# Grammar tokens own the nav-hint line; none may leak onto the info line.
+_GRAMMAR_TOKENS = ("↑↓", "navigate", "Enter", "/ search", ": command", "? help")
+
+
+def _hints_dispatcher(screen_key: str) -> CommandDispatcher:
+    """Build a dispatcher whose context resolves to *screen_key* for hint tests.
+
+    ``command_hints`` only reads ``self.ctx`` and ``SCREEN_SPECS``, so the
     session/screen/env collaborators are unused and passed as ``None``.
     """
     ctx = ContextManager()
-    if track != "home":
-        ctx.push(ContextFrame(track=track))
+    frame = _SCREEN_KEY_FRAMES.get(screen_key)
+    if frame is not None:
+        ctx.push(frame)
+    elif screen_key != "home":
+        ctx.push(ContextFrame(track=screen_key))
     return CommandDispatcher(ctx, None, None, None)  # type: ignore[arg-type]
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("track", list(HELP_TOPICS))
-def test_command_hints_joins_help_topics_for_track(track: str) -> None:
-    """command_hints renders the track's hotkey legend plus the ':' reminder."""
-    hints = _hints_dispatcher(track).command_hints()
-    assert hints == " · ".join([*HELP_TOPICS[track], ": command"])
+@pytest.mark.parametrize("screen_key", list(SCREEN_SPECS))
+def test_command_hints_lists_actions_and_back(screen_key: str) -> None:
+    """command_hints renders the screen's action hotkeys plus its back entry."""
+    spec = SCREEN_SPECS[screen_key]
+    hints = _hints_dispatcher(screen_key).command_hints()
+    assert hints == " · ".join([*spec.actions, spec.back])
 
 
 @pytest.mark.unit
-def test_command_hints_falls_back_for_unknown_track() -> None:
-    """An unknown track yields the generic help/back/command fallback."""
+@pytest.mark.parametrize("screen_key", list(SCREEN_SPECS))
+def test_command_hints_excludes_grammar_tokens(screen_key: str) -> None:
+    """The info line never repeats a nav-line grammar token (the iron-clad split)."""
+    hints = _hints_dispatcher(screen_key).command_hints()
+    assert not any(token in hints for token in _GRAMMAR_TOKENS)
+
+
+@pytest.mark.unit
+def test_command_hints_falls_back_for_unknown_screen() -> None:
+    """An unknown screen yields just the generic back entry."""
     hints = _hints_dispatcher("does_not_exist").command_hints()
-    assert hints == "? help · ^C back · : command"
+    assert hints == "^C back"
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("track", ["route_select", "stage_focus", "risk_mode"])
-def test_help_topics_define_previously_missing_tracks(track: str) -> None:
-    """Every track exposes a non-empty hotkey legend (no typed slash commands)."""
-    assert HELP_TOPICS[track]
-    entries = HELP_TOPICS[track]
+@pytest.mark.parametrize("screen_key", ["route_select", "stage_focus", "risk_mode"])
+def test_specs_define_previously_missing_screens(screen_key: str) -> None:
+    """Every screen exposes a spec whose action entries are plain hotkeys."""
+    entries = SCREEN_SPECS[screen_key].actions
     assert all(isinstance(entry, str) and entry for entry in entries)
     assert not any(entry.startswith(("/add", "/list")) for entry in entries)
 

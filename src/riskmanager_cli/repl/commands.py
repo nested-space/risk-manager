@@ -121,6 +121,7 @@ from ..repl.renderers.component_renderer import (
 )
 from ..repl.renderers.home_renderer import CARDS as HOME_CARDS
 from ..repl.renderers.home_renderer import render_home as render_home_screen
+from ..repl.renderers.library_home_renderer import OVERVIEW_CARDS, render_library_home
 from ..repl.renderers.library_renderer import (
     library_targets,
     render_library_detail,
@@ -776,7 +777,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             if item.item_id == "project":
                 return await self._enter_project_select()
             if item.item_id == "library":
-                return self._start_library_chooser()
+                return await self._enter_library("select")
             if item.item_id == "admin":
                 return self._enter_admin()
             return await self.render_current()
@@ -802,6 +803,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if self.ctx.current.track == "component_focus":
             return await self._activate_component_row(item.item_id)
         if self.ctx.current.track == "library":
+            if (self.ctx.current.library_sub or "select") == "select":
+                return await self._enter_library(item.item_id)
             return await self._activate_library_row(item.item_id)
         return await self.render_current()
 
@@ -1261,7 +1264,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if key == CTRL_P:
             return await self._enter_project_select()
         if key == CTRL_B:
-            return self._start_library_chooser()
+            return await self._enter_library("select")
         if key == CTRL_N:
             return self._enter_admin()
         return None
@@ -1358,6 +1361,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         self, key: str
     ) -> list[str] | None:
         sub_mode = self.ctx.current.library_sub or "select"
+        if sub_mode == "select":
+            # The library landing page is a menu, not a list: add/filter/edit/delete
+            # have nothing to act on, so leave their keys inert (only ↑↓/Enter apply).
+            return None
         if key == CTRL_A:
             return self._start_library_add_prompt(sub_mode)
         if key == CTRL_F:
@@ -1540,22 +1547,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if answer == "yes":
             self._quit_requested = True
         return await self._render_home()
-
-    def _start_library_chooser(self) -> list[str]:
-        return self.start_prompt(
-            [
-                FieldSpec(
-                    "library",
-                    field_type="select",
-                    options=[
-                        ("materials", "materials"),
-                        ("ncrm", "ncrm"),
-                        ("counterions", "counterions"),
-                    ],
-                )
-            ],
-            lambda **payload: self._enter_library(payload["library"]),
-        )
 
     def _start_route_add_chooser(self, process: ManufacturingProcess) -> list[str]:
         return self.start_prompt(
@@ -2091,9 +2082,31 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     # Search and help legend
     # ------------------------------------------------------------------ #
 
+    def current_screen_key(self) -> str:
+        """Return the registry key for the current screen.
+
+        Most tracks map to their own name. The ``library`` track is split by
+        sub-mode so its landing page and list views can expose different
+        capabilities and hints (see :data:`SCREEN_SPECS`).
+        """
+        track = self.ctx.current.track
+        if track == "library":
+            if (self.ctx.current.library_sub or "select") == "select":
+                return "library_home"
+            return "library_list"
+        return track
+
+    def current_spec(self) -> ScreenSpec:
+        """Return the :class:`ScreenSpec` for the current screen."""
+        return SCREEN_SPECS.get(self.current_screen_key(), _DEFAULT_SPEC)
+
+    def is_navigable(self) -> bool:
+        """Return ``True`` when the current screen has ``↑↓``/``Enter`` navigation."""
+        return self.current_spec().navigable
+
     def supports_search(self) -> bool:
-        """Return ``True`` when the current track has an incremental "/" search."""
-        return self.ctx.current.track in {"project_select", "route_select", "route", "library"}
+        """Return ``True`` when the current screen has an incremental "/" search."""
+        return self.current_spec().searchable
 
     async def search(  # pylint: disable=too-many-return-statements  # one return per searchable track
         self, query: str
@@ -2125,9 +2138,14 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return await self.render_current()
 
     def help_legend(self) -> list[str]:
-        """Return the hotkey legend lines for the current track."""
-        track = self.ctx.current.track
-        return [f"Hotkeys · {track}", "", *HELP_TOPICS.get(track, ["? help", "Ctrl-C back"])]
+        """Return the full control legend lines for the current screen.
+
+        Unlike the footer, which splits grammar and actions across two lines, the
+        ``?`` legend lists everything in one place: the interaction grammar
+        followed by the screen's action hotkeys.
+        """
+        key = self.current_screen_key()
+        return [f"Controls · {key}", "", *_screen_controls(self.current_spec())]
 
     def _rebuild_list_navigator(
         self, recents: list[ListItem], all_items: list[ListItem]
@@ -2259,8 +2277,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return [
             f"Routes for {project.name}",
             "",
-            "↑↓ navigate · Enter open · / search · ? help",
-            "",
             *navigator.render_lines(self.screen.width),
         ]
 
@@ -2291,12 +2307,40 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             selected_id=selected_id,
         )
 
+    async def _library_counts(self) -> dict[str, int]:
+        """Return live record counts for each library subsection.
+
+        Keyed by subsection (``ncrm``/``materials``/``counterions``) to match
+        :data:`~.renderers.library_home_renderer.OVERVIEW_CARDS`.
+        """
+        return {
+            "ncrm": len(await list_ncrm_library(self.env)),
+            "materials": len(await list_materials(self.env)),
+            "counterions": len(await list_counterions(self.env)),
+        }
+
+    async def _render_library_home(self) -> list[str]:
+        """Render the Library landing page with its navigable overview cards.
+
+        The three overview cards are backed by a fixed navigator (matching
+        :data:`~.renderers.library_home_renderer.OVERVIEW_CARDS`) so arrow keys
+        and Enter pick a subsection exactly like any other list screen.
+        """
+        counts = await self._library_counts()
+        items = [ListItem(label=title, item_id=key) for key, title in OVERVIEW_CARDS]
+        navigator = self._rebuild_list_navigator([], items)
+        return render_library_home(
+            counts, navigator.selected_index, width=self.screen.width, bold=self.screen.bold
+        )
+
     async def _render_library(
         self,
         sub_mode: str,
         query: str | None = None,
         filter_mode: str | None = None,
     ) -> list[str]:
+        if sub_mode == "select":
+            return await self._render_library_home()
         items = await self._library_items(sub_mode)
         if query:
             lowered = query.lower()
@@ -4256,28 +4300,24 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         ]
 
     def command_hints(self) -> str:
-        """Return a single-line command hint for the current screen.
+        """Return the info-line legend for the current screen.
 
-        Always reflects the active track's slash-commands from ``HELP_TOPICS``,
-        independent of any modal or list-navigation state.
+        The info line carries *screen actions* only: the Ctrl-hotkey actions from
+        the screen's :class:`ScreenSpec` plus its back entry. Interaction grammar
+        (``↑↓``/``Enter``/``/``/``:``/``?``) belongs to the nav-hint line and is
+        deliberately excluded here so the two lines never duplicate a token.
         """
-        track = self.ctx.current.track
-        keys = [*HELP_TOPICS.get(track, ["? help", "^C back"]), ": command"]
-        return " · ".join(keys)
+        spec = self.current_spec()
+        return " · ".join([*spec.actions, spec.back])
 
     def _help_lines(self, topic: str | None) -> list[str]:
         if topic is not None:
-            return [
-                f"Help for {topic}",
-                "",
-                *HELP_TOPICS.get(topic, ["No detailed help available."]),
-            ]
-        track = self.ctx.current.track
-        return [
-            f"Help · {track}",
-            "",
-            *HELP_TOPICS.get(track, ["/help", "/home", "/quit"]),
-        ]
+            spec = SCREEN_SPECS.get(topic)
+            if spec is None:
+                return [f"Help for {topic}", "", "No detailed help available."]
+            return [f"Help for {topic}", "", *_screen_controls(spec)]
+        key = self.current_screen_key()
+        return [f"Help · {key}", "", *_screen_controls(self.current_spec())]
 
     @staticmethod
     def _coerce_lines(result: Any) -> list[str]:
@@ -4288,54 +4328,83 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return [str(result)]
 
 
-# Per-track hotkey legend shown on the bottom info line. Keys are Ctrl-<letter>
-# combinations (rendered ``^X``) plus the always-available "/" search, "?" help,
-# and ":" command line. ``handle_hotkey`` is the source of truth these describe.
-HELP_TOPICS: dict[str, list[str]] = {
-    "home": ["^P project", "^B library", "^N admin", "↑↓ Enter select", "? help", "^C quit"],
-    "project_select": ["↑↓ Enter open", "^A add project", "/ search", "^C back"],
-    "project": ["^T routes", "^R risks", "^A add process", "^E edit", "^C back"],
-    "route_select": ["↑↓ Enter open", "/ search", "^C back"],
-    "route": [
-        "^A add",
-        "^F focus",
-        "^E edit",
-        "^X delete",
-        "^L list",
-        "^R risks",
-        "/ search",
-        "^C back",
-    ],
-    "stage_focus": [
-        "^A add",
-        "^L list",
-        "^E edit",
-        "^R risks",
-        "^U unassign",
-        "^X delete",
-        "^C back",
-    ],
-    "component_focus": [
-        "^A assign salt",
-        "^E edit",
-        "^U unassign",
-        "^X delete",
-        "^R risks",
-        "^C back",
-    ],
-    "library": [
-        "↵ show",
-        "^E edit",
-        "^A add",
-        "^X delete",
-        "^F filter",
-        "/ search",
-        "^C back",
-    ],
-    "library_detail": ["^E edit", "^C back"],
-    "admin": ["^A action", "^C back"],
-    "risk_mode": ["^A add", "^E edit", "^L refresh", "^C back"],
+@dataclass(frozen=True)
+class ScreenSpec:
+    """Capability and hint descriptor for one REPL screen.
+
+    The single source of truth for what a screen offers. The two footer lines
+    derive their contents from it, with a strict division of responsibility:
+
+    * **Nav-hint line** (``screen.draw_nav_hint``) = *interaction grammar*. Built
+      from :attr:`navigable` (``↑↓ navigate · Enter select``) and
+      :attr:`searchable` (``/ search``), plus the always-present ``: command`` and
+      ``? help``. Owned by ``view_hint`` in ``loop.py``.
+    * **Info line** (``screen.draw_info_line``) = *screen actions*. Built from
+      :attr:`actions` (Ctrl-hotkeys) plus :attr:`back`. Owned by
+      :meth:`CommandDispatcher.command_hints`.
+
+    The two lines never share a token: movement and global modes belong to the
+    nav line, entity actions to the info line. ``actions`` therefore lists ONLY
+    Ctrl-<letter> hotkeys, each of which the matching ``_hotkey_<screen>`` handler
+    must actually service.
+
+    Attributes:
+        navigable: Whether ``↑↓``/``Enter`` caret navigation applies (also drives
+            the PgUp/PgDn caret-paging behaviour in ``loop.py``).
+        searchable: Whether incremental "/" search applies.
+        actions: Info-line Ctrl-hotkey entries, e.g. ``("^A add", "^E edit")``.
+        back: Trailing info-line entry (``"^C back"`` or ``"^C quit"``).
+    """
+
+    navigable: bool
+    searchable: bool
+    actions: tuple[str, ...]
+    back: str = "^C back"
+
+
+# Per-screen capability + hint registry. Keyed by screen key (see
+# ``CommandDispatcher.current_screen_key``), which splits the ``library`` track
+# into its landing page and list sub-modes. ``handle_hotkey`` is the source of
+# truth the ``actions`` entries describe.
+SCREEN_SPECS: dict[str, ScreenSpec] = {
+    "home": ScreenSpec(True, False, ("^P project", "^B library", "^N admin"), back="^C quit"),
+    "project_select": ScreenSpec(True, True, ("^A add project",)),
+    "project": ScreenSpec(True, False, ("^T routes", "^R risks", "^A add process", "^E edit")),
+    "route_select": ScreenSpec(True, True, ()),
+    "route": ScreenSpec(
+        False, True, ("^A add", "^F focus", "^E edit", "^X delete", "^L list", "^R risks")
+    ),
+    "stage_focus": ScreenSpec(
+        True, False, ("^A add", "^L list", "^E edit", "^R risks", "^U unassign", "^X delete")
+    ),
+    "component_focus": ScreenSpec(
+        True, False, ("^A assign salt", "^E edit", "^U unassign", "^X delete", "^R risks")
+    ),
+    "library_home": ScreenSpec(True, False, ()),
+    "library_list": ScreenSpec(True, True, ("^E edit", "^A add", "^X delete", "^F filter")),
+    "library_detail": ScreenSpec(False, False, ("^E edit",)),
+    "admin": ScreenSpec(False, False, ("^A action",)),
+    "risk_mode": ScreenSpec(False, False, ("^A add", "^E edit", "^L refresh")),
 }
+
+# Fallback for an unknown screen key: no capabilities, just a way back.
+_DEFAULT_SPEC = ScreenSpec(False, False, ())
+
+
+def _screen_controls(spec: ScreenSpec) -> list[str]:
+    """Return the complete control list for *spec* (grammar + actions).
+
+    Used by the ``?`` legend, which — unlike the footer — shows everything in one
+    place. The interaction grammar comes first, then the screen's action hotkeys
+    and its back entry.
+    """
+    grammar: list[str] = []
+    if spec.navigable:
+        grammar += ["↑↓ navigate", "Enter select"]
+    if spec.searchable:
+        grammar.append("/ search")
+    grammar += [": command", "? help"]
+    return [*grammar, *spec.actions, spec.back]
 
 
 def _field_key(label: str) -> str:

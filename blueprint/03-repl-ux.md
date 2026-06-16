@@ -77,6 +77,38 @@ label as a prefix:
   Current risk level [1-10]: █
 ```
 
+### Footer Lines (responsibility split)
+
+Two footer lines sit at the bottom of every screen, with an **iron-clad division
+of responsibility**. The same control token must never appear on both — movement
+and global modes live on the nav-hint line; entity actions live on the info line.
+
+| Line | Row | Built by | Owns |
+|------|-----|----------|------|
+| **Nav-hint line** | `height-2` | `view_hint()` in `loop.py` (via `screen.draw_nav_hint`) | *Interaction grammar*: `↑↓ navigate · Enter select` (when navigable), `/ search` (when searchable), `: command`, `? help` |
+| **Info line** | `height-1` | `command_hints()` in `commands.py` (via `screen.draw_info_line`) | *Screen actions*: the Ctrl-hotkey actions (`^A`, `^E`, `^X`, …) plus `^C back`/`^C quit` |
+
+Both lines derive from a single source of truth: the `ScreenSpec` registry
+(`SCREEN_SPECS` in `commands.py`), keyed by screen key
+(`CommandDispatcher.current_screen_key()`, which splits the `library` track into
+`library_home` and `library_list`). A `ScreenSpec` declares `navigable`,
+`searchable`, `actions`, and `back`; the nav line reads the capability flags, the
+info line reads `actions`/`back`. Capability predicates (`is_navigable()`,
+`supports_search()`) read the same registry, so the two lines can never disagree
+about a screen.
+
+**Rules for adding a control:**
+
+- A movement/mode control (navigation, search, command, help) is expressed by
+  setting `navigable`/`searchable` on the `ScreenSpec` — never hardcoded into
+  `actions` or a renderer body.
+- An entity action is a Ctrl-hotkey added to `actions`, and must be serviced by
+  the matching `_hotkey_<screen>` handler (no advertised no-ops).
+- Never bake hint text into a renderer's page body; the footer lines own all
+  control hints.
+- The `?` legend (`help_legend()`) is the only place that shows grammar and
+  actions together, composed from the same `ScreenSpec` via `_screen_controls()`.
+
 ---
 
 ## Colour Conventions (using blessed + colorama)

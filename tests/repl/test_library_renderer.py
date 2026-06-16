@@ -25,16 +25,6 @@ def _item(**overrides: Any) -> dict[str, Any]:
 
 
 @pytest.mark.unit
-async def test_render_library_select_lists_subsections() -> None:
-    """The 'select' sub-mode renders the subsection chooser, not a table."""
-    lines = await render_library_screen("select", [])
-    assert lines[0] == "Library"
-    assert "  /library materials" in lines
-    assert "  /library ncrm" in lines
-    assert "  /library counterions" in lines
-
-
-@pytest.mark.unit
 async def test_render_library_empty_shows_placeholder() -> None:
     """A subsection with no items shows the no-items placeholder."""
     lines = await render_library_screen("materials", [])

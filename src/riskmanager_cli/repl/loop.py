@@ -112,7 +112,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
     def view_hint() -> str:
         """Build the input-row reminder for the current view-mode screen."""
         parts = []
-        if _in_list_mode(ctx):
+        if dispatcher.is_navigable():
             parts.append("↑↓ navigate · Enter select")
         if dispatcher.supports_search():
             parts.append("/ search")
@@ -341,7 +341,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             # View-mode content scrolling, available on every screen.
             if _is_scroll_key(key_name, key_text):
                 is_page = key_name in {"KEY_PGUP", "KEY_PGDOWN"}
-                if is_page and _in_list_mode(ctx) and dispatcher.list_navigator is not None:
+                if is_page and dispatcher.is_navigable() and dispatcher.list_navigator is not None:
                     # In a list, PgUp/PgDn move the selection by a screenful of
                     # items (clamped to the ends) while holding the caret at its
                     # current vertical position; the viewport follows it.
@@ -370,7 +370,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                 continue
 
             # View mode: arrow/Enter list navigation, then "/", ":", "?", and hotkeys.
-            if _in_list_mode(ctx) and dispatcher.list_navigator is not None:
+            if dispatcher.is_navigable() and dispatcher.list_navigator is not None:
                 selected = dispatcher.list_navigator.handle_key(key_name)
                 if selected is not None:
                     set_output(
@@ -416,18 +416,6 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             redraw()
     finally:
         signal.signal(signal.SIGWINCH, previous_handler)
-
-
-def _in_list_mode(ctx: ContextManager) -> bool:
-    return ctx.current.track in {
-        "home",
-        "project_select",
-        "project",
-        "route_select",
-        "stage_focus",
-        "component_focus",
-        "library",
-    }
 
 
 def _is_scroll_key(key_name: str, key_text: str) -> bool:
