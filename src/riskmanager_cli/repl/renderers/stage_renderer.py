@@ -54,14 +54,14 @@ class StageSections:
     risks: list[StageRow] = field(default_factory=list)
 
 
-_COMPONENT_COLUMNS = [Column("Name"), Column("Role")]
-_NCRM_COLUMNS = [Column("Name"), Column("Role")]
+_COMPONENT_COLUMNS = [Column("Name"), Column("Role", priority=0)]
+_NCRM_COLUMNS = [Column("Name"), Column("Role", priority=0)]
 _RISK_COLUMNS = [
     Column("Name"),
-    Column("Description"),
-    Column("Level", align="center"),
-    Column("Mitigation"),
-    Column("Mitigated level", align="center"),
+    Column("Description", priority=0),
+    Column("Level", align="center", priority=3),
+    Column("Mitigation", priority=1),
+    Column("Mitigated level", align="center", priority=2),
 ]
 
 

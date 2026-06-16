@@ -104,3 +104,24 @@ def test_render_table_drops_minimums_when_they_cannot_all_fit() -> None:
     )
     assert min(_column_widths(lines[0])) >= 1
     assert len(lines[0]) <= 15
+
+
+@pytest.mark.unit
+def test_render_table_hides_low_priority_column_when_too_narrow() -> None:
+    """A droppable column is hidden so the pinned column stays legible."""
+    columns = [Column("Name"), Column("Detail", priority=0)]
+    rows = [["Acetonitrile", "long detail"], ["Water", "more detail"]]
+    lines = render_table(columns, rows, max_width=12)
+    # The pinned Name column survives; the priority-0 Detail column is gone.
+    assert "Name" in lines[1]
+    assert "Detail" not in lines[1]
+    # Dropping a column changes content, not the row count.
+    assert len(lines[3 : 3 + len(rows)]) == 2
+
+
+@pytest.mark.unit
+def test_render_table_keeps_pinned_columns_under_pressure() -> None:
+    """Columns without a priority are never dropped, only shrunk."""
+    columns = [Column("Name"), Column("Role")]
+    lines = render_table(columns, [["Acetonitrile", "Solvent"]], max_width=12)
+    assert len(_column_widths(lines[0])) == 2  # both columns kept, merely shrunk

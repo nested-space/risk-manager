@@ -29,13 +29,15 @@ async def render_risk_table(
     if not risks:
         return [title, "", "(no risks recorded)"]
 
+    # Name is the identity column and stays; on a narrow terminal Scope drops
+    # first, then Mitigated, Type and the index, leaving Name and Level longest.
     columns = [
-        Column("#", align="right"),
-        Column("Type"),
+        Column("#", align="right", min_width=2, priority=3),
+        Column("Type", priority=2),
         Column("Name"),
-        Column("Level"),
-        Column("Mitigated"),
-        Column("Scope"),
+        Column("Level", priority=4),
+        Column("Mitigated", priority=1),
+        Column("Scope", priority=0),
     ]
     rows = [
         [

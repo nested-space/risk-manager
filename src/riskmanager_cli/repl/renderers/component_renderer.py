@@ -58,14 +58,14 @@ class ComponentSections:
 _DETAIL_COLUMNS = [Column("Property"), Column("Value")]
 _SALT_COLUMNS = [
     Column("Counterion"),
-    Column("Stoichiometry", align="right"),
-    Column("Defined", align="center"),
+    Column("Stoichiometry", align="right", priority=1),
+    Column("Defined", align="center", priority=0),
 ]
 _RISK_COLUMNS = [
-    Column("Type"),
+    Column("Type", priority=1),
     Column("Name"),
-    Column("Level", align="center"),
-    Column("Mitigated", align="center"),
+    Column("Level", align="center", priority=2),
+    Column("Mitigated", align="center", priority=0),
 ]
 
 

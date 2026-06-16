@@ -148,10 +148,10 @@ def _stage_list_lines(
     """
     name_by_id = {component.id: component.display_name for component in components}
     columns = [
-        Column("#", align="right"),
+        Column("#", align="right", min_width=2, priority=2),
         Column("Name"),
-        Column("Starting materials"),
-        Column("Products"),
+        Column("Starting materials", priority=1),
+        Column("Products", priority=0),
     ]
 
     def names(stage: StageInput, kind: str) -> str:

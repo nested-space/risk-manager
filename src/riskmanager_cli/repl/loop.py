@@ -15,7 +15,7 @@ from .commands import CommandDispatcher
 from .context import ContextManager
 from .screen import ScreenManager
 from .session_state import SessionState
-from .sticky_window import reserved_top
+from .viewport import follow, max_offset, parse, selected_line
 
 T = TypeVar("T")
 
@@ -71,8 +71,20 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
     last_field_key: tuple[int, int] | None = None
     notice = ""
     mode = "view"  # "view" (hotkeys) | "search" ("/" filter) | "command" (":" line)
-    current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
+    view = parse(_coerce_lines(run_async(dispatcher.render_current())))
+    current_output_lines = view.lines
     scroll_offset = 0
+    resize_pending = False
+
+    def reflow(lines: list[str]) -> None:
+        """Re-parse the output buffer in place, preserving the scroll position.
+
+        Used for same-screen re-renders (list navigation, resize) where the
+        caller manages ``scroll_offset`` itself.
+        """
+        nonlocal current_output_lines, view
+        view = parse(lines)
+        current_output_lines = view.lines
 
     def set_output(lines: list[str]) -> None:
         """Replace the output pane content, resetting the scroll to the top.
@@ -80,12 +92,12 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
         Every content change other than a same-screen list re-render goes through
         here so the new screen starts unscrolled.
         """
-        nonlocal current_output_lines, scroll_offset
-        current_output_lines = lines
+        nonlocal scroll_offset
+        reflow(lines)
         scroll_offset = 0
 
     def _max_scroll() -> int:
-        return max(0, len(current_output_lines) - screen.output_height)
+        return max_offset(view, screen.output_height)
 
     def consume_notice() -> None:
         """Refresh the status notice from any just-completed dispatcher action.
@@ -131,7 +143,7 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
         sync_prompt_prefill()
         scroll_offset = max(0, min(scroll_offset, _max_scroll()))
         screen.draw_status_bar()
-        screen.draw_output(current_output_lines, scroll_offset)
+        screen.draw_output(view, scroll_offset)
         if dispatcher.picker_state is not None:
             screen.draw_input_line(prompt="filter: ", text=input_buffer)
         elif dispatcher.prompt_state is not None:
@@ -146,7 +158,11 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
             screen.draw_input_line(prompt="/", text=input_buffer)
         else:
             hint = view_hint()
-            indicator = screen.scroll_indicator(scroll_offset, len(current_output_lines))
+            indicator = screen.scroll_indicator(
+                scroll_offset,
+                len(view.lines) - view.sticky_count,
+                height=screen.output_height - view.sticky_count,
+            )
             if indicator:
                 hint = f"{hint}  ·  {indicator}"
             screen.draw_nav_hint(hint, notice=notice)
@@ -190,7 +206,28 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
         return False
 
     def handle_resize(_signum: int, _frame: FrameType | None) -> None:
+        """Flag a pending resize; the reflow happens in the main loop.
+
+        The handler must stay trivial: re-rendering calls ``asyncio.run`` (via
+        ``run_async``), which cannot be re-entered, and SIGWINCH can fire while
+        the loop is mid-render. Setting a flag defers the work to a safe point.
+        """
+        nonlocal resize_pending
+        resize_pending = True
+
+    def apply_resize() -> None:
+        """Reflow the current screen to the new terminal size, then repaint.
+
+        View screens are rebuilt at the new width so tables refit and the home
+        banner re-centres; modal states are only repainted, since ``redraw``
+        draws the live prompt/picker itself.
+        """
+        nonlocal resize_pending
+        resize_pending = False
         screen.clear_screen()
+        idle = mode == "view" and dispatcher.prompt_state is None
+        if idle and dispatcher.picker_state is None:
+            reflow(_coerce_lines(run_async(dispatcher.render_current())))
         redraw()
 
     previous_handler = signal.getsignal(signal.SIGWINCH)
@@ -203,10 +240,14 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
 
     try:  # pylint: disable=too-many-nested-blocks  # blessed inkey loop; prompt/picker/list branches require deep nesting
         while True:
+            if resize_pending:
+                apply_resize()
             if dispatcher.quit_requested:
                 break
             try:
-                key = term.inkey()
+                # A timeout lets the loop notice a pending resize (flagged by the
+                # SIGWINCH handler) without waiting for the next keystroke.
+                key = term.inkey(timeout=0.25)
             except KeyboardInterrupt:
                 if handle_back(quit_at_home=True):
                     request_quit()
@@ -304,15 +345,15 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                     # In a list, PgUp/PgDn move the selection by a screenful of
                     # items (clamped to the ends) while holding the caret at its
                     # current vertical position; the viewport follows it.
-                    selected_before = _selected_line_index(current_output_lines)
+                    selected_before = selected_line(view)
                     caret_row = None if selected_before is None else selected_before - scroll_offset
                     step = screen.output_height
                     dispatcher.list_navigator.move(step if key_name == "KEY_PGDOWN" else -step)
-                    current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
-                    selected_after = _selected_line_index(current_output_lines)
+                    reflow(_coerce_lines(run_async(dispatcher.render_current())))
+                    selected_after = selected_line(view)
                     if selected_after is not None and caret_row is not None:
-                        scroll_offset = _follow_selection(
-                            current_output_lines, selected_after - caret_row, screen.output_height
+                        scroll_offset = follow(
+                            view, selected_after - caret_row, screen.output_height
                         )
                     redraw()
                     continue
@@ -343,11 +384,9 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                     "j",
                     "k",
                 }:
-                    # Same-screen re-render: preserve scroll and keep the caret visible.
-                    current_output_lines = _coerce_lines(run_async(dispatcher.render_current()))
-                    scroll_offset = _follow_selection(
-                        current_output_lines, scroll_offset, screen.output_height
-                    )
+                    # Same-screen re-render: preserve scroll and keep the selection visible.
+                    reflow(_coerce_lines(run_async(dispatcher.render_current())))
+                    scroll_offset = follow(view, scroll_offset, screen.output_height)
                     redraw()
                     continue
 
@@ -402,37 +441,6 @@ def _is_scroll_key(key_name: str, key_text: str) -> bool:
         "\x1b[1;5A",
         "\x1b[1;5B",
     }
-
-
-def _selected_line_index(lines: list[str]) -> int | None:
-    """Return the index of the caret-marked line, if any.
-
-    Selection markers are line-leading by contract: ``"▶ "`` in the list
-    navigator and ``"> "`` in the stage renderer (non-selected rows use a
-    two-space indent), so a ``startswith`` check locates the selected row.
-    """
-    for index, line in enumerate(lines):
-        if line.startswith("▶ ") or line.startswith("> "):
-            return index
-    return None
-
-
-def _follow_selection(lines: list[str], offset: int, height: int) -> int:
-    """Adjust *offset* so the caret-marked line stays within the visible window.
-
-    When the caret sits inside a box-table, a pinned header (see
-    :func:`~.sticky_window.pinned_window`) hides ``reserved`` rows at the top of
-    the window, so the caret is kept that many rows clear of the top edge.
-    """
-    selected = _selected_line_index(lines)
-    if selected is None:
-        return offset
-    reserved = reserved_top(lines, selected)
-    if selected < offset + reserved:
-        return max(0, selected - reserved)
-    if selected >= offset + height:
-        return selected - height + 1
-    return offset
 
 
 def _is_enter(key_name: str, key_text: str) -> bool:

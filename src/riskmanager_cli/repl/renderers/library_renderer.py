@@ -20,11 +20,13 @@ from .tables import Column, render_table, section_rule, section_width
 _BODY_INDENT = "  "
 _CARET = "> "
 
+# Name is the identity column and stays; the rest drop on a narrow terminal,
+# SMILES first, then the display name, leaving the alias count longest.
 _COLUMNS = [
     Column("Name"),
-    Column("Display name"),
-    Column("Aliases", align="right"),
-    Column("SMILES"),
+    Column("Display name", priority=1),
+    Column("Aliases", align="right", min_width=3, priority=2),
+    Column("SMILES", priority=0),
 ]
 
 _DETAIL_COLUMNS = [Column("Property"), Column("Value")]

@@ -7,7 +7,7 @@ import sys
 import blessed
 
 from .context import ContextManager
-from .sticky_window import pinned_window
+from .viewport import ViewModel, parse, window
 
 
 class ScreenManager:
@@ -73,7 +73,7 @@ class ScreenManager:
         """
         self.clear_screen()
         self.draw_status_bar()
-        self.draw_output(lines)
+        self.draw_output(parse(lines))
         self.draw_input_line(text=input_line)
         self.draw_info_line(info_line)
 
@@ -82,7 +82,7 @@ class ScreenManager:
         self._write_header_row(self._ctx.breadcrumb(), self._ctx.mode_label())
         sys.stdout.flush()
 
-    def draw_output(self, lines: list[str], offset: int = 0) -> None:
+    def draw_output(self, view: ViewModel, offset: int = 0) -> None:
         """Frame and fill the output pane: top spacer, content window, underline.
 
         Row 1 is a blank spacer in the default background — one line of breathing
@@ -96,37 +96,40 @@ class ScreenManager:
         centre panel matching horizontal margins.
 
         Args:
-            lines: Full set of output lines (may exceed the pane height).
-            offset: Index of the first line to show. The window is built by
-                :func:`~.sticky_window.pinned_window`, which keeps a box-table's
-                header visible whenever its rows are on screen; absent a table it
-                is just ``lines[offset : offset + output_height]``. Callers are
-                responsible for clamping *offset* to a valid range.
+            view: Parsed output buffer (see :mod:`~.viewport`); may exceed the
+                pane height.
+            offset: Index of the first *body* line to show. The window is built
+                by :func:`~.viewport.window`, which pins the sticky top region
+                and any box-table header on screen; absent both it is a plain
+                slice. Callers clamp *offset* via :func:`~.viewport.max_offset`.
         """
         width = self._term.width
         underline_row = max(self._term.height - 3, 2)
         sys.stdout.write(self._term.move_xy(0, 1) + self._term.clear_eol)
         for row in range(2, underline_row):
             sys.stdout.write(self._term.move_xy(0, row) + self._term.clear_eol)
-        window = pinned_window(lines, offset, self.output_height)
-        for row, line in enumerate(window, start=2):
+        for row, line in enumerate(window(view, offset, self.output_height), start=2):
             sys.stdout.write(self._term.move_xy(1, row) + self._fit_width(line))
         sys.stdout.write(self._term.move_xy(0, underline_row) + self._term.clear_eol + "_" * width)
         sys.stdout.flush()
 
-    def scroll_indicator(self, offset: int, total: int) -> str:
+    def scroll_indicator(self, offset: int, total: int, *, height: int | None = None) -> str:
         """Return a dimmed scroll-position hint, or ``""`` when nothing overflows.
 
         Args:
             offset: Index of the first visible line.
-            total: Total number of output lines.
+            total: Total number of scrollable lines.
+            height: Visible rows for the scrollable region; defaults to the full
+                pane. Pass the body height (pane minus any pinned region) so the
+                hint reflects what actually scrolls.
 
         Returns:
             A hint like ``"▲▼ scroll (12–34 of 80)"`` (arrows reflect whether
             content lies above/below the window), styled dim; empty when the
             content fits the pane.
         """
-        height = self.output_height
+        if height is None:
+            height = self.output_height
         if total <= height or height <= 0:
             return ""
         first = offset + 1
