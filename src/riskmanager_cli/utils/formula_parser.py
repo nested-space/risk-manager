@@ -37,25 +37,30 @@ _SUBSCRIPTS = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
 def render_chemical_formula(text: str) -> str:
     """Render a chemical display name with stoichiometric digits subscripted.
 
-    A digit run is treated as a subscript only when the character immediately
-    preceding it is part of a formula unit — a letter or a closing bracket
-    (``)``, ``]``, ``}``). Digit runs following an adduct separator (``·``,
-    ``.``, ``-``), a comma, whitespace, or the start of the string are left
-    full-size, because there they are multipliers (hydrate/adduct coefficients)
-    or organic locants rather than atom counts.
+    A digit run is treated as a subscript only when it is shorter than four
+    digits and the character immediately preceding it is part of a formula unit
+    — a letter or a closing bracket (``)``, ``]``, ``}``). Digit runs of four or
+    more digits are treated as full-size identifiers (e.g. compound codes like
+    ``AZD9291``), and runs following an adduct separator (``·``, ``.``, ``-``),
+    a comma, whitespace, or the start of the string are also left full-size,
+    because there they are multipliers (hydrate/adduct coefficients) or organic
+    locants rather than atom counts.
 
     Examples:
         ``H2SO4`` → ``H₂SO₄``; ``(NH4)2CO3`` → ``(NH₄)₂CO₃``;
         ``K2HPO4.3H2O`` → ``K₂HPO₄.3H₂O`` (the hydrate ``3`` stays full-size);
-        ``18-crown-6`` is returned unchanged.
+        ``AZD9291`` is returned unchanged; ``18-crown-6`` is returned unchanged.
 
     Why this exists:
         ``interpret_chemically`` display names are free text, so an arbitrary
         formula can appear. This rule is deterministic and never mis-subscripts
-        an organic locant or a hydrate coefficient. It deliberately does NOT
-        handle ionic charges/superscripts or isotope mass numbers — those are
-        ambiguous to detect from free text (``-`` is also a hyphen) and are
-        deferred to a follow-up. This is not a complete chemical typesetter.
+        an organic locant or a hydrate coefficient. Stoichiometric subscripts in
+        this domain never reach four digits, so the length cap cleanly keeps
+        compound codes (``AZD9291``, ``AZ12345678``) full-size without affecting
+        real formulas. It deliberately does NOT handle ionic charges/superscripts
+        or isotope mass numbers — those are ambiguous to detect from free text
+        (``-`` is also a hyphen) and are deferred to a follow-up. This is not a
+        complete chemical typesetter.
 
     Args:
         text: The display name to render.
@@ -75,10 +80,11 @@ def render_chemical_formula(text: str) -> str:
                 index += 1
             run = text[start:index]
             prev = text[start - 1] if start > 0 else ""
-            # The whole digit run is a subscript only when it directly follows a
-            # formula unit (element symbol or closing bracket); otherwise it is a
-            # coefficient/locant and stays full-size.
-            subscript = bool(prev) and (prev.isalpha() or prev in ")]}")
+            # The whole digit run is a subscript only when it is short (< 4
+            # digits) and directly follows a formula unit (element symbol or
+            # closing bracket); otherwise it is a coefficient/locant or a compound
+            # code (e.g. AZD9291) and stays full-size.
+            subscript = len(run) < 4 and bool(prev) and (prev.isalpha() or prev in ")]}")
             out.append(run.translate(_SUBSCRIPTS) if subscript else run)
             continue
         out.append(char)
