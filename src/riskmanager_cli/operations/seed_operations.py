@@ -47,6 +47,7 @@ from ..model.tables import (
     StageComponent,
     StageNcrm,
 )
+from ..utils.name_simplifier import simplify_name
 from .smiles_operations import canonicalize_smiles, is_valid_smiles
 
 COUNTERION_SEED_FILE = "counterions.json"
@@ -361,17 +362,38 @@ async def _seed_project_material(
     session: AsyncSession,
     entry: ProjectSeedMaterial,
     material_ids: dict[str, str],
+    display_names: list[str],
 ) -> str:
-    """Seed one material plus its aliases; record its id and return the outcome bucket."""
+    """Seed one material plus its aliases; record its id and return the outcome bucket.
+
+    The display name is derived with :func:`~..utils.name_simplifier.simplify_name`
+    — the same shortening offered interactively when adding a material — so the
+    seeded worked examples carry concise labels (e.g.
+    ``4-Fluoro-2-methoxy-5-nitroaniline`` → ``F-MeO-NO₂-aniline``). Names already
+    seeded in this batch are passed as the collision set so suggestions stay
+    distinct.
+
+    Args:
+        session: The open session shared across the seeding batch.
+        entry: One material entry from the example-project seed.
+        material_ids: Mapping of material name to id, updated on success.
+        display_names: Display names already assigned in this batch; appended to.
+
+    Returns:
+        The outcome bucket: ``"created"``, ``"skipped"``, or ``"errors"``.
+    """
     name = entry["name"].strip()
     if not name:
         return "skipped"
     valid, smiles = _resolve_smiles(entry["smiles"])
     if not valid:
         return "errors"
+    source = entry["display_name"].strip() or name
+    display_name = simplify_name(source, existing_names=display_names).display_name
+    display_names.append(display_name)
     parent = Material(
         name=name,
-        display_name=entry["display_name"].strip() or name,
+        display_name=display_name,
         interpret_chemically=entry["interpret_chemically"],
         smiles=smiles,
     )
@@ -505,22 +527,23 @@ async def seed_example_project(
         materials and stages processed.
     """
     counts = {"created": 0, "skipped": 0, "errors": 0}
-    materials = data["materials"]
-    stages = data["stages"]
-    total = len(materials) + len(stages)
+    total = len(data["materials"]) + len(data["stages"])
     done = 0
     async with get_db_session(env) as session:
         ncrm_by_name = {
             row.name.casefold(): str(row.id) for row in await NcrmLibrary.get_all(session)
         }
         material_ids: dict[str, str] = {}
-        for material in materials:
-            counts[await _seed_project_material(session, material, material_ids)] += 1
+        display_names: list[str] = []
+        for material in data["materials"]:
+            counts[
+                await _seed_project_material(session, material, material_ids, display_names)
+            ] += 1
             done += 1
             if progress is not None:
                 progress(done, total)
         process_id, component_ids = await _seed_project_skeleton(session, data, material_ids)
-        for stage in stages:
+        for stage in data["stages"]:
             counts[
                 await _seed_project_stage(session, stage, process_id, component_ids, ncrm_by_name)
             ] += 1

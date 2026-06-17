@@ -11,6 +11,16 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Display-name suggestions: when adding a Library entry (material, NCRM, or
+  counterion), the `display_name` field is pre-filled with a deterministic,
+  shortened suggestion derived from the full name (noise-word removal,
+  substituent-symbol substitution such as `nitro` → `NO₂-`, locant removal, and
+  fragment compression), targeting a ≤25-character soft cap. Accept it with Enter
+  or type over it; typing is capped at 30 characters. For materials, the
+  suggestion is disambiguated against existing names/aliases and best-effort
+  validated against PubChem, with a review note when flagged. New pure module
+  `utils/name_simplifier.py` and operations helpers `existing_display_names` /
+  `display_name_is_unambiguous`.
 - Molecular structure display: press `^K` on any Library list row or detail page
   to render the selected entity's SMILES to a PNG (via RDKit/`dmta_cli`) and open
   it in a system image viewer. Images are cached under `~/.rmgr/structures`

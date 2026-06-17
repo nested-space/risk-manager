@@ -458,6 +458,13 @@ Entered via `/library` from any screen.
 /filter no-smiles         — show only entries without SMILES
 ```
 
+When adding an entry, the `display_name` field is pre-filled with a shortened
+suggestion derived from the full name (e.g. `4-Fluoro-2-methoxy-5-nitroaniline`
+→ `F-MeO-NO₂-aniline`). Press Enter to accept it or type your own; the field is
+capped at 30 characters. For materials, the suggestion is disambiguated against
+existing names and best-effort checked against PubChem, with a review note when
+it may be ambiguous.
+
 **Material-specific:**
 
 ```

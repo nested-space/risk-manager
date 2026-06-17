@@ -15,6 +15,7 @@ from ..schema.create import MaterialAliasCreate, MaterialCreate
 from ..schema.update import MaterialUpdate
 from ..utils.console_formatting import print_error, print_success, print_warning
 from ..utils.parsing import parse_csv_rows, split_aliases
+from .dmta_operations import augment_name
 from .smiles_operations import (
     canonicalize_smiles,
     detect_search_type,
@@ -393,3 +394,69 @@ async def bulk_import_materials(
                 )
 
     return counts
+
+
+async def existing_display_names(
+    exclude_id: UUID | None = None,
+    env: Environment = Environment.DEV,
+    verbose: bool = False,
+) -> list[str]:
+    """Return names already in use by materials, for display-name collision checks.
+
+    Gathers every material's ``name`` and ``display_name`` plus all aliases, so a
+    suggested display name can be disambiguated against the existing set.
+
+    Args:
+        exclude_id: Material to omit (the one being edited), or ``None``.
+        env: Database environment.
+        verbose: If ``True``, prints the database path.
+
+    Returns:
+        The names, display names, and aliases in use; empty on error.
+    """
+    try:
+        async with get_db_session(env, verbose) as session:
+            materials = await Material.get_all(session)
+            aliases = await MaterialAlias.get_all(session)
+        names: list[str] = []
+        for material in materials:
+            if exclude_id is not None and str(material.id) == str(exclude_id):
+                continue
+            names.append(material.name)
+            names.append(material.display_name)
+        names.extend(alias.alias for alias in aliases)
+        return names
+    except Exception as exc:  # pylint: disable=broad-except
+        print_error(f"Failed to gather existing display names: {exc}")
+        return []
+
+
+async def display_name_is_unambiguous(
+    display_name: str,
+    own_smiles: str | None,
+) -> bool | None:
+    """Check that *display_name* does not resolve to a *different* known compound.
+
+    Why this exists:
+        A shortened display name should not coincide with a registry/PubChem
+        synonym for an unrelated structure. This best-effort check resolves the
+        candidate name and compares the resulting structure with the material's
+        own SMILES.
+
+    Args:
+        display_name: The candidate short display name.
+        own_smiles: The material's canonical SMILES, or ``None`` when unknown.
+
+    Returns:
+        ``True`` when the name resolves to the same structure (or harmlessly),
+        ``False`` when it resolves to a different compound, and ``None`` when no
+        determination is possible (no SMILES to compare, offline, or unresolved).
+    """
+    if not own_smiles:
+        return None
+    result = await augment_name(display_name)
+    if not result.resolved or not result.smiles:
+        return None
+    resolved = canonicalize_smiles(result.smiles) or result.smiles
+    own = canonicalize_smiles(own_smiles) or own_smiles
+    return resolved == own

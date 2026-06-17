@@ -63,6 +63,8 @@ from ..operations.material_operations import (
     bulk_import_materials,
     create_material,
     delete_material,
+    display_name_is_unambiguous,
+    existing_display_names,
     get_material_by_id,
     get_material_by_search,
     list_material_aliases,
@@ -171,6 +173,7 @@ from ..schema.update import (
     StageUpdate,
 )
 from ..service.structure_viewer import StructureResult, show_structure
+from ..utils.name_simplifier import simplify_name
 from ..utils.parsing import split_aliases
 from .context import ContextFrame, ContextManager
 from .list_navigator import ListItem, ListNavigator
@@ -190,6 +193,9 @@ class FieldSpec:
         options: ``(label, value)`` pairs for ``select`` fields. The label is
             shown in the list while the value is what gets stored, so booleans
             can present ``Yes``/``No`` yet persist ``"true"``/``"false"``.
+        max_length: Optional cap on the number of characters that can be typed
+            into a ``text`` field. ``None`` means no limit. Enforced by the REPL
+            loop's input handler.
     """
 
     label: str
@@ -197,6 +203,7 @@ class FieldSpec:
     required: bool = True
     default: str | None = None
     options: list[tuple[str, str]] = field(default_factory=list)
+    max_length: int | None = None
 
 
 @dataclass
@@ -497,6 +504,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         self._picker_state: PickerState | None = None
         self._notice: tuple[str, str] | None = None
         self._quit_requested = False
+        # Transient inputs for the next display-name suggestion, gathered in the
+        # async augment step and consumed by the (sync) finish form. Reset on use.
+        self._suggestion_inputs: tuple[list[str] | None, bool] = (None, False)
         # Active tab index for the current tabbed screen, with the screen key it
         # applies to so it auto-resets when navigation changes screens.
         self._active_tab = 0
@@ -2836,12 +2846,39 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         editable. On a miss (or "No"), the form opens for manual SMILES entry.
         """
         if answer != "yes":
+            self._suggestion_inputs = await self._collision_inputs(sub_mode, name, None)
             return self._finish_library_add(sub_mode, name, None, [])
         result = await augment_name(name)
         if result.resolved:
+            self._suggestion_inputs = await self._collision_inputs(sub_mode, name, result.smiles)
             return self._finish_library_add_augmented(sub_mode, name, result)
         self._notice = (f"Could not resolve '{name}'. Enter SMILES manually.", "warning")
+        self._suggestion_inputs = await self._collision_inputs(sub_mode, name, None)
         return self._finish_library_add(sub_mode, name, None, [])
+
+    async def _collision_inputs(
+        self, sub_mode: str, name: str, smiles: str | None
+    ) -> tuple[list[str] | None, bool]:
+        """Gather the collision set and PubChem-ambiguity flag for a suggestion.
+
+        Only materials currently expose a collision/ambiguity source; the other
+        subsections receive rules-only suggestions.
+
+        Args:
+            sub_mode: Library subsection.
+            name: The lead chemical name collected earlier.
+            smiles: The resolved SMILES to validate the suggestion against, if any.
+
+        Returns:
+            A ``(existing_names, ambiguous)`` pair. ``existing_names`` is ``None``
+            for subsections without a collision source.
+        """
+        if sub_mode != "materials":
+            return None, False
+        existing = await existing_display_names(env=self.env)
+        candidate = simplify_name(name, existing_names=existing).display_name
+        ambiguous = (await display_name_is_unambiguous(candidate, smiles)) is False
+        return existing, ambiguous
 
     # Library add/edit titles keyed by sub-mode. Materials, counterions, and
     # NCRM entries now share the same shape (name, display_name,
@@ -2888,9 +2925,11 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         handler = self._library_create_handler(sub_mode)
         if handler is None:
             return ["Choose a library subsection first."]
+        display_field, note = self._suggested_display_name_field(name)
+        info = InfoSection(title="Suggested display name", rows=[("note", note)]) if note else None
         return self.start_prompt(
             [
-                FieldSpec("display_name", required=False),
+                display_field,
                 FieldSpec(
                     "interpret_chemically",
                     field_type="select",
@@ -2901,7 +2940,38 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             ],
             lambda **payload: handler(name, payload, aliases),
             title=self._LIBRARY_ADD_TITLES[sub_mode],
+            info_section=info,
         )
+
+    def _suggested_display_name_field(self, name: str) -> tuple[FieldSpec, str | None]:
+        """Build a ``display_name`` field pre-filled with a simplified suggestion.
+
+        The suggestion is a deterministic shortening of *name* (see
+        :func:`~..utils.name_simplifier.simplify_name`); the user can accept it
+        with Enter or type over it. Typing is capped at the hard length limit.
+        Collision inputs gathered by the async augment step (stored in
+        ``self._suggestion_inputs``) are consumed and reset here.
+
+        Args:
+            name: The lead chemical name collected earlier.
+
+        Returns:
+            A ``(field, note)`` pair. ``note`` is a short review message when the
+            suggestion was truncated, disambiguated, or ambiguous, else ``None``.
+        """
+        existing_names, ambiguous = self._suggestion_inputs
+        self._suggestion_inputs = (None, False)
+        suggestion = simplify_name(name, existing_names=existing_names)
+        spec = FieldSpec(
+            "display_name",
+            required=False,
+            default=suggestion.display_name,
+            max_length=30,
+        )
+        note = suggestion.notes[0] if suggestion.notes else None
+        if ambiguous and note is None:
+            note = "Suggestion matches another compound on PubChem — review recommended."
+        return spec, note
 
     def _finish_library_add_augmented(
         self,
@@ -2927,16 +2997,19 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         handler = self._library_create_handler(sub_mode)
         if handler is None:
             return ["Choose a library subsection first."]
+        display_field, note = self._suggested_display_name_field(name)
         rows: list[tuple[str, str]] = [("name", name)]
         if result.smiles:
             rows.append(("smiles", result.smiles))
         if result.aliases:
             rows.append(("aliases", ", ".join(result.aliases)))
+        if note:
+            rows.append(("display-name note", note))
         info = InfoSection(title=f"Retrieved values (source: {result.source})", rows=rows)
 
         return self.start_prompt(
             [
-                FieldSpec("display_name", required=False),
+                display_field,
                 FieldSpec(
                     "interpret_chemically",
                     field_type="select",
@@ -3005,7 +3078,11 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 [
                     FieldSpec("name", default=str(item["name"])),
-                    FieldSpec("display_name", default=_default_text(item.get("display_name"))),
+                    FieldSpec(
+                        "display_name",
+                        default=_default_text(item.get("display_name")),
+                        max_length=30,
+                    ),
                     FieldSpec(
                         "interpret_chemically",
                         field_type="select",
@@ -3021,7 +3098,11 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self.start_prompt(
                 [
                     FieldSpec("name", default=str(item["name"])),
-                    FieldSpec("display_name", default=str(item["display_name"])),
+                    FieldSpec(
+                        "display_name",
+                        default=str(item["display_name"]),
+                        max_length=30,
+                    ),
                     FieldSpec(
                         "interpret_chemically",
                         field_type="select",
@@ -3036,7 +3117,11 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return self.start_prompt(
             [
                 FieldSpec("name", default=str(item["name"])),
-                FieldSpec("display_name", default=_default_text(item.get("display_name"))),
+                FieldSpec(
+                    "display_name",
+                    default=_default_text(item.get("display_name")),
+                    max_length=30,
+                ),
                 FieldSpec(
                     "interpret_chemically",
                     field_type="select",

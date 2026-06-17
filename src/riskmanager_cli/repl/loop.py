@@ -291,7 +291,9 @@ def start_repl(  # pylint: disable=too-many-arguments,too-many-positional-argume
                 elif _is_backspace(key_name, key_text):
                     input_buffer = input_buffer[:-1]
                 elif _is_text_input(key):
-                    input_buffer += key_text
+                    field_max = dispatcher.prompt_state.current_field.max_length
+                    if field_max is None or len(input_buffer) < field_max:
+                        input_buffer += key_text
                 redraw()
                 continue
 
