@@ -1375,6 +1375,29 @@
     ]
   },
   {
+    "name": "2-pentanol",
+    "display_name": "2-pentanol",
+    "interpret_chemically": true,
+    "smiles": "CCCC(C)O",
+    "aliases": [
+      "pentan-2-ol",
+      "6032-29-7",
+      "sec-amyl alcohol"
+    ]
+  },
+  {
+    "name": "ketene",
+    "display_name": "ketene",
+    "interpret_chemically": true,
+    "smiles": "C=C=O",
+    "aliases": [
+      "463-51-4",
+      "Ethenone",
+      "Keten",
+      "Carbomethene"
+    ]
+  },
+  {
     "name": "Ketoreductase",
     "display_name": "KRED",
     "interpret_chemically": false,

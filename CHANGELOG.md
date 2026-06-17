@@ -11,6 +11,25 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Second example project: first-run bootstrap now also seeds the
+  Osimertinib (Tagrisso) synthesis (AstraZeneca AZD9291) alongside the ibuprofen
+  example — a convergent 9-stage oncology route (15 materials, 9 stages, 30
+  stage→NCRM links). Committed as
+  `riskmanager_cli/data/seed/example_project_osimertinib.json` and loaded via the
+  same `seed_example_project` machinery; `load_example_project` now takes a
+  filename and bootstrap iterates over `EXAMPLE_PROJECT_SEED_FILES`. The single
+  "Seeding example project entities" progress line now aggregates the entity
+  counts of every example project. The NCRM seed library gains a `2-pentanol`
+  entry (Stage 1 SNAr solvent), raising its count to 327.
+- Example project seeding: first-run bootstrap now seeds a worked example
+  project — the Boots ibuprofen synthesis — after the reference libraries, so a
+  new database opens with a real 9-stage manufacturing process to explore. The
+  graph (14 materials, project, process, stages, components, and stage→NCRM
+  links) is committed as `riskmanager_cli/data/seed/example_project.json` and
+  loaded via `operations.seed_operations.seed_example_project`; the bootstrap
+  progress box gains a fourth "Seeding example project" line. The NCRM seed
+  library gains a `ketene` entry (used by the acetic-anhydride branch), raising
+  its count to 326.
 - Selectable library tables: the materials, NCRM and counterion subsections now
   render as navigable, alphabetised box tables with a `>` selection caret. ↑/↓
   move the caret and Enter (or `^E`) edits the highlighted row inline, replacing
@@ -21,7 +40,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   from new `*_alias_counts` operations.
 - First-run reference-library seeding: when no database file exists at the
   resolved path, the app now creates the schema and seeds the default
-  counterion (24) and NCRM (325) libraries from committed JSON
+  counterion (24) and NCRM (327) libraries from committed JSON
   (`riskmanager_cli/data/seed/*.json`), showing a live initialisation progress
   box. Subsequent launches detect the existing file and skip seeding.
   New: `operations/seed_operations.py`, `repl/bootstrap.py`, and

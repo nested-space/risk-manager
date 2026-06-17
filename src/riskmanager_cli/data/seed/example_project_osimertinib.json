@@ -1,0 +1,294 @@
+{
+  "project": {
+    "name": "Osimertinib (Tagrisso)",
+    "therapy_area": "Oncology",
+    "route_number": 1,
+    "process_number": 1,
+    "api_material": "Osimertinib mesylate"
+  },
+  "materials": [
+    {
+      "name": "1-Methylindole",
+      "display_name": "1-Methylindole",
+      "interpret_chemically": true,
+      "smiles": "Cn1ccc2ccccc21",
+      "aliases": [
+        "1-Methyl-1H-indole",
+        "603-76-9"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "2,4-Dichloropyrimidine",
+      "display_name": "2,4-Dichloropyrimidine",
+      "interpret_chemically": true,
+      "smiles": "Clc1ccnc(Cl)n1",
+      "aliases": [
+        "3934-20-1"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "4-Fluoro-2-methoxyaniline",
+      "display_name": "4-Fluoro-2-methoxyaniline",
+      "interpret_chemically": true,
+      "smiles": "COc1cc(F)ccc1N",
+      "aliases": [
+        "4-Fluoro-2-anisidine",
+        "458-52-6"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "N,N,N′-Trimethylethylenediamine",
+      "display_name": "N,N,N′-Trimethylethylenediamine",
+      "interpret_chemically": true,
+      "smiles": "CNCCN(C)C",
+      "aliases": [
+        "N′,N′-dimethyl-N-methylethane-1,2-diamine",
+        "142-25-6"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "3-Chloropropanoyl chloride",
+      "display_name": "3-Chloropropanoyl chloride",
+      "interpret_chemically": true,
+      "smiles": "ClCCC(=O)Cl",
+      "aliases": [
+        "3-Chloropropionyl chloride",
+        "625-36-5"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "Methanesulfonic acid",
+      "display_name": "Methanesulfonic acid",
+      "interpret_chemically": true,
+      "smiles": "CS(=O)(=O)O",
+      "aliases": [
+        "Mesic acid",
+        "75-75-2"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "3-(2-Chloropyrimidin-4-yl)-1-methylindole",
+      "display_name": "3-(2-Chloropyrimidin-4-yl)-1-methylindole",
+      "interpret_chemically": true,
+      "smiles": "Cn1cc(-c2ccnc(Cl)n2)c2ccccc21",
+      "aliases": [
+        "2-Chloro-4-(1-methyl-1H-indol-3-yl)pyrimidine",
+        "1143517-99-0"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "N-(4-Fluoro-2-methoxyphenyl)acetamide",
+      "display_name": "N-(4-Fluoro-2-methoxyphenyl)acetamide",
+      "interpret_chemically": true,
+      "smiles": "COc1cc(F)ccc1NC(C)=O",
+      "aliases": [
+        "N-(4-fluoro-2-methoxyphenyl)acetamide"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "4-Fluoro-2-methoxy-5-nitroaniline",
+      "display_name": "4-Fluoro-2-methoxy-5-nitroaniline",
+      "interpret_chemically": true,
+      "smiles": "Nc1cc(F)c([N+](=O)[O-])cc1OC",
+      "aliases": [
+        "1075705-01-9"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "AZD9291 nitro-SNAr product",
+      "display_name": "AZD9291 nitro-SNAr product",
+      "interpret_chemically": true,
+      "smiles": "COc1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(F)cc1[N+](=O)[O-]",
+      "aliases": [
+        "N-(4-fluoro-2-methoxy-5-nitrophenyl)-4-(1-methyl-1H-indol-3-yl)pyrimidin-2-amine",
+        "1421373-61-6"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "AZD9291 Nitrodiamine",
+      "display_name": "AZD9291 Nitrodiamine",
+      "interpret_chemically": true,
+      "smiles": "CN(CCN(C)C)c1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c([N+](=O)[O-])cc1OC",
+      "aliases": [
+        "N′-[2-(dimethylamino)ethyl]-5-methoxy-N′-methyl-N-[4-(1-methyl-1H-indol-3-yl)pyrimidin-2-yl]-4-nitrobenzene-1,2-diamine",
+        "1421373-62-7"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "AZD9291 Aniline",
+      "display_name": "AZD9291 Aniline",
+      "interpret_chemically": true,
+      "smiles": "CN(CCN(C)C)c1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(N)cc1OC",
+      "aliases": [
+        "N1-[2-(dimethylamino)ethyl]-5-methoxy-N1-methyl-N4-[4-(1-methyl-1H-indol-3-yl)pyrimidin-2-yl]benzene-1,2,4-triamine",
+        "1421373-63-8"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "AZD9291 chloropropanamide",
+      "display_name": "AZD9291 chloropropanamide",
+      "interpret_chemically": true,
+      "smiles": "CN(CCN(C)C)c1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(NC(=O)CCCl)cc1OC",
+      "aliases": [
+        "3-chloro-N-(2-{[2-(dimethylamino)ethyl](methyl)amino}-4-methoxy-5-{[4-(1-methyl-1H-indol-3-yl)pyrimidin-2-yl]amino}phenyl)propanamide",
+        "1421373-64-9"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "Osimertinib free base",
+      "display_name": "Osimertinib free base",
+      "interpret_chemically": true,
+      "smiles": "CN(CCN(C)C)c1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(NC(=O)C=C)cc1OC",
+      "aliases": [
+        "N-(2-{[2-(dimethylamino)ethyl](methyl)amino}-4-methoxy-5-{[4-(1-methyl-1H-indol-3-yl)pyrimidin-2-yl]amino}phenyl)prop-2-enamide",
+        "1421373-65-0"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "Osimertinib mesylate",
+      "display_name": "Osimertinib mesylate",
+      "interpret_chemically": true,
+      "smiles": "CN(CCN(C)C)c1cc(Nc2nccc(-c3cn(C)c4ccccc34)n2)c(NC(=O)C=C)cc1OC.CS(=O)(=O)O",
+      "aliases": [
+        "Tagrisso",
+        "AZD9291",
+        "Osimertinib mesilate",
+        "1421373-66-1"
+      ],
+      "control_strategy_role": "API",
+      "is_isolated": true
+    }
+  ],
+  "stages": [
+    {
+      "number": 1,
+      "name": "Stage A1 — Friedel-Crafts Arylation (Branch A)",
+      "reactants": ["1-Methylindole", "2,4-Dichloropyrimidine"],
+      "products": ["3-(2-Chloropyrimidin-4-yl)-1-methylindole"],
+      "ncrms": [
+        { "name": "aluminium chloride", "role": "catalyst" },
+        { "name": "dichloromethane", "role": "solvent" }
+      ]
+    },
+    {
+      "number": 2,
+      "name": "Stage B0 — Acetyl Protection of Aniline (Branch B)",
+      "reactants": ["4-Fluoro-2-methoxyaniline"],
+      "products": ["N-(4-Fluoro-2-methoxyphenyl)acetamide"],
+      "ncrms": [
+        { "name": "acetic anhydride", "role": "reagent" },
+        { "name": "acetic acid", "role": "solvent" }
+      ]
+    },
+    {
+      "number": 3,
+      "name": "Stage B1 — Regioselective Nitration (Branch B)",
+      "reactants": ["N-(4-Fluoro-2-methoxyphenyl)acetamide"],
+      "products": ["4-Fluoro-2-methoxy-5-nitroaniline"],
+      "ncrms": [
+        { "name": "Nitric acid", "role": "reagent" },
+        { "name": "sulfuric acid", "role": "catalyst" },
+        { "name": "acetic acid", "role": "solvent" },
+        { "name": "Water", "role": "additive" }
+      ]
+    },
+    {
+      "number": 4,
+      "name": "Stage 1 — SNAr Coupling (Convergence)",
+      "reactants": ["3-(2-Chloropyrimidin-4-yl)-1-methylindole", "4-Fluoro-2-methoxy-5-nitroaniline"],
+      "products": ["AZD9291 nitro-SNAr product"],
+      "ncrms": [
+        { "name": "p-toluenesulfonic acid", "role": "catalyst" },
+        { "name": "2-pentanol", "role": "solvent" },
+        { "name": "Dimethylacetamide", "role": "solvent" },
+        { "name": "N,N-Diisopropylethylamine", "role": "additive" }
+      ]
+    },
+    {
+      "number": 5,
+      "name": "Stage 2 — SNAr with Trimethylethylenediamine",
+      "reactants": ["AZD9291 nitro-SNAr product", "N,N,N′-Trimethylethylenediamine"],
+      "products": ["AZD9291 Nitrodiamine"],
+      "ncrms": [
+        { "name": "N,N-Diisopropylethylamine", "role": "additive" },
+        { "name": "Dimethylacetamide", "role": "solvent" },
+        { "name": "acetonitrile", "role": "solvent" }
+      ]
+    },
+    {
+      "number": 6,
+      "name": "Stage 3 — Catalytic Hydrogenation (Nitro Reduction)",
+      "reactants": ["AZD9291 Nitrodiamine"],
+      "products": ["AZD9291 Aniline"],
+      "ncrms": [
+        { "name": "palladium on carbon", "role": "catalyst" },
+        { "name": "hydrogen gas", "role": "reagent" },
+        { "name": "ethanol", "role": "solvent" },
+        { "name": "Water", "role": "solvent" },
+        { "name": "acetic acid", "role": "additive" }
+      ]
+    },
+    {
+      "number": 7,
+      "name": "Stage 4 — Acylation with 3-Chloropropanoyl Chloride",
+      "reactants": ["AZD9291 Aniline", "3-Chloropropanoyl chloride"],
+      "products": ["AZD9291 chloropropanamide"],
+      "ncrms": [
+        { "name": "sodium bicarbonate", "role": "additive" },
+        { "name": "acetone", "role": "solvent" },
+        { "name": "dichloromethane", "role": "solvent" },
+        { "name": "Water", "role": "additive" }
+      ]
+    },
+    {
+      "number": 8,
+      "name": "Stage 5 — Base-Mediated Elimination to Acrylamide",
+      "reactants": ["AZD9291 chloropropanamide"],
+      "products": ["Osimertinib free base"],
+      "ncrms": [
+        { "name": "triethylamine", "role": "reagent" },
+        { "name": "acetonitrile", "role": "solvent" }
+      ]
+    },
+    {
+      "number": 9,
+      "name": "Stage 6 — Mesylate Salt Formation (Final API)",
+      "reactants": ["Osimertinib free base", "Methanesulfonic acid"],
+      "products": ["Osimertinib mesylate"],
+      "ncrms": [
+        { "name": "acetone", "role": "solvent" },
+        { "name": "ethanol", "role": "solvent" },
+        { "name": "Water", "role": "additive" },
+        { "name": "activated carbon", "role": "additive" }
+      ]
+    }
+  ]
+}

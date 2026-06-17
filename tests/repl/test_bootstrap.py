@@ -5,7 +5,7 @@ import pytest
 
 from riskmanager_cli.config.settings import Environment
 from riskmanager_cli.database.db_session import get_db_session
-from riskmanager_cli.model.tables import Counterion, NcrmLibrary
+from riskmanager_cli.model.tables import Counterion, NcrmLibrary, Project, Stage
 from riskmanager_cli.repl.bootstrap import is_first_run, run_first_time_setup
 
 
@@ -49,7 +49,11 @@ async def test_run_first_time_setup_creates_and_seeds(
 
     async with get_db_session(Environment.DEV) as session:
         assert len(await Counterion.get_all(session)) == 24
-        assert len(await NcrmLibrary.get_all(session)) == 325
+        assert len(await NcrmLibrary.get_all(session)) == 327
+        # Both example projects are seeded after the reference libraries.
+        assert len(await Project.get_all(session)) == 2
+        assert len(await Stage.get_all(session)) == 18
 
     output = capsys.readouterr().out
     assert "Initialising" in output
+    assert "example project" in output
