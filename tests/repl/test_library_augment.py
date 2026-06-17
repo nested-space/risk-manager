@@ -249,3 +249,28 @@ async def test_counterion_add_augment_creates_with_smiles_and_aliases(
         assert rows[0].smiles == "[Cl-]"
         assert rows[0].display_name == "chloride"
         assert rows[0].interpret_chemically is False
+
+
+@pytest.mark.integration
+async def test_material_add_prefills_shortened_display_name(temp_env: Environment) -> None:
+    """The display_name field is pre-filled with a capped, shortened suggestion."""
+    dispatcher = _make_dispatcher(temp_env)
+
+    dispatcher._start_library_add_prompt("materials")  # pylint: disable=protected-access
+    await dispatcher.advance_prompt("4-Fluoro-2-methoxy-5-nitroaniline")  # name
+    await dispatcher.advance_prompt("no")  # decline augment -> manual finish form
+
+    state = dispatcher.prompt_state
+    assert state is not None
+    field = state.current_field
+    assert field.label == "display_name"
+    assert field.default == "F-MeO-NO₂-aniline"
+    assert field.max_length == 30
+
+    # Accept the suggestion (pressing Enter submits the pre-filled buffer).
+    await dispatcher.advance_prompt(field.default or "")  # display_name
+    await dispatcher.advance_prompt("false")  # interpret_chemically
+    await dispatcher.advance_prompt("")  # smiles (manual, left blank)
+
+    material = await _material(temp_env, "4-Fluoro-2-methoxy-5-nitroaniline")
+    assert material.display_name == "F-MeO-NO₂-aniline"

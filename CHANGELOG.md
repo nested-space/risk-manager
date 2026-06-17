@@ -11,6 +11,52 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Display-name suggestions: when adding a Library entry (material, NCRM, or
+  counterion), the `display_name` field is pre-filled with a deterministic,
+  shortened suggestion derived from the full name (noise-word removal,
+  substituent-symbol substitution such as `nitro` → `NO₂-`, locant removal, and
+  fragment compression), targeting a ≤25-character soft cap. Accept it with Enter
+  or type over it; typing is capped at 30 characters. For materials, the
+  suggestion is disambiguated against existing names/aliases and best-effort
+  validated against PubChem, with a review note when flagged. New pure module
+  `utils/name_simplifier.py` and operations helpers `existing_display_names` /
+  `display_name_is_unambiguous`.
+- Molecular structure display: press `^K` on any Library list row or detail page
+  to render the selected entity's SMILES to a PNG (via RDKit/`dmta_cli`) and open
+  it in a system image viewer. Images are cached under `~/.rmgr/structures`
+  (overridable via `RMGR_STRUCTURE_CACHE_DIR`); the viewer is the first of `feh`,
+  `xdg-open`, `display` on `PATH`, or `RMGR_IMAGE_VIEWER` if set. A status notice
+  covers every failure path (no SMILES, render failure, no viewer, launch
+  failure). New module `service/structure_viewer.py`; `^K structure` is added to
+  the `library_list` and `library_detail` footer hints.
+
+### Changed
+
+- Default database location moved to `~/.rmgr/database/` (`riskmanager.db` /
+  `riskmanager-dev.db`); the directory is created automatically. The
+  `APP_DB_PATH` / `APP_PROD_DB_PATH` / `APP_DEV_DB_PATH` overrides are unchanged.
+
+### Added
+
+- Second example project: first-run bootstrap now also seeds the
+  Osimertinib (Tagrisso) synthesis (AstraZeneca AZD9291) alongside the ibuprofen
+  example — a convergent 9-stage oncology route (15 materials, 9 stages, 30
+  stage→NCRM links). Committed as
+  `riskmanager_cli/data/seed/example_project_osimertinib.json` and loaded via the
+  same `seed_example_project` machinery; `load_example_project` now takes a
+  filename and bootstrap iterates over `EXAMPLE_PROJECT_SEED_FILES`. The single
+  "Seeding example project entities" progress line now aggregates the entity
+  counts of every example project. The NCRM seed library gains a `2-pentanol`
+  entry (Stage 1 SNAr solvent), raising its count to 327.
+- Example project seeding: first-run bootstrap now seeds a worked example
+  project — the Boots ibuprofen synthesis — after the reference libraries, so a
+  new database opens with a real 9-stage manufacturing process to explore. The
+  graph (14 materials, project, process, stages, components, and stage→NCRM
+  links) is committed as `riskmanager_cli/data/seed/example_project.json` and
+  loaded via `operations.seed_operations.seed_example_project`; the bootstrap
+  progress box gains a fourth "Seeding example project" line. The NCRM seed
+  library gains a `ketene` entry (used by the acetic-anhydride branch), raising
+  its count to 326.
 - Selectable library tables: the materials, NCRM and counterion subsections now
   render as navigable, alphabetised box tables with a `>` selection caret. ↑/↓
   move the caret and Enter (or `^E`) edits the highlighted row inline, replacing
@@ -21,7 +67,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   from new `*_alias_counts` operations.
 - First-run reference-library seeding: when no database file exists at the
   resolved path, the app now creates the schema and seeds the default
-  counterion (24) and NCRM (325) libraries from committed JSON
+  counterion (24) and NCRM (327) libraries from committed JSON
   (`riskmanager_cli/data/seed/*.json`), showing a live initialisation progress
   box. Subsequent launches detect the existing file and skip seeding.
   New: `operations/seed_operations.py`, `repl/bootstrap.py`, and

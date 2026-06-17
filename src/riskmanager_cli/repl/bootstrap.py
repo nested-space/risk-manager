@@ -30,9 +30,12 @@ from ..config.settings import Environment, build_db_url, get_db_path
 from ..database.db_session import init_db
 from ..operations.seed_operations import (
     COUNTERION_SEED_FILE,
+    EXAMPLE_PROJECT_SEED_FILES,
     NCRM_SEED_FILE,
+    load_example_project,
     load_seed_entries,
     seed_counterions,
+    seed_example_project,
     seed_ncrm,
 )
 from .renderers.layout import render_box
@@ -81,6 +84,7 @@ class _BootstrapScreen:
             _Step("Creating database"),
             _Step("Seeding NCRM library"),
             _Step("Seeding counterion library"),
+            _Step("Seeding example project entities"),
         ]
         self._rendered_lines = 0
 
@@ -171,3 +175,19 @@ async def run_first_time_setup(term: blessed.Terminal, env: Environment) -> None
         counterion_entries, env, progress=lambda done, _total: screen.advance(2, done)
     )
     screen.complete(2)
+
+    # Seeded last because their stages reference entries in the NCRM library above.
+    # Both example projects share one progress line whose counter aggregates the
+    # entities (materials + stages) of every project; ``base`` carries the count
+    # already completed by earlier projects so the line keeps climbing.
+    seeds = [load_example_project(name) for name in EXAMPLE_PROJECT_SEED_FILES]
+    screen.begin(3, total=sum(len(s["materials"]) + len(s["stages"]) for s in seeds))
+    base = 0
+
+    def advance_projects(step: int, _total: int) -> None:
+        screen.advance(3, base + step)
+
+    for seed in seeds:
+        await seed_example_project(seed, env, progress=advance_projects)
+        base += len(seed["materials"]) + len(seed["stages"])
+    screen.complete(3)

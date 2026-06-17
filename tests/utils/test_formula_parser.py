@@ -44,6 +44,22 @@ def test_render_chemical_formula_keeps_coefficients_full_size(text: str, expecte
 @pytest.mark.parametrize(
     "text",
     [
+        # Compound codes: a digit run of 4+ digits is an identifier, not a
+        # subscript, even though it follows a letter.
+        "AZD9291",
+        "AZD1234",
+        "AZ12345678",
+    ],
+)
+def test_render_chemical_formula_keeps_compound_codes_full_size(text: str) -> None:
+    """Digit runs of four or more digits are treated as codes, never subscripts."""
+    assert render_chemical_formula(text) == text
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "text",
+    [
         # Boundary cases that must pass through unchanged (deferred scope).
         "18-crown-6",  # organic locants
         "tert-butyl",

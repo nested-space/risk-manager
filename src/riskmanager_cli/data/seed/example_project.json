@@ -1,0 +1,276 @@
+{
+  "project": {
+    "name": "Ibuprofen (Boots Synthesis)",
+    "therapy_area": "Respiratory and Immunology",
+    "route_number": 1,
+    "process_number": 1,
+    "api_material": "Ibuprofen"
+  },
+  "materials": [
+    {
+      "name": "Ibuprofen",
+      "display_name": "Ibuprofen",
+      "interpret_chemically": true,
+      "smiles": "CC(C(=O)O)c1ccc(CC(C)C)cc1",
+      "aliases": [
+        "(RS)-2-[4-(2-Methylpropyl)phenyl]propanoic acid",
+        "15687-27-1"
+      ],
+      "control_strategy_role": "API",
+      "is_isolated": true
+    },
+    {
+      "name": "Benzene",
+      "display_name": "Benzene",
+      "interpret_chemically": true,
+      "smiles": "c1ccccc1",
+      "aliases": [
+        "71-43-2"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "Isobutylene",
+      "display_name": "Isobutylene",
+      "interpret_chemically": true,
+      "smiles": "CC(=C)C",
+      "aliases": [
+        "2-Methylprop-1-ene",
+        "115-11-7"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "Isobutylbenzene",
+      "display_name": "Isobutylbenzene",
+      "interpret_chemically": true,
+      "smiles": "CC(C)Cc1ccccc1",
+      "aliases": [
+        "1-(2-Methylpropyl)benzene",
+        "538-93-2"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "Acetic anhydride",
+      "display_name": "Acetic anhydride",
+      "interpret_chemically": true,
+      "smiles": "CC(=O)OC(C)=O",
+      "aliases": [
+        "108-24-7",
+        "Ethanoic anhydride"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "Ethyl chloroacetate",
+      "display_name": "Ethyl chloroacetate",
+      "interpret_chemically": true,
+      "smiles": "ClCC(=O)OCC",
+      "aliases": [
+        "Ethyl 2-chloroacetate",
+        "105-39-5"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "Hydroxylamine hydrochloride",
+      "display_name": "Hydroxylamine hydrochloride",
+      "interpret_chemically": true,
+      "smiles": "ON.Cl",
+      "aliases": [
+        "5470-11-1"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "Isobutyraldehyde",
+      "display_name": "Isobutyraldehyde",
+      "interpret_chemically": true,
+      "smiles": "CC(C)C=O",
+      "aliases": [
+        "2-Methylpropanal",
+        "78-84-2"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "Acetic acid",
+      "display_name": "Acetic acid",
+      "interpret_chemically": true,
+      "smiles": "CC(=O)O",
+      "aliases": [
+        "ethanoic acid",
+        "64-19-7"
+      ],
+      "control_strategy_role": "RSM",
+      "is_isolated": true
+    },
+    {
+      "name": "4′-Isobutylacetophenone",
+      "display_name": "4′-Isobutylacetophenone",
+      "interpret_chemically": true,
+      "smiles": "CC(=O)c1ccc(CC(C)C)cc1",
+      "aliases": [
+        "1-[4-(2-Methylpropyl)phenyl]ethan-1-one",
+        "38861-78-8"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "Ibuprofen glycidic ester",
+      "display_name": "Ibuprofen glycidic ester",
+      "interpret_chemically": true,
+      "smiles": "CCOC(=O)C1OC1(C)c1ccc(CC(C)C)cc1",
+      "aliases": [
+        "Ethyl 3-[4-(2-methylpropyl)phenyl]-3-methyloxirane-2-carboxylate",
+        "39049-13-1"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "Ibuprofen aldehyde",
+      "display_name": "Ibuprofen aldehyde",
+      "interpret_chemically": true,
+      "smiles": "CC(C=O)c1ccc(CC(C)C)cc1",
+      "aliases": [
+        "2-[4-(2-Methylpropyl)phenyl]propanal",
+        "51407-00-2"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "Ibuprofen aldoxime",
+      "display_name": "Ibuprofen aldoxime",
+      "interpret_chemically": true,
+      "smiles": "CC(/C=N/O)c1ccc(CC(C)C)cc1",
+      "aliases": [
+        "(E)-2-[4-(2-Methylpropyl)phenyl]propanal oxime",
+        "53949-53-4"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    },
+    {
+      "name": "Ibuprofen nitrile",
+      "display_name": "Ibuprofen nitrile",
+      "interpret_chemically": true,
+      "smiles": "CC(C#N)c1ccc(CC(C)C)cc1",
+      "aliases": [
+        "2-[4-(2-Methylpropyl)phenyl]propanenitrile",
+        "51246-48-1"
+      ],
+      "control_strategy_role": "INT",
+      "is_isolated": true
+    }
+  ],
+  "stages": [
+    {
+      "number": 1,
+      "name": "Branch A1 — Friedel-Crafts Alkylation",
+      "reactants": ["Benzene", "Isobutylene"],
+      "products": ["Isobutylbenzene"],
+      "ncrms": [
+        { "name": "aluminium chloride", "role": "catalyst" },
+        { "name": "dichloromethane", "role": "solvent" },
+        { "name": "hydrochloric acid", "role": "additive" }
+      ]
+    },
+    {
+      "number": 2,
+      "name": "Branch A2 — Alternative Alkylation via Isobutyraldehyde",
+      "reactants": ["Benzene", "Isobutyraldehyde"],
+      "products": ["Isobutylbenzene"],
+      "ncrms": [
+        { "name": "aluminium chloride", "role": "catalyst" },
+        { "name": "dichloromethane", "role": "solvent" }
+      ]
+    },
+    {
+      "number": 3,
+      "name": "Branch B1 — Acetic Anhydride Preparation",
+      "reactants": ["Acetic acid"],
+      "products": ["Acetic anhydride"],
+      "ncrms": [
+        { "name": "ketene", "role": "reagent" },
+        { "name": "phosphoric acid", "role": "catalyst" }
+      ]
+    },
+    {
+      "number": 4,
+      "name": "Stage 1 — Friedel-Crafts Acylation (Convergence)",
+      "reactants": ["Isobutylbenzene", "Acetic anhydride"],
+      "products": ["4′-Isobutylacetophenone"],
+      "ncrms": [
+        { "name": "aluminium chloride", "role": "catalyst" },
+        { "name": "dichloromethane", "role": "solvent" },
+        { "name": "hydrochloric acid", "role": "additive" },
+        { "name": "sodium hydroxide", "role": "additive" },
+        { "name": "sodium chloride", "role": "additive" }
+      ]
+    },
+    {
+      "number": 5,
+      "name": "Stage 2 — Darzens Condensation",
+      "reactants": ["4′-Isobutylacetophenone", "Ethyl chloroacetate"],
+      "products": ["Ibuprofen glycidic ester"],
+      "ncrms": [
+        { "name": "sodium ethoxide", "role": "reagent" },
+        { "name": "ethanol", "role": "solvent" }
+      ]
+    },
+    {
+      "number": 6,
+      "name": "Stage 3 — Hydrolysis & Decarboxylation",
+      "reactants": ["Ibuprofen glycidic ester"],
+      "products": ["Ibuprofen aldehyde"],
+      "ncrms": [
+        { "name": "hydrochloric acid", "role": "additive" },
+        { "name": "toluene", "role": "solvent" },
+        { "name": "Water", "role": "reagent" }
+      ]
+    },
+    {
+      "number": 7,
+      "name": "Stage 4 — Oximation",
+      "reactants": ["Ibuprofen aldehyde", "Hydroxylamine hydrochloride"],
+      "products": ["Ibuprofen aldoxime"],
+      "ncrms": [
+        { "name": "sodium acetate", "role": "additive" },
+        { "name": "ethanol", "role": "solvent" },
+        { "name": "Water", "role": "solvent" }
+      ]
+    },
+    {
+      "number": 8,
+      "name": "Stage 5 — Dehydration to Nitrile",
+      "reactants": ["Ibuprofen aldoxime"],
+      "products": ["Ibuprofen nitrile"],
+      "ncrms": [
+        { "name": "acetic anhydride", "role": "reagent" },
+        { "name": "toluene", "role": "solvent" }
+      ]
+    },
+    {
+      "number": 9,
+      "name": "Stage 6 — Nitrile Hydrolysis (Final API)",
+      "reactants": ["Ibuprofen nitrile"],
+      "products": ["Ibuprofen"],
+      "ncrms": [
+        { "name": "sulfuric acid", "role": "catalyst" },
+        { "name": "Water", "role": "reagent" },
+        { "name": "ethanol", "role": "solvent" }
+      ]
+    }
+  ]
+}
