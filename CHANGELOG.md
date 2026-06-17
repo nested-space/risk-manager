@@ -11,6 +11,23 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Molecular structure display: press `^K` on any Library list row or detail page
+  to render the selected entity's SMILES to a PNG (via RDKit/`dmta_cli`) and open
+  it in a system image viewer. Images are cached under `~/.rmgr/structures`
+  (overridable via `RMGR_STRUCTURE_CACHE_DIR`); the viewer is the first of `feh`,
+  `xdg-open`, `display` on `PATH`, or `RMGR_IMAGE_VIEWER` if set. A status notice
+  covers every failure path (no SMILES, render failure, no viewer, launch
+  failure). New module `service/structure_viewer.py`; `^K structure` is added to
+  the `library_list` and `library_detail` footer hints.
+
+### Changed
+
+- Default database location moved to `~/.rmgr/database/` (`riskmanager.db` /
+  `riskmanager-dev.db`); the directory is created automatically. The
+  `APP_DB_PATH` / `APP_PROD_DB_PATH` / `APP_DEV_DB_PATH` overrides are unchanged.
+
+### Added
+
 - Second example project: first-run bootstrap now also seeds the
   Osimertinib (Tagrisso) synthesis (AstraZeneca AZD9291) alongside the ibuprofen
   example — a convergent 9-stage oncology route (15 materials, 9 stages, 30

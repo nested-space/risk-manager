@@ -138,8 +138,8 @@ files are required — the defaults work out of the box for local development.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_ENV` | `dev` | Active environment. Accepted: `dev`, `prod` |
-| `APP_DEV_DB_PATH` | `./riskmanager-dev.db` | SQLite file path for `dev` |
-| `APP_PROD_DB_PATH` | `./riskmanager.db` | SQLite file path for `prod` |
+| `APP_DEV_DB_PATH` | `~/.rmgr/database/riskmanager-dev.db` | SQLite file path for `dev` |
+| `APP_PROD_DB_PATH` | `~/.rmgr/database/riskmanager.db` | SQLite file path for `prod` |
 | `APP_DB_PATH` | _(none)_ | Overrides both path vars regardless of `APP_ENV` |
 
 **Precedence:**
@@ -155,6 +155,19 @@ files are required — the defaults work out of the box for local development.
 
 The session state file is created automatically on first run. If missing or
 corrupt, the application starts fresh without error.
+
+#### Structure Display
+
+In the Library, press `^K` on any list row or detail page to render the
+entity's SMILES to a PNG and open it in an image viewer.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RMGR_STRUCTURE_CACHE_DIR` | `~/.rmgr/structures` | Cache directory for rendered structure PNGs |
+| `RMGR_IMAGE_VIEWER` | _(auto)_ | Viewer command; when unset, the first of `feh`, `xdg-open`, `display` on `PATH` is used |
+
+A clear status notice is shown when the entity has no SMILES, the SMILES cannot
+be rendered, no viewer is installed, or the viewer fails to launch.
 
 #### DMTA Enrichment (optional)
 

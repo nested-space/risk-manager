@@ -170,6 +170,7 @@ from ..schema.update import (
     StageRiskUpdate,
     StageUpdate,
 )
+from ..service.structure_viewer import StructureResult, show_structure
 from ..utils.parsing import split_aliases
 from .context import ContextFrame, ContextManager
 from .list_navigator import ListItem, ListNavigator
@@ -239,6 +240,7 @@ CTRL_B = "\x02"  # library
 CTRL_E = "\x05"  # edit
 CTRL_F = "\x06"  # focus / filter
 CTRL_G = "\x07"  # go home
+CTRL_K = "\x0b"  # view molecular structure
 CTRL_L = "\x0c"  # list
 CTRL_N = "\x0e"  # admin
 CTRL_O = "\x0f"  # open / show
@@ -1378,6 +1380,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return self._start_library_filter_chooser(sub_mode)
         if key == CTRL_L:
             return await self._render_library(sub_mode)
+        if key == CTRL_K:
+            return await self._visualize_library_structure(sub_mode)
         if key in {CTRL_E, CTRL_X}:
             return await self._library_selection_action(sub_mode, key)
         return None
@@ -1385,16 +1389,19 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     async def _hotkey_library_detail(self, key: str) -> list[str] | None:
         """Handle hotkeys on the library detail (show) screen.
 
-        Only ``^E`` is active: it opens the inline edit form for the shown entry;
-        ``^C`` (back to the list) is handled generically by the REPL loop.
+        ``^E`` opens the inline edit form for the shown entry and ``^K`` displays
+        its molecular structure; ``^C`` (back to the list) is handled generically
+        by the REPL loop.
         """
-        if key != CTRL_E:
+        if key not in {CTRL_E, CTRL_K}:
             return None
         sub_mode = self.ctx.current.library_sub or "select"
         item_id = self.ctx.current.library_detail_id or ""
         item = await self._find_library_item_by_id(sub_mode, item_id)
         if item is None:
             return await self._refresh_with_notice("Item not found.", "error")
+        if key == CTRL_K:
+            return await self._show_structure_for_item(item)
         return self._library_edit_form(sub_mode, item)
 
     async def _library_selection_action(self, sub_mode: str, key: str) -> list[str]:
@@ -1417,6 +1424,41 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             f"Delete '{label}'",
             lambda: self._delete_library_entry(sub_mode, item),
         )
+
+    async def _visualize_library_structure(self, sub_mode: str) -> list[str]:
+        """Display the molecular structure of the caret-selected library row."""
+        selected = self.list_navigator.selected if self.list_navigator else None
+        if selected is None:
+            return await self._refresh_with_notice("No item selected.", "warning")
+        item = await self._find_library_item_by_id(sub_mode, selected.item_id)
+        if item is None:
+            return await self._refresh_with_notice("Item not found.", "error")
+        return await self._show_structure_for_item(item)
+
+    async def _show_structure_for_item(self, item: dict[str, Any]) -> list[str]:
+        """Render *item*'s SMILES to an image and open it, returning a notice.
+
+        Maps each :class:`StructureResult` to a status notice so every failure
+        path (missing SMILES, render failure, no viewer, launch failure) is
+        reported on the input row.
+        """
+        name = str(item.get("name") or item.get("display_name") or "item")
+        smiles = item.get("smiles")
+        if not smiles:
+            return await self._refresh_with_notice(f"No SMILES available for '{name}'.", "warning")
+        match show_structure(str(smiles)):
+            case StructureResult.OK:
+                return await self._refresh_with_notice(f"Opened structure for '{name}'.")
+            case StructureResult.RENDER_FAILED:
+                return await self._refresh_with_notice(
+                    "Could not render structure (invalid SMILES).", "error"
+                )
+            case StructureResult.NO_VIEWER:
+                return await self._refresh_with_notice(
+                    "No image viewer found (install feh).", "error"
+                )
+            case _:
+                return await self._refresh_with_notice("Failed to open image viewer.", "error")
 
     async def _hotkey_admin(self, key: str) -> list[str] | None:
         if key == CTRL_A:
@@ -4435,8 +4477,10 @@ SCREEN_SPECS: dict[str, ScreenSpec] = {
         True, False, ("^A assign salt", "^E edit", "^U unassign", "^X delete", "^R risks")
     ),
     "library_home": ScreenSpec(True, False, (), tab_hint="Tab switch tabs"),
-    "library_list": ScreenSpec(True, True, ("^E edit", "^A add", "^X delete", "^F filter")),
-    "library_detail": ScreenSpec(False, False, ("^E edit",)),
+    "library_list": ScreenSpec(
+        True, True, ("^E edit", "^A add", "^X delete", "^F filter", "^K structure")
+    ),
+    "library_detail": ScreenSpec(False, False, ("^E edit", "^K structure")),
     "admin": ScreenSpec(False, False, ("^A action",)),
     "risk_mode": ScreenSpec(False, False, ("^A add", "^E edit", "^L refresh")),
 }

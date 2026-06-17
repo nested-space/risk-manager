@@ -16,10 +16,17 @@ from riskmanager_cli.operations.counterion_operations import (
     create_counterion,
     list_counterions,
 )
-from riskmanager_cli.repl.commands import CTRL_E, CTRL_O, CTRL_X, CommandDispatcher
+from riskmanager_cli.repl.commands import (
+    CTRL_E,
+    CTRL_K,
+    CTRL_O,
+    CTRL_X,
+    CommandDispatcher,
+)
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
 from riskmanager_cli.repl.session_state import SessionState
 from riskmanager_cli.schema.create import CounterionAliasCreate, CounterionCreate
+from riskmanager_cli.service.structure_viewer import StructureResult
 
 
 class _StubScreen:
@@ -121,6 +128,70 @@ async def test_library_ctrl_e_without_items_notifies(temp_env: Environment) -> N
     await dispatcher.handle_hotkey(CTRL_E)
 
     assert dispatcher.take_notice() == ("No item selected.", "warning")
+
+
+@pytest.mark.integration
+async def test_library_ctrl_k_without_selection_notifies(temp_env: Environment) -> None:
+    """^K on an empty subsection reports nothing selected rather than erroring."""
+    dispatcher = _library_dispatcher(temp_env)
+    await dispatcher.render_current()
+
+    await dispatcher.handle_hotkey(CTRL_K)
+
+    assert dispatcher.take_notice() == ("No item selected.", "warning")
+
+
+@pytest.mark.integration
+async def test_library_ctrl_k_without_smiles_notifies(temp_env: Environment) -> None:
+    """^K on a row without a SMILES string names the entity in the warning."""
+    await _seed_counterions(temp_env)  # acetate (no SMILES) sorts first
+    dispatcher = _library_dispatcher(temp_env)
+    await dispatcher.render_current()
+
+    await dispatcher.handle_hotkey(CTRL_K)
+
+    assert dispatcher.take_notice() == ("No SMILES available for 'acetate'.", "warning")
+
+
+@pytest.mark.integration
+async def test_library_ctrl_k_opens_structure(
+    temp_env: Environment, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """^K on a row with a SMILES renders/opens it and reports success."""
+    await create_counterion(CounterionCreate(name="acetate", smiles="CC(=O)[O-]"), env=temp_env)
+    seen: list[str] = []
+    monkeypatch.setattr(
+        "riskmanager_cli.repl.commands.show_structure",
+        lambda smiles, **_kw: seen.append(smiles) or StructureResult.OK,
+    )
+    dispatcher = _library_dispatcher(temp_env)
+    await dispatcher.render_current()
+
+    await dispatcher.handle_hotkey(CTRL_K)
+
+    assert seen == ["CC(=O)[O-]"]
+    assert dispatcher.take_notice() == ("Opened structure for 'acetate'.", "success")
+
+
+@pytest.mark.integration
+async def test_library_detail_ctrl_k_opens_structure(
+    temp_env: Environment, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """^K works on the detail screen, acting on the shown entry's SMILES."""
+    await create_counterion(CounterionCreate(name="acetate", smiles="CC(=O)[O-]"), env=temp_env)
+    monkeypatch.setattr(
+        "riskmanager_cli.repl.commands.show_structure",
+        lambda _smiles, **_kw: StructureResult.OK,
+    )
+    dispatcher = _library_dispatcher(temp_env)
+    await dispatcher.render_current()
+    selected = dispatcher.list_navigator.selected  # type: ignore[union-attr]
+    await dispatcher.activate_list_selection(selected)  # type: ignore[arg-type]
+    assert dispatcher.ctx.current.track == "library_detail"
+
+    await dispatcher.handle_hotkey(CTRL_K)
+
+    assert dispatcher.take_notice() == ("Opened structure for 'acetate'.", "success")
 
 
 @pytest.mark.integration
