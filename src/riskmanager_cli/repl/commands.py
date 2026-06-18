@@ -10,7 +10,6 @@ from uuid import UUID
 
 from ..config.settings import Environment
 from ..model.enums import NcrmRole
-from ..model.severity import LEVEL_OPTIONS
 from ..model.tables import Component, ManufacturingProcess, Project, Stage
 from ..operations.component_operations import (
     component_display_name,
@@ -117,7 +116,7 @@ from ..schema.update import (
     StageRiskUpdate,
     StageUpdate,
 )
-from . import lookup
+from . import lookup, picker_items, risk_forms
 from .context import ContextFrame, ContextManager
 from .form_fields import (
     BOOL_OPTIONS,
@@ -126,7 +125,6 @@ from .form_fields import (
     OPTIONAL_BOOL_OPTIONS,
     QUIT_OPTIONS,
     as_bool,
-    default_text,
     enum_options,
     optional_bool,
     optional_float,
@@ -482,7 +480,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         if verb == "/add" and args:
             if args[0].lower() == "risk":
                 return self.modal.start_prompt(
-                    self._risk_fields(),
+                    risk_forms.risk_fields(),
                     lambda **payload: self._create_stage_risk_from_prompt(stage, payload),
                     title="Add risk",
                 )
@@ -650,7 +648,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
             if process is None:
                 return ["Route not found."]
             return self.modal.start_prompt(
-                self._risk_fields(),
+                risk_forms.risk_fields(),
                 lambda **payload: self._create_process_risk_from_prompt(process, payload),
                 title="Add risk",
             )
@@ -659,7 +657,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
             if stage is None:
                 return ["Stage not found."]
             return self.modal.start_prompt(
-                self._risk_fields(),
+                risk_forms.risk_fields(),
                 lambda **payload: self._create_stage_risk_from_prompt(stage, payload),
                 title="Add risk",
             )
@@ -668,7 +666,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
             if component is None:
                 return ["Component not found."]
             return self.modal.start_prompt(
-                self._risk_fields(),
+                risk_forms.risk_fields(),
                 lambda **payload: self._create_component_risk_from_prompt(component, payload),
                 title="Add risk",
             )
@@ -787,7 +785,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
             return await self._start_component_add_picker(process)
         if kind == "risk":
             return self.modal.start_prompt(
-                self._risk_fields(),
+                risk_forms.risk_fields(),
                 lambda **payload: self._create_process_risk_from_prompt(process, payload),
                 title="Add risk",
             )
@@ -867,7 +865,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
 
     async def _route_focus_dispatch(self, process: ManufacturingProcess, scope: str) -> list[str]:
         if scope == "stage":
-            items = await self._stage_items(process)
+            items = await picker_items.stage_items(self.env, process)
             if not items:
                 return ["No stages yet."]
             return self.modal.start_picker(
@@ -875,7 +873,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
                 items,
                 lambda item: self._open_stage_by_id(process, item.item_id),
             )
-        items = await self._process_component_items(process)
+        items = await picker_items.process_component_items(self.env, process)
         if not items:
             return ["No components yet."]
         return self.modal.start_picker(
@@ -926,7 +924,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         if scope == "route":
             return self._start_process_edit_form(process)
         if scope == "stage":
-            items = await self._stage_items(process)
+            items = await picker_items.stage_items(self.env, process)
             if not items:
                 return ["No stages yet."]
             return self.modal.start_picker(
@@ -934,7 +932,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
                 items,
                 lambda item: self._start_stage_edit_form_by_id(process, item.item_id),
             )
-        items = await self._process_component_items(process)
+        items = await picker_items.process_component_items(self.env, process)
         if not items:
             return ["No components yet."]
         return self.modal.start_picker(
@@ -1004,7 +1002,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         if risk is None:
             return ["Risk not found."]
         return self.modal.start_prompt(
-            self._risk_edit_fields(risk),
+            risk_forms.risk_edit_fields(risk),
             lambda **payload: self._update_stage_risk_from_prompt(risk_id, payload),
             title="Edit risk",
         )
@@ -1025,7 +1023,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         if risk is None:
             return ["Risk not found."]
         return self.modal.start_prompt(
-            self._risk_edit_fields(risk),
+            risk_forms.risk_edit_fields(risk),
             lambda **payload: self._update_process_risk_from_prompt(risk_id, payload),
             title="Edit risk",
         )
@@ -1046,7 +1044,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         if risk is None:
             return ["Risk not found."]
         return self.modal.start_prompt(
-            self._risk_edit_fields(risk),
+            risk_forms.risk_edit_fields(risk),
             lambda **payload: self._update_component_risk_from_prompt(risk_id, payload),
             title="Edit risk",
         )
@@ -1090,7 +1088,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
 
     async def _route_delete_dispatch(self, process: ManufacturingProcess, scope: str) -> list[str]:
         if scope == "stage":
-            items = await self._stage_items(process)
+            items = await picker_items.stage_items(self.env, process)
             if not items:
                 return ["No stages yet."]
             return self.modal.start_picker(
@@ -1098,7 +1096,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
                 items,
                 lambda item: self._confirm_delete_stage_by_id(process, item.item_id),
             )
-        items = await self._process_component_items(process)
+        items = await picker_items.process_component_items(self.env, process)
         if not items:
             return ["No components yet."]
         return self.modal.start_picker(
@@ -1161,7 +1159,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
     ) -> list[str]:
         if kind == "risk":
             return self.modal.start_prompt(
-                self._risk_fields(),
+                risk_forms.risk_fields(),
                 lambda **payload: self._create_stage_risk_from_prompt(stage, payload),
                 title="Add risk",
             )
@@ -1468,7 +1466,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
     ) -> list[str]:
         if not args or args == ["process"]:
             return self.modal.start_prompt(
-                self._risk_fields(),
+                risk_forms.risk_fields(),
                 lambda **payload: self._create_process_risk_from_prompt(process, payload),
                 title="Add risk",
             )
@@ -1478,7 +1476,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
             if stage is None:
                 return [f"Stage '{stage_name}' not found."]
             return self.modal.start_prompt(
-                self._risk_fields(),
+                risk_forms.risk_fields(),
                 lambda **payload: self._create_stage_risk_from_prompt(stage, payload),
                 title="Add risk",
             )
@@ -1488,7 +1486,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
             if component is None:
                 return [f"Component '{component_name}' not found."]
             return self.modal.start_prompt(
-                self._risk_fields(),
+                risk_forms.risk_fields(),
                 lambda **payload: self._create_component_risk_from_prompt(component, payload),
                 title="Add risk",
             )
@@ -1703,7 +1701,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         creates a :class:`StageComponent` link without creating a new component,
         so a single component can appear in several stages with different roles.
         """
-        items = await self._process_component_items(process)
+        items = await picker_items.process_component_items(self.env, process)
         if not items:
             return [
                 "No components yet. Create one at the route level with /add component <material>.",
@@ -1713,48 +1711,6 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
             items,
             lambda item: self._start_assign_role_prompt(stage, item),
         )
-
-    async def _process_component_items(self, process: ManufacturingProcess) -> list[ListItem]:
-        """Build picker items for every component in *process*, labelled by salt-form name.
-
-        Each item's subtitle summarises the component's current stage assignments
-        (``Stage {n} {role}``, comma-separated) so that several components sharing
-        a material — e.g. a reactant reused across stages — stay distinguishable.
-        Components with no assignments read ``unassigned``.
-
-        Args:
-            process: The manufacturing process whose components to list.
-
-        Returns:
-            One :class:`ListItem` per component (empty when the process has none).
-        """
-        components = await list_components_for_process(UUID(str(process.id)), self.env)
-        assignments = await self._component_assignment_map(process)
-        items: list[ListItem] = []
-        for component in components:
-            label = await component_display_name(component, self.env)
-            if component.control_strategy_role:
-                label = f"{label} ({component.control_strategy_role})"
-            entries = sorted(assignments.get(str(component.id), []))
-            subtitle = (
-                ", ".join(f"Stage {number} {role}" for number, role in entries)
-                if entries
-                else "unassigned"
-            )
-            items.append(ListItem(label=label, subtitle=subtitle, item_id=str(component.id)))
-        return items
-
-    async def _component_assignment_map(
-        self, process: ManufacturingProcess
-    ) -> dict[str, list[tuple[int, str]]]:
-        """Map each component id to its ``(stage_number, component_type)`` links."""
-        assignments: dict[str, list[tuple[int, str]]] = {}
-        for stage in await list_stages_for_process(UUID(str(process.id)), self.env):
-            for link in await list_stage_components(UUID(str(stage.id)), self.env):
-                assignments.setdefault(str(link.component_id), []).append(
-                    (stage.number, link.component_type)
-                )
-        return assignments
 
     def _start_assign_role_prompt(self, stage: Stage, component_item: ListItem) -> list[str]:
         return self.modal.start_prompt(
@@ -1857,7 +1813,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         Args:
             process: The manufacturing process owning the stages and components.
         """
-        items = await self._stage_items(process)
+        items = await picker_items.stage_items(self.env, process)
         if not items:
             return ["Add a stage first with /add stage <name> --number N."]
         return self.modal.start_picker(
@@ -1869,7 +1825,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
     async def _start_stage_component_component_picker(
         self, process: ManufacturingProcess, stage_id: str
     ) -> list[str]:
-        items = await self._process_component_items(process)
+        items = await picker_items.process_component_items(self.env, process)
         if not items:
             return ["No components yet. Create one with /add component <material>."]
         return self.modal.start_picker(
@@ -1907,7 +1863,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         Args:
             process: The manufacturing process owning the stages.
         """
-        items = await self._stage_items(process)
+        items = await picker_items.stage_items(self.env, process)
         if not items:
             return ["Add a stage first with /add stage <name> --number N."]
         return self.modal.start_picker(
@@ -1947,18 +1903,6 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         if link is None:
             return await self.refresh_with_notice("Failed to create stage-NCRM link.", "error")
         return await self.refresh_with_notice("Stage-NCRM link created.")
-
-    async def _stage_items(self, process: ManufacturingProcess) -> list[ListItem]:
-        """Build picker items for every stage in *process*, labelled by name.
-
-        Args:
-            process: The manufacturing process whose stages to list.
-
-        Returns:
-            One :class:`ListItem` per stage (empty when the process has none).
-        """
-        stages = await list_stages_for_process(UUID(str(process.id)), self.env)
-        return [ListItem(label=stage.name, item_id=str(stage.id)) for stage in stages]
 
     async def _create_stage_ncrm_from_prompt(
         self,
@@ -2149,7 +2093,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
             return await self.refresh_with_notice("Nothing selected.", "warning")
         kind, _, raw_id = selected.item_id.partition(":")
         if kind == "component":
-            link_id = await self._stage_component_link_id(stage, raw_id)
+            link_id = await picker_items.stage_component_link_id(self.env, stage, raw_id)
             if link_id is None:
                 return await self.refresh_with_notice("Component not found.", "error")
             return self.start_confirm(
@@ -2201,14 +2145,6 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
                 ),
             )
         return await self.refresh_with_notice("Nothing to unassign.", "warning")
-
-    async def _stage_component_link_id(self, stage: Stage, component_id: str) -> UUID | None:
-        """Resolve the stage-component link id for a component row's component id."""
-        links = await list_stage_components(UUID(str(stage.id)), self.env)
-        for link in links:
-            if str(link.component_id) == component_id:
-                return UUID(str(link.id))
-        return None
 
     async def _unassign_with_notice(self, delete_coro: Awaitable[bool], success: str) -> list[str]:
         """Await a delete operation, then refresh the screen with a status notice."""
@@ -2285,42 +2221,6 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         if created is None:
             return await self.refresh_with_notice("Failed to create salt record.", "error")
         return await self.refresh_with_notice("Created salt record.")
-
-    def _risk_fields(self) -> list[FieldSpec]:
-        return [
-            FieldSpec("risk_type"),
-            FieldSpec("name"),
-            FieldSpec("description", required=False),
-            FieldSpec("current_level", field_type="select", options=LEVEL_OPTIONS),
-            FieldSpec("proposed_mitigation"),
-            FieldSpec("mitigated_level", field_type="select", options=LEVEL_OPTIONS),
-        ]
-
-    def _risk_edit_fields(self, risk: Any) -> list[FieldSpec]:
-        """Return the risk fields pre-filled from *risk* for an edit form.
-
-        Stage, process, and component risks share the same editable columns, so
-        one helper serves every scope. The level fields are number-selects on the
-        1-5 severity scale, pre-selected to the risk's stored level.
-        """
-        return [
-            FieldSpec("risk_type", default=risk.risk_type),
-            FieldSpec("name", default=risk.name),
-            FieldSpec("description", required=False, default=risk.description),
-            FieldSpec(
-                "current_level",
-                field_type="select",
-                options=LEVEL_OPTIONS,
-                default=default_text(risk.current_level),
-            ),
-            FieldSpec("proposed_mitigation", default=risk.proposed_mitigation),
-            FieldSpec(
-                "mitigated_level",
-                field_type="select",
-                options=LEVEL_OPTIONS,
-                default=default_text(risk.mitigated_level),
-            ),
-        ]
 
     def _help_lines(self, topic: str | None) -> list[str]:
         if topic is not None:
