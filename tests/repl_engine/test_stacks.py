@@ -2,15 +2,15 @@
 
 import pytest
 
-from riskmanager_cli.repl.renderers.layout.geometry import block_width, visible_len
-from riskmanager_cli.repl.renderers.layout.stacks import (
+from riskmanager_cli.repl_engine.layout.geometry import block_width, visible_len
+from riskmanager_cli.repl_engine.layout.stacks import (
     card_row,
     center_block,
     hstack,
     join_horizontal,
     vstack,
 )
-from riskmanager_cli.repl.viewport import parse
+from riskmanager_cli.repl_engine.viewport import parse
 
 
 @pytest.mark.unit

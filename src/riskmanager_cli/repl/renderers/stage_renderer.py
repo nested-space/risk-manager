@@ -24,8 +24,8 @@ from ...operations.ncrm_library_operations import get_ncrm_by_id
 from ...operations.stage_component_operations import list_stage_components
 from ...operations.stage_ncrm_operations import list_ncrms_for_stage
 from ...operations.stage_risk_operations import list_risks_for_stage
-from ..list_navigator import ListItem
-from .layout import Column, render_table, section_rule, section_width
+from ...repl_engine.layout import Column, render_table, section_rule, section_width
+from ...repl_engine.list_navigator import ListItem
 
 _BODY_INDENT = "  "
 _CARET = "> "

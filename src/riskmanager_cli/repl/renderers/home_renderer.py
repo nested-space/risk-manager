@@ -11,8 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from ..viewport import parse, tag_selected, tag_sticky
-from .layout import (
+from ...repl_engine.layout import (
     Placement,
     card_row,
     center_block,
@@ -22,6 +21,7 @@ from .layout import (
     vstack,
     widest_fitting,
 )
+from ...repl_engine.viewport import parse, tag_selected, tag_sticky
 
 #: "RISK MANAGER" in the ANSI Shadow block font.
 _BANNER: list[str] = [

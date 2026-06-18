@@ -18,7 +18,7 @@ from ...model.tables import Project
 from ...operations.manufacturing_process_operations import list_processes_for_project
 from ...operations.manufacturing_process_risk_operations import list_risks_for_process
 from ...operations.material_operations import get_material_by_id
-from .layout import Column, render_table, section_rule, section_width
+from ...repl_engine.layout import Column, render_table, section_rule, section_width
 
 _BODY_INDENT = "  "
 

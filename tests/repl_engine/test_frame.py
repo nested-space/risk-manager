@@ -2,7 +2,7 @@
 
 import pytest
 
-from riskmanager_cli.repl.renderers.layout import render_box
+from riskmanager_cli.repl_engine.layout import render_box
 
 
 @pytest.mark.unit

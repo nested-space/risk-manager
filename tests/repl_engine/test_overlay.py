@@ -2,8 +2,8 @@
 
 import pytest
 
-from riskmanager_cli.repl.renderers.layout.geometry import visible_len
-from riskmanager_cli.repl.renderers.layout.overlay import Placement, overlay
+from riskmanager_cli.repl_engine.layout.geometry import visible_len
+from riskmanager_cli.repl_engine.layout.overlay import Placement, overlay
 
 
 @pytest.mark.unit

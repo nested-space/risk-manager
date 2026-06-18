@@ -210,7 +210,7 @@ async def test_ncrm_add_augment_shows_retrieved_values_readonly(
     await dispatcher.advance_prompt("chloroform")  # name (drives lookup)
     await dispatcher.advance_prompt("yes")  # augment? -> yes
 
-    rendered = "\n".join(dispatcher._render_prompt_lines())  # pylint: disable=protected-access
+    rendered = "\n".join(dispatcher.modal._render_prompt_lines())  # pylint: disable=protected-access
     assert "Retrieved values (source: pubchem)" in rendered
     assert "chloroform" in rendered
     assert "ClC(Cl)Cl" in rendered

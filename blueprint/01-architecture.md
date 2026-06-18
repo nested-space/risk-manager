@@ -14,6 +14,34 @@ and replaceable.
 
 ---
 
+## Engine / application split
+
+The TUI is divided into two top-level packages joined by one explicit seam:
+
+- **`repl_engine/`** — the application-agnostic terminal UI engine: the event
+  loop (`loop.py`), screen drawing (`screen.py`), keystroke classification
+  (`keys.py`), viewport scrolling (`viewport.py`, `sticky_window.py`), list
+  navigation (`list_navigator.py`), the guided-prompt/picker forms engine
+  (`forms.py`), and the layout primitives (`layout/`). It knows nothing about
+  the risk-manager domain and imports no application code.
+- **`repl/`** — the application: the command dispatcher (`commands.py`),
+  navigation context (`context.py`), session state (`session_state.py`),
+  bootstrap (`bootstrap.py`), and the domain screen renderers (`renderers/`).
+
+**The seam is the `ReplController` protocol** (`repl_engine/controller.py`). The
+engine's `start_repl(term, screen, controller)` drives any object implementing
+that protocol; the application's `CommandDispatcher` is the concrete
+implementation, supplying header text, screen capabilities, navigation, command
+dispatch, and modal callbacks. Because the engine depends only on this
+abstraction (dependency inversion), it could render a different application
+unchanged.
+
+The layer diagram below predates this split; treat `loop.py`, `screen.py`, and
+the forms/viewport/layout machinery as living under `repl_engine/`, and the
+dispatcher/context/renderers under `repl/`.
+
+---
+
 ## Layer Diagram
 
 ```

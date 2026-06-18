@@ -1,4 +1,9 @@
-"""Blessed-backed screen drawing utilities for the riskmanager REPL."""
+"""Blessed-backed screen drawing utilities for a terminal REPL.
+
+This is application-agnostic: the header content (breadcrumb, mode label) is
+passed in as plain strings by the caller, so the drawer knows nothing about
+navigation or the domain it renders.
+"""
 
 from __future__ import annotations
 
@@ -6,22 +11,19 @@ import sys
 
 import blessed
 
-from .context import ContextManager
 from .viewport import ViewModel, parse, window
 
 
 class ScreenManager:
     """Draw the status bar, output pane, and input line."""
 
-    def __init__(self, term: blessed.Terminal, ctx: ContextManager) -> None:
-        """Create a screen manager for *term* and *ctx*.
+    def __init__(self, term: blessed.Terminal) -> None:
+        """Create a screen manager for *term*.
 
         Args:
             term: Active blessed terminal instance.
-            ctx: Navigation context manager.
         """
         self._term = term
-        self._ctx = ctx
 
     @property
     def output_height(self) -> int:
@@ -63,23 +65,39 @@ class ScreenManager:
         }.get(level, self._term.normal)
         return f"{color}{message}{self._term.normal}"
 
-    def draw_full(self, lines: list[str], input_line: str = "", info_line: str = "") -> None:
+    def draw_full(
+        self,
+        lines: list[str],
+        input_line: str = "",
+        info_line: str = "",
+        *,
+        left: str = "",
+        right: str = "",
+    ) -> None:
         """Fully repaint the screen.
 
         Args:
             lines: Output pane lines.
             input_line: Current input buffer content.
             info_line: Command-hint text for the bottom information line.
+            left: Header text aligned to the left (e.g. a breadcrumb).
+            right: Header text aligned to the right (e.g. a mode label).
         """
         self.clear_screen()
-        self.draw_status_bar()
+        self.draw_status_bar(left, right)
         self.draw_output(parse(lines))
         self.draw_input_line(text=input_line)
         self.draw_info_line(info_line)
 
-    def draw_status_bar(self) -> None:
-        """Render the single-row header: breadcrumb left, mode right."""
-        self._write_header_row(self._ctx.breadcrumb(), self._ctx.mode_label())
+    def draw_status_bar(self, left: str = "", right: str = "") -> None:
+        """Render the single-row header: *left* aligned left, *right* aligned right.
+
+        Args:
+            left: Text aligned to the left of the header band (e.g. a breadcrumb).
+            right: Text aligned to the right (e.g. a mode label); dropped when it
+                cannot fit alongside *left*.
+        """
+        self._write_header_row(left, right)
         sys.stdout.flush()
 
     def draw_output(self, view: ViewModel, offset: int = 0) -> None:

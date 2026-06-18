@@ -2,7 +2,7 @@
 
 import pytest
 
-from riskmanager_cli.repl.viewport import (
+from riskmanager_cli.repl_engine.viewport import (
     follow,
     max_offset,
     parse,

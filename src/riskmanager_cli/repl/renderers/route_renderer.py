@@ -13,6 +13,7 @@ from ...operations.visualization_operations import (
     get_route_risk_summary,
     get_unconnected_component_names,
 )
+from ...repl_engine.layout import Column, render_box, render_table, section_rule, section_width
 from ...utils.component_graph_layout import (
     ComponentInput,
     IncompleteProcessError,
@@ -20,7 +21,6 @@ from ...utils.component_graph_layout import (
     split_for_width,
 )
 from ...utils.manufacturing_layout_engine import RiskDict, render_risk_summary
-from .layout import Column, render_box, render_table, section_rule, section_width
 
 # Box chrome consumed before the graph: two reserved screen margins, two box
 # borders, and ``2 * _PAD_X`` interior padding columns.

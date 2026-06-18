@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ...model.severity import format_level
-from .layout import Column, render_table
+from ...repl_engine.layout import Column, render_table
 
 
 async def render_risk_table(

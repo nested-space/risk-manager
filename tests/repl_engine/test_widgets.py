@@ -2,8 +2,8 @@
 
 import pytest
 
-from riskmanager_cli.repl.renderers.layout.geometry import block_width, visible_len
-from riskmanager_cli.repl.renderers.layout.widgets import (
+from riskmanager_cli.repl_engine.layout.geometry import block_width, visible_len
+from riskmanager_cli.repl_engine.layout.widgets import (
     bullet_list,
     card,
     subtitle,
