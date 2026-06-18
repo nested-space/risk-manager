@@ -20,7 +20,7 @@ from .list_navigator import ListItem, ListNavigator
 
 
 @runtime_checkable
-class ReplController(Protocol):  # pylint: disable=too-many-public-methods  # the loop's full drive surface; one method per interaction it performs
+class ReplController(Protocol):  # pylint: disable=too-many-public-methods  # the loop's full drive surface
     """Application-facing contract for driving the REPL event loop."""
 
     # --- lifecycle & global state ---

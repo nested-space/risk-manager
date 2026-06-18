@@ -3,19 +3,13 @@
 
 from __future__ import annotations
 
-import csv
 import inspect
-import shlex
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass
-from enum import Enum
-from io import StringIO
-from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from ..config.settings import Environment
-from ..model.enums import TA, NcrmRole
+from ..model.enums import NcrmRole
 from ..model.severity import LEVEL_OPTIONS
 from ..model.tables import Component, ManufacturingProcess, Project, Stage
 from ..operations.component_operations import (
@@ -37,19 +31,9 @@ from ..operations.component_salt_operations import (
     delete_component_salt,
 )
 from ..operations.counterion_operations import (
-    add_counterion_alias,
-    counterion_alias_counts,
-    create_counterion,
-    delete_counterion,
-    list_counterion_aliases,
     list_counterions,
-    update_counterion,
 )
-from ..operations.dmta_operations import ResolveResult, augment_name
 from ..operations.manufacturing_process_operations import (
-    create_manufacturing_process,
-    get_process_by_id,
-    get_process_by_route,
     list_processes_for_project,
     update_manufacturing_process,
 )
@@ -59,37 +43,14 @@ from ..operations.manufacturing_process_risk_operations import (
     update_manufacturing_process_risk,
 )
 from ..operations.material_operations import (
-    add_material_alias,
-    bulk_import_materials,
-    create_material,
-    delete_material,
-    display_name_is_unambiguous,
-    existing_display_names,
     get_material_by_id,
     get_material_by_search,
-    list_material_aliases,
     list_materials,
-    material_alias_counts,
-    update_material,
 )
 from ..operations.ncrm_library_operations import (
-    add_ncrm_alias,
-    create_ncrm_library_entry,
-    delete_ncrm_library_entry,
     get_ncrm_by_display_name,
-    list_ncrm_aliases,
     list_ncrm_library,
-    ncrm_alias_counts,
-    update_ncrm_library_entry,
 )
-from ..operations.project_operations import (
-    create_project,
-    get_project_by_id,
-    list_projects,
-    search_projects,
-    update_project,
-)
-from ..operations.smiles_operations import canonicalize_smiles
 from ..operations.stage_component_operations import (
     create_stage_component,
     delete_stage_component,
@@ -104,7 +65,6 @@ from ..operations.stage_ncrm_operations import (
 from ..operations.stage_operations import (
     create_stage,
     delete_stage,
-    get_stage_by_name,
     list_stages_for_process,
     update_stage,
 )
@@ -120,19 +80,6 @@ from ..repl.renderers.component_renderer import (
     gather_component_sections,
     render_component_screen,
 )
-from ..repl.renderers.home_renderer import CARDS as HOME_CARDS
-from ..repl.renderers.home_renderer import render_home as render_home_screen
-from ..repl.renderers.library_home_renderer import (
-    LIBRARY_HOME_TABS,
-    OVERVIEW_CARDS,
-    render_library_home,
-)
-from ..repl.renderers.library_renderer import (
-    library_targets,
-    render_library_detail,
-    render_library_screen,
-)
-from ..repl.renderers.project_renderer import render_project_screen
 from ..repl.renderers.risk_renderer import render_risk_table
 from ..repl.renderers.route_renderer import render_route_screen
 from ..repl.renderers.stage_renderer import (
@@ -140,30 +87,22 @@ from ..repl.renderers.stage_renderer import (
     render_stage_screen,
     stage_targets,
 )
+from ..repl_engine.dispatch import (
+    Screen,
+    ScreenRouter,
+    screen_controls,
+)
 from ..repl_engine.forms import (
     FieldSpec,
-    InfoSection,
-    ModalController,
-    PickerState,
-    PromptState,
     field_key,
 )
-from ..repl_engine.layout import section_rule, section_width
 from ..repl_engine.list_navigator import ListItem, ListNavigator
 from ..repl_engine.screen import ScreenManager
 from ..schema.create import (
     ComponentCreate,
     ComponentRiskCreate,
     ComponentSaltCreate,
-    CounterionAliasCreate,
-    CounterionCreate,
-    ManufacturingProcessCreate,
     ManufacturingProcessRiskCreate,
-    MaterialAliasCreate,
-    MaterialCreate,
-    NcrmLibraryAliasCreate,
-    NcrmLibraryCreate,
-    ProjectCreate,
     StageComponentCreate,
     StageCreate,
     StageNcrmCreate,
@@ -172,75 +111,62 @@ from ..schema.create import (
 from ..schema.update import (
     ComponentRiskUpdate,
     ComponentUpdate,
-    CounterionUpdate,
     ManufacturingProcessRiskUpdate,
     ManufacturingProcessUpdate,
-    MaterialUpdate,
-    NcrmLibraryUpdate,
-    ProjectUpdate,
     StageNcrmUpdate,
     StageRiskUpdate,
     StageUpdate,
 )
-from ..service.structure_viewer import StructureResult, show_structure
-from ..utils.name_simplifier import simplify_name
-from ..utils.parsing import split_aliases
+from . import lookup
 from .context import ContextFrame, ContextManager
+from .form_fields import (
+    BOOL_OPTIONS,
+    COMPONENT_TYPE_OPTIONS,
+    CONFIRM_OPTIONS,
+    OPTIONAL_BOOL_OPTIONS,
+    QUIT_OPTIONS,
+    as_bool,
+    default_text,
+    enum_options,
+    optional_bool,
+    optional_float,
+    optional_int,
+)
+from .hotkeys import (
+    CTRL_A,
+    CTRL_E,
+    CTRL_F,
+    CTRL_G,
+    CTRL_L,
+    CTRL_R,
+    CTRL_U,
+    CTRL_X,
+)
+from .screens.admin import AdminScreen
+from .screens.home import HomeScreen
+from .screens.legacy import LegacyScreen
+from .screens.library import LibraryDetailScreen, LibraryScreen
+from .screens.project import ProjectScreen
+from .screens.project_select import ProjectSelectScreen
+from .screens.route_select import RouteSelectScreen
+from .screens.specs import DEFAULT_SPEC, SCREEN_SPECS
 from .session_state import SessionState
 
-#: Yes/No options for required boolean ``select`` fields.
-BOOL_OPTIONS: list[tuple[str, str]] = [("Yes", "true"), ("No", "false")]
 
-#: Yes/No options for optional boolean ``select`` fields, with an unset choice
-#: that stores an empty string (coerced to ``None`` downstream).
-OPTIONAL_BOOL_OPTIONS: list[tuple[str, str]] = [("Not specified", ""), *BOOL_OPTIONS]
+class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attributes
+    """Map the navigation context to a screen and service global commands.
 
-#: Allowed component-type values for stage-component links.
-COMPONENT_TYPE_OPTIONS: list[tuple[str, str]] = [
-    ("reactant", "reactant"),
-    ("product", "product"),
-]
+    Subclasses :class:`~..repl_engine.dispatch.ScreenRouter`, which owns the
+    generic dispatch plumbing (command parsing, modal/notice/tab state, and the
+    capability/legend surface). This class supplies the application specifics:
+    which :class:`~..repl_engine.dispatch.Screen` is active, the global commands
+    and hotkeys, the status-bar header, and the quit-confirmation flow.
 
-#: No/Yes options for confirmation prompts, defaulting to the safe "No" choice.
-CONFIRM_OPTIONS: list[tuple[str, str]] = [("No", "no"), ("Yes", "yes")]
-
-#: Yes/No options for the home quit confirmation, defaulting to "Yes".
-QUIT_OPTIONS: list[tuple[str, str]] = [("Yes", "yes"), ("No", "no")]
-
-# Control-character hotkeys (``str(key)`` for Ctrl-<letter> in the blessed loop).
-# Terminal-reserved combos are avoided: Ctrl-C/D (interrupt/EOF, handled in the
-# loop), Ctrl-S/Q (flow control), Ctrl-Z (suspend), Ctrl-H/I/J/M (backspace, tab,
-# newline, carriage return), and Ctrl-[ (escape).
-CTRL_A = "\x01"  # add
-CTRL_B = "\x02"  # library
-CTRL_E = "\x05"  # edit
-CTRL_F = "\x06"  # focus / filter
-CTRL_G = "\x07"  # go home
-CTRL_K = "\x0b"  # view molecular structure
-CTRL_L = "\x0c"  # list
-CTRL_N = "\x0e"  # admin
-CTRL_O = "\x0f"  # open / show
-CTRL_P = "\x10"  # project (project list)
-CTRL_R = "\x12"  # risks
-CTRL_T = "\x14"  # routes
-CTRL_U = "\x15"  # unassign
-CTRL_X = "\x18"  # delete
-
-
-def _enum_options(enum_cls: type[Enum]) -> list[tuple[str, str]]:
-    """Return ``(label, value)`` select options for a string enum.
-
-    Args:
-        enum_cls: The enum to enumerate. Members must have string values.
-
-    Returns:
-        One ``(value, value)`` pair per member, in definition order.
+    Screens not yet extracted into ``repl/screens/`` are served by
+    :class:`~.screens.legacy.LegacyScreen`, which routes engine calls back to the
+    ``_dispatch_<track>``/``_hotkey_<track>``/``_render_*`` methods still defined
+    here.
     """
-    return [(str(member.value), str(member.value)) for member in enum_cls]
-
-
-class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-many-public-methods  # modal state + hotkey/search/dispatch entry points
-    """Parse slash commands, update REPL state, and call operations."""
 
     def __init__(
         self,
@@ -257,21 +183,26 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             screen: Screen manager for width-aware list rendering.
             env: Active database environment.
         """
+        super().__init__(screen)
         self.ctx = ctx
         self.session = session
-        self.screen = screen
         self.env = env
-        self.modal = ModalController(screen, self._refresh_with_notice)
-        self._list_navigator: ListNavigator | None = None
-        self._notice: tuple[str, str] | None = None
+        self.navigator: ListNavigator | None = None
         self._quit_requested = False
-        # Transient inputs for the next display-name suggestion, gathered in the
-        # async augment step and consumed by the (sync) finish form. Reset on use.
-        self._suggestion_inputs: tuple[list[str] | None, bool] = (None, False)
-        # Active tab index for the current tabbed screen, with the screen key it
-        # applies to so it auto-resets when navigation changes screens.
-        self._active_tab = 0
-        self._active_tab_key: str | None = None
+        # Screens already extracted into repl/screens/; everything else falls
+        # back to a LegacyScreen adapter (see active_screen). The single library
+        # screen serves both the home and list views (keyed by sub-mode).
+        library = LibraryScreen(self)
+        self._screens: dict[str, Screen] = {
+            "home": HomeScreen(self),
+            "admin": AdminScreen(self),
+            "project_select": ProjectSelectScreen(self),
+            "project": ProjectScreen(self),
+            "route_select": RouteSelectScreen(self),
+            "library_home": library,
+            "library_list": library,
+            "library_detail": LibraryDetailScreen(self),
+        }
 
     @property
     def quit_requested(self) -> bool:
@@ -284,137 +215,22 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """
         return self._quit_requested
 
-    @property
-    def prompt_state(self) -> PromptState | None:
-        """Return the active guided prompt state, if any."""
-        return self.modal.prompt_state
+    def active_screen(self) -> Screen:
+        """Return the screen matching the current navigation context.
 
-    def prompt_prefill(self) -> str:
-        """Return the editable initial text for the active prompt field."""
-        return self.modal.prompt_prefill()
-
-    @property
-    def list_navigator(self) -> ListNavigator | None:
-        """Return the active list navigator, if any."""
-        return self._list_navigator
-
-    @property
-    def picker_state(self) -> PickerState | None:
-        """Return the active typeahead picker state, if any."""
-        return self.modal.picker_state
-
-    async def advance_prompt(self, value: str) -> list[str]:
-        """Submit a value to the active guided prompt."""
-        return await self.modal.advance_prompt(value)
-
-    def prompt_move(self, direction: str) -> list[str]:
-        """Move the highlight of the active select field up or down."""
-        return self.modal.prompt_move(direction)
-
-    async def submit_prompt_selection(self) -> list[str]:
-        """Submit the highlighted option of the active select field."""
-        return await self.modal.submit_prompt_selection()
-
-    async def cancel_prompt(self) -> list[str]:
-        """Cancel the active guided prompt and restore the current screen."""
-        return await self.modal.cancel_prompt()
-
-    def update_picker_query(self, query: str) -> list[str]:
-        """Re-filter the active picker for *query* and re-render matches."""
-        return self.modal.update_picker_query(query)
-
-    def picker_move(self, direction: str) -> list[str]:
-        """Move the picker highlight up or down."""
-        return self.modal.picker_move(direction)
-
-    async def picker_select(self) -> list[str]:
-        """Choose the highlighted match and invoke the picker callback."""
-        return await self.modal.picker_select()
-
-    async def cancel_picker(self) -> list[str]:
-        """Cancel the active typeahead picker and restore the current screen."""
-        return await self.modal.cancel_picker()
-
-    async def dispatch(self, command: str) -> list[str] | str:
-        """Execute a ``:`` command line, persisting any navigation it triggers.
-
-        Args:
-            command: Raw user-entered command string.
-
-        Returns:
-            Output lines, or the ``"__QUIT__"`` sentinel for REPL shutdown.
+        Extracted screens come from :attr:`_screens`; the rest are served by a
+        :class:`~.screens.legacy.LegacyScreen` adapter keyed on the current
+        screen, which routes engine calls back to the ``_dispatch_<track>`` /
+        ``_hotkey_<track>`` / ``_render_*`` methods still defined here.
         """
-        result = await self._run_command(command)
-        self._sync_session()
-        return result
+        key = self.current_screen_key()
+        screen = self._screens.get(key)
+        if screen is not None:
+            return screen
+        spec = SCREEN_SPECS.get(key, DEFAULT_SPEC)
+        return LegacyScreen(self, key, self.ctx.current.track, spec)
 
-    async def _run_command(  # pylint: disable=too-many-return-statements,too-many-branches  # top-level command router
-        self, command: str
-    ) -> list[str] | str:
-        """Parse and execute a slash command.
-
-        Args:
-            command: Raw user-entered command string.
-
-        Returns:
-            Output lines, or the ``"__QUIT__"`` sentinel for REPL shutdown.
-        """
-        stripped = command.strip()
-        if not stripped:
-            return await self.render_current()
-        if not stripped.startswith("/"):
-            return [f"Unknown command: {stripped}. Type /help for commands."]
-
-        try:
-            parts = shlex.split(stripped)
-        except ValueError as exc:
-            return [f"Command parse error: {exc}"]
-        if not parts:
-            return ["Type /help for commands."]
-
-        verb = parts[0].lower()
-        args = parts[1:]
-        global_result = await self._dispatch_global(verb, args)
-        if global_result is not None:
-            return global_result
-
-        track = self.ctx.current.track
-        if track == "home":
-            return await self._dispatch_home(verb, args)
-        if track == "project_select":
-            return await self._dispatch_project_select(verb, args)
-        if track == "project":
-            return await self._dispatch_project(verb, args)
-        if track == "route_select":
-            return await self._dispatch_route_select(verb, args)
-        if track == "route":
-            return await self._dispatch_route(verb, args)
-        if track == "stage_focus":
-            return await self._dispatch_stage_focus(verb, args)
-        if track == "component_focus":
-            return await self._dispatch_component_focus(verb, args)
-        if track == "library":
-            return await self._dispatch_library(verb, args)
-        if track == "admin":
-            return await self._dispatch_admin(verb, args)
-        if track == "risk_mode":
-            return await self._dispatch_risk_mode(verb, args)
-        return [f"Unknown command: {verb}. Type /help for commands."]
-
-    async def activate_list_selection(self, item: ListItem) -> list[str]:
-        """Open the selected list *item*, persisting the resulting navigation.
-
-        Args:
-            item: Selected list item.
-
-        Returns:
-            Rendered lines for the activated screen.
-        """
-        lines = await self._run_activate_selection(item)
-        self._sync_session()
-        return lines
-
-    async def _run_activate_selection(  # pylint: disable=too-many-return-statements,too-many-branches  # one return per list-driven track
+    async def activate_selection(  # pylint: disable=too-many-return-statements,too-many-branches  # one return per list-driven track
         self, item: ListItem
     ) -> list[str]:
         """Open the currently selected list item for list-driven screens.
@@ -425,39 +241,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         Returns:
             Rendered lines for the activated screen.
         """
-        if self.ctx.current.track == "home":
-            if item.item_id == "project":
-                return await self._enter_project_select()
-            if item.item_id == "library":
-                return await self._enter_library("select")
-            if item.item_id == "admin":
-                return self._enter_admin()
-            return await self.render_current()
-        if self.ctx.current.track == "project_select":
-            project = await self._project_from_id(item.item_id)
-            if project is None:
-                return ["Project not found."]
-            return await self._open_project(project)
-        if self.ctx.current.track == "project":
-            process = await self._process_from_id(item.item_id)
-            project = await self._current_project()
-            if process is None or project is None:
-                return ["Route not found."]
-            return await self._open_route(project, process)
-        if self.ctx.current.track == "route_select":
-            process = await self._process_from_id(item.item_id)
-            project = await self._current_project()
-            if process is None or project is None:
-                return ["Route not found."]
-            return await self._open_route(project, process)
         if self.ctx.current.track == "stage_focus":
             return await self._activate_stage_row(item.item_id)
         if self.ctx.current.track == "component_focus":
             return await self._activate_component_row(item.item_id)
-        if self.ctx.current.track == "library":
-            if (self.ctx.current.library_sub or "select") == "select":
-                return await self._enter_library(item.item_id)
-            return await self._activate_library_row(item.item_id)
         return await self.render_current()
 
     async def _activate_component_row(self, item_id: str) -> list[str]:
@@ -490,16 +277,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._start_stage_risk_edit_form(raw_id)
         return await self.render_current()
 
-    def take_notice(self) -> tuple[str, str] | None:
-        """Return and clear the pending status notice, if any.
-
-        Returns:
-            A ``(message, level)`` pair where *level* is ``"success"``,
-            ``"warning"``, or ``"error"``; ``None`` when no notice is pending.
-        """
-        notice, self._notice = self._notice, None
-        return notice
-
     def header(self) -> tuple[str, str]:
         """Return the status-bar header as ``(left, right)`` text.
 
@@ -507,10 +284,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         left-aligned and the mode label right-aligned.
         """
         return self.ctx.breadcrumb(), self.ctx.mode_label()
-
-    def tab_hint(self) -> str | None:
-        """Return the current screen's tab grammar hint, or ``None`` if untabbed."""
-        return self.current_spec().tab_hint
 
     async def pop_context(self) -> list[str] | None:
         """Pop one navigation level and re-render, or signal nothing to leave.
@@ -537,37 +310,21 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             component_id=current.component_id,
         )
 
-    async def _refresh_with_notice(self, message: str, level: str = "success") -> list[str]:
-        """Set a transient status notice and re-render the current screen.
+    def after_navigation(self) -> None:
+        """Persist navigation after any command/hotkey/activation (router hook)."""
+        self._sync_session()
 
-        Args:
-            message: Status text shown right-aligned on the input row.
-            level: Notice severity controlling its colour.
-
-        Returns:
-            The refreshed screen lines for the current navigation track.
-        """
-        self._notice = (message, level)
-        return await self.render_current()
-
-    async def render_current(  # pylint: disable=too-many-return-statements,too-many-branches  # one render path per navigation track
+    async def render_screen(  # pylint: disable=too-many-return-statements,too-many-branches  # one render path per navigation track
         self,
     ) -> list[str]:
-        """Render the screen matching the current navigation context."""
+        """Render the screen matching the current navigation context.
+
+        The :class:`~.screens.legacy.LegacyScreen` adapter calls this for screens
+        not yet extracted into ``repl/screens/``.
+        """
         track = self.ctx.current.track
-        if track == "home":
-            return await self._render_home()
-        if track == "project_select":
-            return await self._render_project_select()
-        if track == "project":
-            project = await self._current_project()
-            if project is None:
-                return ["Project not found."]
-            return await self._render_project(project)
-        if track == "route_select":
-            return await self._render_route_select()
         if track == "route":
-            process = await self._current_process()
+            process = await lookup.current_process(self.ctx, self.env)
             if process is None:
                 return ["Route not found."]
             return await render_route_screen(
@@ -577,27 +334,19 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._render_stage_focus()
         if track == "component_focus":
             return await self._render_component_focus()
-        if track == "library":
-            return await self._render_library(self.ctx.current.library_sub or "select")
-        if track == "library_detail":
-            return await self._render_library_detail(
-                self.ctx.current.library_sub or "select",
-                self.ctx.current.library_detail_id or "",
-            )
-        if track == "admin":
-            return render_admin_screen()
         if track == "risk_mode":
             return await self._render_risk_mode()
         return ["Home"]
 
-    async def _dispatch_global(  # pylint: disable=too-many-return-statements  # one return per global command
+    async def dispatch_global(  # pylint: disable=too-many-return-statements  # one return per global command
         self, verb: str, args: list[str]
     ) -> list[str] | str | None:
+        """Service commands available on every screen, or defer with ``None``."""
         if verb == "/quit":
             return "__QUIT__"
         if verb == "/home":
             self.ctx.reset()
-            self._list_navigator = None
+            self.navigator = None
             self.session.update_context(
                 track="home",
                 project_id=None,
@@ -605,72 +354,37 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 stage_id=None,
                 component_id=None,
             )
-            return await self._render_home()
+            return await self.render_current()
         if verb == "/help":
             return self._help_lines(args[0] if args else None)
         if verb == "/admin" and not args:
             if self.ctx.current.track != "home":
                 return ["/admin is only available from home."]
-            return self._enter_admin()
+            return self.enter_admin()
         if verb == "/admin" and args:
-            return await self._dispatch_admin(verb, args)
+            return await self._screens["admin"].run_command(verb, args)
         return None
 
-    def _enter_admin(self) -> list[str]:
+    async def hotkey_global(self, key_text: str) -> list[str] | str | None:
+        """Service the home hotkey (``^G``), or defer with ``None``."""
+        if key_text == CTRL_G and self.ctx.current.track != "home":
+            return await self.dispatch_global("/home", [])
+        return None
+
+    def enter_admin(self) -> list[str]:
         """Push the admin track and render it."""
         self.ctx.push(ContextFrame(track="admin"))
         self.session.update_context(track="admin")
         return render_admin_screen()
 
-    async def _dispatch_home(self, verb: str, args: list[str]) -> list[str]:
-        """Dispatch commands available from the landing screen.
-
-        The three top-level tracks are reachable only from here: ``/project``
-        opens the project picker, ``/library`` the library track, and ``/admin``
-        (handled in :meth:`_dispatch_global`) the admin track.
-        """
-        if verb == "/project":
-            return await self._enter_project_select()
-        if verb == "/library":
-            sub_mode = args[0].lower() if args else "select"
-            if sub_mode not in {"materials", "ncrm", "counterions", "select"}:
-                return ["Usage: /library [materials|ncrm|counterions]"]
-            return await self._enter_library(sub_mode)
-        return [f"Unknown command: {verb}. Type /help for commands."]
-
-    async def _dispatch_project_select(self, verb: str, args: list[str]) -> list[str]:
-        """Dispatch commands on the project picker (the former home screen)."""
-        if verb == "/select" and args:
-            query = " ".join(args)
-            projects = await search_projects(query, self.env)
-            if not projects:
-                return [f"No project matched '{query}'."]
-            return await self._open_project(projects[0])
-        if verb == "/search" and args:
-            return await self._render_project_select(" ".join(args))
-        if verb == "/add" and args and args[0].lower() == "project":
-            return self.modal.start_prompt(
-                [
-                    FieldSpec("name"),
-                    FieldSpec(
-                        "therapy_area",
-                        field_type="select",
-                        options=_enum_options(TA),
-                    ),
-                ],
-                lambda **payload: self._start_project_material_picker(payload),
-                title="Add project",
-            )
-        return [f"Unknown command: {verb}. Type /help for commands."]
-
-    async def _enter_project_select(self) -> list[str]:
+    async def enter_project_select(self) -> list[str]:
         """Push the project-picker track and render it."""
         self.ctx.push(ContextFrame(track="project_select"))
-        self._list_navigator = None
+        self.navigator = None
         self.session.update_context(track="project_select")
-        return await self._render_project_select()
+        return await self.render_current()
 
-    async def _enter_library(self, sub_mode: str) -> list[str]:
+    async def enter_library(self, sub_mode: str) -> list[str]:
         """Push the library track for *sub_mode* and render it.
 
         Args:
@@ -678,69 +392,27 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """
         self.ctx.push(ContextFrame(track="library", library_sub=sub_mode))
         self.session.update_context(track="library")
-        return await self._render_library(sub_mode)
+        return await self.render_current()
 
-    async def _dispatch_project(  # pylint: disable=too-many-return-statements  # one return per command verb
-        self, verb: str, args: list[str]
-    ) -> list[str]:
-        project = await self._current_project()
-        if project is None:
-            return ["Project not found."]
-        if verb == "/route":
-            if not args:
-                self.ctx.push(
-                    ContextFrame(
-                        track="route_select",
-                        project_id=str(project.id),
-                        project_name=project.name,
-                    )
-                )
-                self.session.update_context(track="route_select", project_id=str(project.id))
-                return await self._render_route_select()
-            process = await self._process_from_route_label(str(project.id), args[0])
-            if process is None:
-                return [f"Route '{args[0]}' not found."]
-            return await self._open_route(project, process)
-        if verb == "/risks":
-            self.ctx.push(
-                ContextFrame(
-                    track="risk_mode",
-                    project_id=str(project.id),
-                    project_name=project.name,
-                    risk_scope="project",
-                )
-            )
-            self.session.update_context(track="risk_mode", project_id=str(project.id))
-            return await self._render_project_risks(project)
-        if verb == "/add" and args and args[0].lower() == "process":
-            return self.modal.start_prompt(
-                [
-                    FieldSpec("route_number", field_type="int"),
-                    FieldSpec("process_number", field_type="int"),
-                ],
-                lambda **payload: self._create_manufacturing_process_from_prompt(project, payload),
-                title="Add process",
-            )
-        return [f"Unknown command: {verb}. Type /help for commands."]
+    def push_library_detail(self, sub_mode: str, item_id: str) -> None:
+        """Push a library-detail frame for the entry *item_id* in *sub_mode*.
 
-    async def _dispatch_route_select(self, verb: str, args: list[str]) -> list[str]:
-        if verb == "/search" and args:
-            return await self._render_route_select(" ".join(args))
-        if verb == "/route" and args:
-            project = await self._current_project()
-            if project is None:
-                return ["Project not found."]
-            process = await self._process_from_route_label(str(project.id), args[0])
-            if process is None:
-                return [f"Route '{args[0]}' not found."]
-            return await self._open_route(project, process)
-        return [f"Unknown command: {verb}. Type /help for commands."]
+        The library screen calls this when Enter opens a row's detail page, so the
+        navigation context (owned here) stays the dispatcher's responsibility.
+        """
+        self.ctx.push(
+            ContextFrame(
+                track="library_detail",
+                library_sub=sub_mode,
+                library_detail_id=item_id,
+            )
+        )
 
     async def _dispatch_route(  # pylint: disable=too-many-return-statements  # one return per command verb
         self, verb: str, args: list[str]
     ) -> list[str]:
-        process = await self._current_process()
-        project = await self._current_project()
+        process = await lookup.current_process(self.ctx, self.env)
+        project = await lookup.current_project(self.ctx, self.env)
         if process is None or project is None:
             return ["Route not found."]
         if verb == "/risks":
@@ -764,12 +436,12 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             scope = args[0].lower()
             target_name = " ".join(args[1:])
             if scope == "stage":
-                stage = await self._find_stage(process, target_name)
+                stage = await lookup.find_stage(self.env, process, target_name)
                 if stage is None:
                     return [f"Stage '{target_name}' not found."]
                 return await self._open_stage(stage)
             if scope == "component":
-                component = await self._find_component(process, target_name)
+                component = await lookup.find_component(self.env, process, target_name)
                 if component is None:
                     return [f"Component '{target_name}' not found."]
                 return await self._open_component(component)
@@ -788,8 +460,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     async def _dispatch_stage_focus(  # pylint: disable=too-many-return-statements  # one return per command verb
         self, verb: str, args: list[str]
     ) -> list[str]:
-        stage = await self._current_stage()
-        process = await self._current_process()
+        stage = await lookup.current_stage(self.ctx, self.env)
+        process = await lookup.current_process(self.ctx, self.env)
         if stage is None or process is None:
             return ["Stage not found."]
         if verb == "/risks":
@@ -821,7 +493,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                         FieldSpec(
                             "role",
                             field_type="select",
-                            options=_enum_options(NcrmRole),
+                            options=enum_options(NcrmRole),
                         )
                     ],
                     lambda **payload: self._create_stage_ncrm_from_prompt(
@@ -846,7 +518,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         return [f"Unknown command: {verb}. Type /help for commands."]
 
     async def _dispatch_component_focus(self, verb: str, args: list[str]) -> list[str]:
-        component = await self._current_component()
+        component = await lookup.current_component(self.ctx, self.env)
         if component is None:
             return ["Component not found."]
         if verb == "/add" and args and args[0].lower() == "salt":
@@ -872,36 +544,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return await self._render_component_risks(component)
         return [f"Unknown command: {verb}. Type /help for commands."]
 
-    async def _dispatch_library(  # pylint: disable=too-many-return-statements  # one return per command verb
-        self, verb: str, args: list[str]
-    ) -> list[str]:
-        sub_mode = self.ctx.current.library_sub or "select"
-        if verb == "/list":
-            return await self._render_library(sub_mode)
-        if verb == "/search" and args:
-            return await self._render_library(sub_mode, query=" ".join(args))
-        if verb == "/filter" and args:
-            return await self._render_library(sub_mode, filter_mode=args[0].lower())
-        if verb == "/show" and args:
-            return await self._show_library_item(sub_mode, " ".join(args))
-        if verb == "/add":
-            return self._start_library_add_prompt(sub_mode)
-        if verb == "/edit" and args:
-            return await self._start_library_edit_prompt(sub_mode, " ".join(args))
-        if verb == "/delete" and args:
-            return await self._delete_library_item(sub_mode, " ".join(args))
-        return [f"Unknown command: {verb}. Type /help for commands."]
-
-    async def _dispatch_admin(self, verb: str, args: list[str]) -> list[str]:
-        admin_args = args if verb == "/admin" else [verb.removeprefix("/admin"), *args]
-        if not admin_args:
-            return render_admin_screen()
-        if admin_args[0] == "import" and len(admin_args) >= 3:
-            return await self._admin_import(admin_args[1:])
-        if admin_args[0] == "db" and len(admin_args) >= 2:
-            return await self._admin_db(admin_args[1:])
-        return ["Usage: /admin import <type> <file.csv> | /admin db <analyze|canonicalize>"]
-
     async def _dispatch_risk_mode(self, verb: str, args: list[str]) -> list[str]:
         if verb == "/list" and args and args[0].lower() == "risks":
             return await self._render_risk_mode()
@@ -911,94 +553,18 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     # Hotkey dispatch
     #
     # Commands are driven by Ctrl-<letter> hotkeys instead of typed slash
-    # commands. ``handle_hotkey`` is the keystroke entry point, mirroring the
-    # ``_dispatch_<track>`` router structure: no-argument actions reuse the
-    # existing ``_dispatch_*`` handlers, while argument-bearing actions open a
+    # commands. The engine routes each keystroke to the active screen's
+    # ``run_hotkey``; LegacyScreen forwards that to the matching
+    # ``_hotkey_<track>`` handler below. No-argument actions reuse the existing
+    # ``_dispatch_*`` handlers, while argument-bearing actions open a
     # chooser/form/picker chain that ends in the same leaf handlers the slash
-    # commands use. Slash commands remain available through the ``:`` command
-    # line, so ``dispatch`` is untouched.
+    # commands use.
     # ------------------------------------------------------------------ #
-
-    async def handle_hotkey(self, key_text: str) -> list[str] | str | None:
-        """Route a hotkey, persisting any navigation it triggers.
-
-        Args:
-            key_text: The raw keystroke (a control character).
-
-        Returns:
-            Rendered lines, the ``"__QUIT__"`` sentinel, or ``None`` when the
-            key is not a hotkey on the current screen (so the loop ignores it).
-        """
-        result = await self._run_hotkey(key_text)
-        self._sync_session()
-        return result
-
-    async def _run_hotkey(self, key_text: str) -> list[str] | str | None:
-        """Route a control-character hotkey for the current track.
-
-        Args:
-            key_text: The raw keystroke (a control character).
-
-        Returns:
-            Rendered lines, the ``"__QUIT__"`` sentinel, or ``None`` when the
-            key is not a hotkey on the current screen (so the loop ignores it).
-        """
-        track = self.ctx.current.track
-        if key_text == CTRL_G and track != "home":
-            return await self._dispatch_global("/home", [])
-        handler = {
-            "home": self._hotkey_home,
-            "project_select": self._hotkey_project_select,
-            "project": self._hotkey_project,
-            "route_select": self._hotkey_route_select,
-            "route": self._hotkey_route,
-            "stage_focus": self._hotkey_stage_focus,
-            "component_focus": self._hotkey_component_focus,
-            "library": self._hotkey_library,
-            "library_detail": self._hotkey_library_detail,
-            "admin": self._hotkey_admin,
-            "risk_mode": self._hotkey_risk_mode,
-        }.get(track)
-        if handler is None:
-            return None
-        return await handler(key_text)
-
-    async def _hotkey_home(self, key: str) -> list[str] | str | None:
-        if key == CTRL_P:
-            return await self._enter_project_select()
-        if key == CTRL_B:
-            return await self._enter_library("select")
-        if key == CTRL_N:
-            return self._enter_admin()
-        return None
-
-    async def _hotkey_project_select(self, key: str) -> list[str] | None:
-        if key == CTRL_A:
-            return await self._dispatch_project_select("/add", ["project"])
-        return None
-
-    async def _hotkey_project(self, key: str) -> list[str] | None:
-        if key == CTRL_T:
-            return await self._dispatch_project("/route", [])
-        if key == CTRL_R:
-            return await self._dispatch_project("/risks", [])
-        if key == CTRL_A:
-            return await self._dispatch_project("/add", ["process"])
-        if key == CTRL_E:
-            project = await self._current_project()
-            if project is None:
-                return ["Project not found."]
-            return self._start_project_edit_form(project)
-        return None
-
-    async def _hotkey_route_select(self, key: str) -> list[str] | None:
-        del key  # Routes are opened by list navigation or "/" search only.
-        return None
 
     async def _hotkey_route(  # pylint: disable=too-many-return-statements  # one return per route hotkey
         self, key: str
     ) -> list[str] | None:
-        process = await self._current_process()
+        process = await lookup.current_process(self.ctx, self.env)
         if process is None:
             return ["Route not found."]
         if key == CTRL_A:
@@ -1018,8 +584,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     async def _hotkey_stage_focus(  # pylint: disable=too-many-return-statements  # one return per stage hotkey
         self, key: str
     ) -> list[str] | None:
-        stage = await self._current_stage()
-        process = await self._current_process()
+        stage = await lookup.current_stage(self.ctx, self.env)
+        process = await lookup.current_process(self.ctx, self.env)
         if stage is None or process is None:
             return ["Stage not found."]
         if key == CTRL_A:
@@ -1033,7 +599,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if key == CTRL_U:
             return await self._start_stage_row_unassign(stage)
         if key == CTRL_X:
-            return self._start_confirm(
+            return self.start_confirm(
                 f"Delete stage '{stage.name}'",
                 lambda: self._delete_stage_with_confirmation(stage, ["--confirm"]),
             )
@@ -1042,7 +608,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     async def _hotkey_component_focus(  # pylint: disable=too-many-return-statements  # one return per component hotkey
         self, key: str
     ) -> list[str] | None:
-        component = await self._current_component()
+        component = await lookup.current_component(self.ctx, self.env)
         if component is None:
             return ["Component not found."]
         if key == CTRL_A:
@@ -1052,111 +618,12 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if key == CTRL_U:
             return await self._start_component_row_unassign(component)
         if key == CTRL_X:
-            return self._start_confirm(
+            return self.start_confirm(
                 "Delete component",
                 lambda: self._delete_component_with_confirmation(component, ["--confirm"]),
             )
         if key == CTRL_R:
             return await self._dispatch_component_focus("/risks", [])
-        return None
-
-    async def _hotkey_library(  # pylint: disable=too-many-return-statements  # one return per library hotkey
-        self, key: str
-    ) -> list[str] | None:
-        sub_mode = self.ctx.current.library_sub or "select"
-        if sub_mode == "select":
-            # The library landing page is a menu, not a list: add/filter/edit/delete
-            # have nothing to act on, so leave their keys inert (only ↑↓/Enter apply).
-            return None
-        if key == CTRL_A:
-            return self._start_library_add_prompt(sub_mode)
-        if key == CTRL_F:
-            return self._start_library_filter_chooser(sub_mode)
-        if key == CTRL_L:
-            return await self._render_library(sub_mode)
-        if key == CTRL_K:
-            return await self._visualize_library_structure(sub_mode)
-        if key in {CTRL_E, CTRL_X}:
-            return await self._library_selection_action(sub_mode, key)
-        return None
-
-    async def _hotkey_library_detail(self, key: str) -> list[str] | None:
-        """Handle hotkeys on the library detail (show) screen.
-
-        ``^E`` opens the inline edit form for the shown entry and ``^K`` displays
-        its molecular structure; ``^C`` (back to the list) is handled generically
-        by the REPL loop.
-        """
-        if key not in {CTRL_E, CTRL_K}:
-            return None
-        sub_mode = self.ctx.current.library_sub or "select"
-        item_id = self.ctx.current.library_detail_id or ""
-        item = await self._find_library_item_by_id(sub_mode, item_id)
-        if item is None:
-            return await self._refresh_with_notice("Item not found.", "error")
-        if key == CTRL_K:
-            return await self._show_structure_for_item(item)
-        return self._library_edit_form(sub_mode, item)
-
-    async def _library_selection_action(self, sub_mode: str, key: str) -> list[str]:
-        """Run edit/delete against the caret-selected library row.
-
-        Edit (``^E``) and delete (``^X``) act on the row the navigator currently
-        highlights, so no chooser is needed. (Enter opens the detail/show screen
-        via :meth:`_activate_library_row`.)
-        """
-        selected = self.list_navigator.selected if self.list_navigator else None
-        if selected is None:
-            return await self._refresh_with_notice("No item selected.", "warning")
-        item = await self._find_library_item_by_id(sub_mode, selected.item_id)
-        if item is None:
-            return await self._refresh_with_notice("Item not found.", "error")
-        if key == CTRL_E:
-            return self._library_edit_form(sub_mode, item)
-        label = str(item.get("name") or item.get("display_name") or "item")
-        return self._start_confirm(
-            f"Delete '{label}'",
-            lambda: self._delete_library_entry(sub_mode, item),
-        )
-
-    async def _visualize_library_structure(self, sub_mode: str) -> list[str]:
-        """Display the molecular structure of the caret-selected library row."""
-        selected = self.list_navigator.selected if self.list_navigator else None
-        if selected is None:
-            return await self._refresh_with_notice("No item selected.", "warning")
-        item = await self._find_library_item_by_id(sub_mode, selected.item_id)
-        if item is None:
-            return await self._refresh_with_notice("Item not found.", "error")
-        return await self._show_structure_for_item(item)
-
-    async def _show_structure_for_item(self, item: dict[str, Any]) -> list[str]:
-        """Render *item*'s SMILES to an image and open it, returning a notice.
-
-        Maps each :class:`StructureResult` to a status notice so every failure
-        path (missing SMILES, render failure, no viewer, launch failure) is
-        reported on the input row.
-        """
-        name = str(item.get("name") or item.get("display_name") or "item")
-        smiles = item.get("smiles")
-        if not smiles:
-            return await self._refresh_with_notice(f"No SMILES available for '{name}'.", "warning")
-        match show_structure(str(smiles)):
-            case StructureResult.OK:
-                return await self._refresh_with_notice(f"Opened structure for '{name}'.")
-            case StructureResult.RENDER_FAILED:
-                return await self._refresh_with_notice(
-                    "Could not render structure (invalid SMILES).", "error"
-                )
-            case StructureResult.NO_VIEWER:
-                return await self._refresh_with_notice(
-                    "No image viewer found (install feh).", "error"
-                )
-            case _:
-                return await self._refresh_with_notice("Failed to open image viewer.", "error")
-
-    async def _hotkey_admin(self, key: str) -> list[str] | None:
-        if key == CTRL_A:
-            return self._start_admin_action_chooser()
         return None
 
     async def _hotkey_risk_mode(self, key: str) -> list[str] | None:
@@ -1179,7 +646,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """
         scope = self.ctx.current.risk_scope
         if scope == "process":
-            process = await self._current_process()
+            process = await lookup.current_process(self.ctx, self.env)
             if process is None:
                 return ["Route not found."]
             return self.modal.start_prompt(
@@ -1188,7 +655,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 title="Add risk",
             )
         if scope == "stage":
-            stage = await self._current_stage()
+            stage = await lookup.current_stage(self.ctx, self.env)
             if stage is None:
                 return ["Stage not found."]
             return self.modal.start_prompt(
@@ -1197,7 +664,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 title="Add risk",
             )
         if scope == "component":
-            component = await self._current_component()
+            component = await lookup.current_component(self.ctx, self.env)
             if component is None:
                 return ["Component not found."]
             return self.modal.start_prompt(
@@ -1213,19 +680,19 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """Pick a risk in the current scope and open its pre-filled edit form."""
         scope = self.ctx.current.risk_scope
         if scope == "process":
-            process = await self._current_process()
+            process = await lookup.current_process(self.ctx, self.env)
             if process is None:
                 return ["Route not found."]
             process_risks = await list_risks_for_process(UUID(str(process.id)), self.env)
             return self._start_risk_edit_picker(process_risks, self._start_process_risk_edit_form)
         if scope == "stage":
-            stage = await self._current_stage()
+            stage = await lookup.current_stage(self.ctx, self.env)
             if stage is None:
                 return ["Stage not found."]
             stage_risks = await list_risks_for_stage(UUID(str(stage.id)), self.env)
             return self._start_risk_edit_picker(stage_risks, self._start_stage_risk_edit_form)
         if scope == "component":
-            component = await self._current_component()
+            component = await lookup.current_component(self.ctx, self.env)
             if component is None:
                 return ["Component not found."]
             component_risks = await list_risks_for_component(UUID(str(component.id)), self.env)
@@ -1252,7 +719,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     # Chooser, picker, and confirmation chains
     # ------------------------------------------------------------------ #
 
-    def _start_confirm(self, label: str, on_yes: Callable[[], Any]) -> list[str]:
+    def start_confirm(self, label: str, on_yes: Callable[[], Any]) -> list[str]:
         """Open a No/Yes confirmation prompt that runs *on_yes* when confirmed.
 
         Args:
@@ -1269,7 +736,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
     async def _resolve_confirm(self, answer: str | None, on_yes: Callable[[], Any]) -> list[str]:
         if answer != "yes":
-            return await self._refresh_with_notice("Cancelled.", "warning")
+            return await self.refresh_with_notice("Cancelled.", "warning")
         result = on_yes()
         if inspect.isawaitable(result):
             return self._coerce_lines(await result)
@@ -1289,7 +756,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     async def _resolve_quit(self, answer: str | None) -> list[str]:
         if answer == "yes":
             self._quit_requested = True
-        return await self._render_home()
+        return await self.render_current()
 
     def _start_route_add_chooser(self, process: ManufacturingProcess) -> list[str]:
         return self.modal.start_prompt(
@@ -1337,13 +804,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             StageCreate(
                 process_id=UUID(str(process.id)),
                 name=payload.get("name") or "",
-                number=_optional_int(payload.get("number")) or 0,
+                number=optional_int(payload.get("number")) or 0,
             ),
             self.env,
         )
         if created is None:
-            return await self._refresh_with_notice("Failed to create stage.", "error")
-        return await self._refresh_with_notice(f"Created stage '{created.name}'.")
+            return await self.refresh_with_notice("Failed to create stage.", "error")
+        return await self.refresh_with_notice(f"Created stage '{created.name}'.")
 
     async def _start_component_add_picker(self, process: ManufacturingProcess) -> list[str]:
         materials = await list_materials(self.env)
@@ -1378,13 +845,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 process_id=UUID(str(process.id)),
                 material_id=UUID(material_id),
                 control_strategy_role=payload.get("control_strategy_role"),
-                is_isolated=_as_bool(payload.get("is_isolated")),
+                is_isolated=as_bool(payload.get("is_isolated")),
             ),
             self.env,
         )
         if created is None:
-            return await self._refresh_with_notice("Failed to create component.", "error")
-        return await self._refresh_with_notice("Component created.")
+            return await self.refresh_with_notice("Failed to create component.", "error")
+        return await self.refresh_with_notice("Component created.")
 
     def _start_route_focus_chooser(self, process: ManufacturingProcess) -> list[str]:
         return self.modal.start_prompt(
@@ -1428,21 +895,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if component is None:
             return ["Component not found."]
         return await self._open_component(component)
-
-    def _start_project_edit_form(self, project: Project) -> list[str]:
-        return self.modal.start_prompt(
-            [
-                FieldSpec("name", default=project.name),
-                FieldSpec(
-                    "therapy_area",
-                    field_type="select",
-                    options=_enum_options(TA),
-                    default=project.therapy_area.value,
-                ),
-            ],
-            lambda **payload: self._update_project_from_prompt(project, payload),
-            title="Edit project",
-        )
 
     def _start_route_edit_chooser(self, process: ManufacturingProcess) -> list[str]:
         return self.modal.start_prompt(
@@ -1511,7 +963,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
     async def _start_stage_ncrm_edit_form(self, link_id: str) -> list[str]:
         """Open a role-edit form for the stage-NCRM link with id *link_id*."""
-        stage = await self._current_stage()
+        stage = await lookup.current_stage(self.ctx, self.env)
         if stage is None:
             return ["Stage not found."]
         link = next(
@@ -1529,7 +981,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 FieldSpec(
                     "role",
                     field_type="select",
-                    options=_enum_options(NcrmRole),
+                    options=enum_options(NcrmRole),
                     default=link.role.value,
                 )
             ],
@@ -1538,7 +990,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
     async def _start_stage_risk_edit_form(self, risk_id: str) -> list[str]:
         """Open an edit form for the stage risk with id *risk_id*."""
-        stage = await self._current_stage()
+        stage = await lookup.current_stage(self.ctx, self.env)
         if stage is None:
             return ["Stage not found."]
         risk = next(
@@ -1559,7 +1011,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
     async def _start_process_risk_edit_form(self, risk_id: str) -> list[str]:
         """Open an edit form for the process risk with id *risk_id*."""
-        process = await self._current_process()
+        process = await lookup.current_process(self.ctx, self.env)
         if process is None:
             return ["Route not found."]
         risk = next(
@@ -1580,7 +1032,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
     async def _start_component_risk_edit_form(self, risk_id: str) -> list[str]:
         """Open an edit form for the component risk with id *risk_id*."""
-        component = await self._current_component()
+        component = await lookup.current_component(self.ctx, self.env)
         if component is None:
             return ["Component not found."]
         risk = next(
@@ -1660,7 +1112,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
     ) -> list[str]:
         for stage in await list_stages_for_process(UUID(str(process.id)), self.env):
             if str(stage.id) == stage_id:
-                return self._start_confirm(
+                return self.start_confirm(
                     f"Delete stage '{stage.name}'",
                     lambda: self._delete_stage_with_confirmation(stage, ["--confirm"]),
                 )
@@ -1670,7 +1122,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         component = await get_component_by_id(UUID(component_id), self.env)
         if component is None:
             return ["Component not found."]
-        return self._start_confirm(
+        return self.start_confirm(
             "Delete component",
             lambda: self._delete_component_with_confirmation(component, ["--confirm"]),
         )
@@ -1733,94 +1185,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             lambda **payload: self._handle_stage_list(stage, payload["list"]),
         )
 
-    def _start_library_filter_chooser(self, sub_mode: str) -> list[str]:
-        return self.modal.start_prompt(
-            [
-                FieldSpec(
-                    "filter",
-                    field_type="select",
-                    options=[
-                        ("all", ""),
-                        ("has SMILES", "has-smiles"),
-                        ("no SMILES", "no-smiles"),
-                    ],
-                )
-            ],
-            lambda **payload: self._render_library(sub_mode, filter_mode=payload["filter"] or None),
-        )
-
-    def _start_admin_action_chooser(self) -> list[str]:
-        return self.modal.start_prompt(
-            [
-                FieldSpec(
-                    "action",
-                    field_type="select",
-                    options=[
-                        ("import CSV", "import"),
-                        ("analyze database", "analyze"),
-                        ("canonicalize SMILES", "canonicalize"),
-                    ],
-                )
-            ],
-            lambda **payload: self._admin_action_dispatch(payload["action"]),
-        )
-
-    async def _admin_action_dispatch(self, action: str) -> list[str]:
-        if action == "import":
-            return self.modal.start_prompt(
-                [
-                    FieldSpec(
-                        "type",
-                        field_type="select",
-                        options=[
-                            ("materials", "materials"),
-                            ("ncrm", "ncrm"),
-                            ("counterions", "counterions"),
-                        ],
-                    ),
-                    FieldSpec("file"),
-                    FieldSpec(
-                        "dry_run", field_type="select", options=BOOL_OPTIONS, default="false"
-                    ),
-                    FieldSpec(
-                        "skip_errors", field_type="select", options=BOOL_OPTIONS, default="false"
-                    ),
-                ],
-                lambda **payload: self._admin_import_from_prompt(payload),
-                title="Import CSV",
-            )
-        scope_field = FieldSpec(
-            "scope", field_type="select", options=[("all", "all"), ("ncrm only", "ncrm")]
-        )
-        if action == "analyze":
-            return self.modal.start_prompt(
-                [scope_field],
-                lambda **payload: self._admin_db(
-                    ["analyze", *(["--ncrm"] if payload["scope"] == "ncrm" else [])]
-                ),
-            )
-        return self.modal.start_prompt(
-            [
-                scope_field,
-                FieldSpec("dry_run", field_type="select", options=BOOL_OPTIONS, default="false"),
-            ],
-            lambda **payload: self._admin_db(
-                [
-                    "canonicalize",
-                    *(["--ncrm"] if payload["scope"] == "ncrm" else []),
-                    *(["--dry-run"] if _as_bool(payload["dry_run"]) else []),
-                ]
-            ),
-        )
-
-    async def _admin_import_from_prompt(self, payload: dict[str, str | None]) -> list[str]:
-        args = [payload.get("type") or "", payload.get("file") or ""]
-        if _as_bool(payload.get("dry_run")):
-            args.append("--dry-run")
-        if _as_bool(payload.get("skip_errors")):
-            args.append("--skip-errors")
-        return await self._admin_import(args)
-
     # ------------------------------------------------------------------ #
     # Search and help legend
     # ------------------------------------------------------------------ #
@@ -1839,51 +1203,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return "library_list"
         return track
 
-    def current_spec(self) -> ScreenSpec:
-        """Return the :class:`ScreenSpec` for the current screen."""
-        return SCREEN_SPECS.get(self.current_screen_key(), _DEFAULT_SPEC)
-
-    def is_navigable(self) -> bool:
-        """Return ``True`` when the current screen has ``↑↓``/``Enter`` navigation.
-
-        The Library home's navigation belongs to its ``Libraries`` tab only; the
-        ``Information`` tab has no cards, so it reports as non-navigable.
-        """
-        if self.current_screen_key() == "library_home" and self.active_tab() != 0:
-            return False
-        return self.current_spec().navigable
-
-    def supports_search(self) -> bool:
-        """Return ``True`` when the current screen has an incremental "/" search."""
-        return self.current_spec().searchable
-
-    def tab_count(self) -> int:
-        """Return the number of tabs on the current screen (0 when untabbed)."""
-        return len(LIBRARY_HOME_TABS) if self.current_screen_key() == "library_home" else 0
-
-    def active_tab(self) -> int:
-        """Return the active tab index for the current screen.
-
-        Resets to the first tab whenever the screen key changes, so navigating
-        away and back to a tabbed screen starts on its first tab.
-        """
-        key = self.current_screen_key()
-        if self._active_tab_key != key:
-            self._active_tab = 0
-            self._active_tab_key = key
-        return self._active_tab
-
-    def cycle_active_tab(self, step: int) -> None:
-        """Advance the active tab by *step* (wrapping) on the current screen."""
-        count = self.tab_count()
-        if count <= 0:
-            return
-        self._active_tab = (self.active_tab() + step) % count
-
-    async def search(  # pylint: disable=too-many-return-statements  # one return per searchable track
+    async def search_screen(  # pylint: disable=too-many-return-statements  # one return per searchable track
         self, query: str
     ) -> list[str]:
         """Re-render the current screen filtered by *query* for "/" search mode.
+
+        The :class:`~.screens.legacy.LegacyScreen` adapter calls this for screens
+        not yet extracted into ``repl/screens/``.
 
         Args:
             query: Raw filter text; an empty/blank query shows the full screen.
@@ -1893,33 +1219,16 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """
         track = self.ctx.current.track
         cleaned = query.strip() or None
-        if track == "project_select":
-            return await self._render_project_select(cleaned)
-        if track == "route_select":
-            return await self._render_route_select(cleaned)
-        if track == "library":
-            sub_mode = self.ctx.current.library_sub or "select"
-            return await self._render_library(sub_mode, query=cleaned)
         if track == "route":
             if cleaned is None:
                 return await self.render_current()
-            process = await self._current_process()
+            process = await lookup.current_process(self.ctx, self.env)
             if process is None:
                 return ["Route not found."]
             return await self._search_route(process, cleaned)
         return await self.render_current()
 
-    def help_legend(self) -> list[str]:
-        """Return the full control legend lines for the current screen.
-
-        Unlike the footer, which splits grammar and actions across two lines, the
-        ``?`` legend lists everything in one place: the interaction grammar
-        followed by the screen's action hotkeys.
-        """
-        key = self.current_screen_key()
-        return [f"Controls · {key}", "", *_screen_controls(self.current_spec())]
-
-    def _rebuild_list_navigator(
+    def rebuild_navigator(
         self, recents: list[ListItem], all_items: list[ListItem]
     ) -> ListNavigator:
         """Rebuild the list navigator, preserving the current selection by id.
@@ -1936,7 +1245,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         Returns:
             The freshly built navigator, also stored on ``self``.
         """
-        previous = self._list_navigator
+        previous = self.navigator
         previous_id = (
             previous.selected.item_id
             if previous is not None and previous.selected is not None
@@ -1945,135 +1254,28 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         navigator = ListNavigator(recents, all_items)
         if previous_id:
             navigator.select_item_id(previous_id)
-        self._list_navigator = navigator
+        self.navigator = navigator
         return navigator
 
-    async def _render_home(self) -> list[str]:
-        """Render the landing screen: the banner and the three track cards.
-
-        The cards are backed by a fixed three-item navigator (matching
-        :data:`~.renderers.home_renderer.CARDS`) so arrow keys and Enter select
-        a track exactly like any other list screen.
-        """
-        items = [ListItem(label=title, item_id=key) for key, title, _hotkey in HOME_CARDS]
-        navigator = self._rebuild_list_navigator([], items)
-        return render_home_screen(
-            navigator.selected_index,
-            width=self.screen.width,
-            height=self.screen.output_height,
-            bold=self.screen.bold,
-        )
-
-    async def _render_project_select(self, query: str | None = None) -> list[str]:
-        projects = await list_projects(self.env)
-        if query:
-            lowered = query.lower()
-            projects = [project for project in projects if lowered in project.name.lower()]
-        recent_map = {
-            project.item_id: project for project in await self._recent_project_items(projects)
-        }
-        recents = list(recent_map.values())
-        all_items = [
-            ListItem(label=project.name, item_id=str(project.id))
-            for project in projects
-            if str(project.id) not in recent_map
-        ]
-        navigator = self._rebuild_list_navigator(recents, all_items)
-        header = [section_rule("Projects", section_width(self.screen.width)), ""]
-        return [*header, *navigator.render_lines(self.screen.width)]
-
-    async def _render_project(self, project: Project) -> list[str]:
-        """Render the project screen with a navigable routes pick-list.
-
-        The project's manufacturing processes are shown as a :class:`ListNavigator`
-        so routes can be opened inline with the arrow keys and Enter, the same way
-        projects are opened from the home screen.
-
-        Args:
-            project: The project whose screen to render.
-
-        Returns:
-            The composed project-screen lines, including the routes pick-list.
-        """
-        processes = await list_processes_for_project(UUID(str(project.id)), self.env)
-        recent_ids = self.session.recent_routes.get(str(project.id), [])
-
-        def label(process: ManufacturingProcess) -> str:
-            return f"Route {process.route_number} Process {process.process_number}"
-
-        recent_lookup = {
-            str(process.id): ListItem(label=label(process), item_id=str(process.id))
-            for process in processes
-            if str(process.id) in recent_ids
-        }
-        recents = [recent_lookup[route_id] for route_id in recent_ids if route_id in recent_lookup]
-        all_items = [
-            ListItem(label=label(process), item_id=str(process.id))
-            for process in processes
-            if str(process.id) not in recent_lookup
-        ]
-        navigator = self._rebuild_list_navigator(recents, all_items)
-        route_lines = navigator.render_lines(self.screen.width)
-        return await render_project_screen(
-            project, self.env, route_lines=route_lines, width=self.screen.width
-        )
-
-    async def _render_route_select(self, query: str | None = None) -> list[str]:
-        project = await self._current_project()
-        if project is None:
-            return ["Project not found."]
-        processes = await list_processes_for_project(UUID(str(project.id)), self.env)
-        if query:
-            lowered = query.lower()
-            processes = [
-                process
-                for process in processes
-                if lowered in f"{process.route_number}.{process.process_number}".lower()
-            ]
-        recent_ids = self.session.recent_routes.get(str(project.id), [])
-        recent_lookup = {
-            str(process.id): ListItem(
-                label=f"{process.route_number}.{process.process_number}",
-                item_id=str(process.id),
-            )
-            for process in processes
-            if str(process.id) in recent_ids
-        }
-        recents = [recent_lookup[route_id] for route_id in recent_ids if route_id in recent_lookup]
-        all_items = [
-            ListItem(
-                label=f"{process.route_number}.{process.process_number}",
-                item_id=str(process.id),
-            )
-            for process in processes
-            if str(process.id) not in recent_lookup
-        ]
-        navigator = self._rebuild_list_navigator(recents, all_items)
-        return [
-            f"Routes for {project.name}",
-            "",
-            *navigator.render_lines(self.screen.width),
-        ]
-
     async def _render_stage_focus(self) -> list[str]:
-        stage = await self._current_stage()
+        stage = await lookup.current_stage(self.ctx, self.env)
         if stage is None:
             return ["Stage not found."]
         sections = await gather_stage_sections(stage, self.env)
-        navigator = self._rebuild_list_navigator([], stage_targets(sections))
+        navigator = self.rebuild_navigator([], stage_targets(sections))
         selected_id = navigator.selected.item_id if navigator.selected is not None else None
         return render_stage_screen(
             stage, sections, width=self.screen.width, selected_id=selected_id
         )
 
     async def _render_component_focus(self) -> list[str]:
-        component = await self._current_component()
+        component = await lookup.current_component(self.ctx, self.env)
         if component is None:
             return ["Component not found."]
         material = await get_material_by_id(UUID(str(component.material_id)), self.env)
         sections = await gather_component_sections(component, material, self.env)
         display_name = await component_display_name(component, self.env)
-        navigator = self._rebuild_list_navigator([], component_targets(sections))
+        navigator = self.rebuild_navigator([], component_targets(sections))
         selected_id = navigator.selected.item_id if navigator.selected is not None else None
         return render_component_screen(
             sections,
@@ -2082,90 +1284,26 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             selected_id=selected_id,
         )
 
-    async def _library_counts(self) -> dict[str, int]:
-        """Return live record counts for each library subsection.
-
-        Keyed by subsection (``ncrm``/``materials``/``counterions``) to match
-        :data:`~.renderers.library_home_renderer.OVERVIEW_CARDS`.
-        """
-        return {
-            "ncrm": len(await list_ncrm_library(self.env)),
-            "materials": len(await list_materials(self.env)),
-            "counterions": len(await list_counterions(self.env)),
-        }
-
-    async def _render_library_home(self) -> list[str]:
-        """Render the Library landing page: a tabbed overview/information pane.
-
-        On the ``Libraries`` tab the three overview cards are backed by a fixed
-        navigator (matching
-        :data:`~.renderers.library_home_renderer.OVERVIEW_CARDS`) so arrow keys
-        and Enter pick a subsection exactly like any other list screen. The
-        ``Information`` tab has no cards, so its navigator is cleared.
-        """
-        counts = await self._library_counts()
-        active = self.active_tab()
-        if active == 0:
-            items = [ListItem(label=title, item_id=key) for key, title in OVERVIEW_CARDS]
-            navigator = self._rebuild_list_navigator([], items)
-            selected_index = navigator.selected_index
-        else:
-            self._list_navigator = None
-            selected_index = -1
-        return render_library_home(
-            counts,
-            selected_index,
-            active_tab=active,
-            width=self.screen.width,
-            bold=self.screen.bold,
-        )
-
-    async def _render_library(
-        self,
-        sub_mode: str,
-        query: str | None = None,
-        filter_mode: str | None = None,
-    ) -> list[str]:
-        if sub_mode == "select":
-            return await self._render_library_home()
-        items = await self._library_items(sub_mode)
-        if query:
-            lowered = query.lower()
-            items = [
-                item
-                for item in items
-                if lowered in str(item.get("name") or item.get("display_name") or "").lower()
-            ]
-        if filter_mode == "has-smiles":
-            items = [item for item in items if item.get("smiles")]
-        if filter_mode == "no-smiles":
-            items = [item for item in items if not item.get("smiles")]
-        navigator = self._rebuild_list_navigator([], library_targets(items))
-        selected_id = navigator.selected.item_id if navigator.selected is not None else None
-        return await render_library_screen(
-            sub_mode, items, width=self.screen.width, selected_id=selected_id
-        )
-
     async def _render_risk_mode(  # pylint: disable=too-many-return-statements  # one return per risk scope
         self,
     ) -> list[str]:
         scope = self.ctx.current.risk_scope or "project"
         if scope == "project":
-            project = await self._current_project()
+            project = await lookup.current_project(self.ctx, self.env)
             if project is None:
                 return ["Project not found."]
             return await self._render_project_risks(project)
         if scope == "process":
-            process = await self._current_process()
+            process = await lookup.current_process(self.ctx, self.env)
             if process is None:
                 return ["Route not found."]
             return await self._render_process_risks(process)
         if scope == "stage":
-            stage = await self._current_stage()
+            stage = await lookup.current_stage(self.ctx, self.env)
             if stage is None:
                 return ["Stage not found."]
             return await self._render_stage_risks(stage)
-        component = await self._current_component()
+        component = await lookup.current_component(self.ctx, self.env)
         if component is None:
             return ["Component not found."]
         return await self._render_component_risks(component)
@@ -2296,8 +1434,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 self.env,
             )
             if created is None:
-                return await self._refresh_with_notice("Failed to create stage.", "error")
-            return await self._refresh_with_notice(f"Created stage '{created.name}'.")
+                return await self.refresh_with_notice("Failed to create stage.", "error")
+            return await self.refresh_with_notice(f"Created stage '{created.name}'.")
         if subject == "component" and len(args) >= 2:
             material_name = " ".join(args[1:])
             return self.modal.start_prompt(
@@ -2336,7 +1474,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             )
         if args[0].lower() == "stage" and len(args) >= 2:
             stage_name = " ".join(args[1:])
-            stage = await self._find_stage(process, stage_name)
+            stage = await lookup.find_stage(self.env, process, stage_name)
             if stage is None:
                 return [f"Stage '{stage_name}' not found."]
             return self.modal.start_prompt(
@@ -2346,7 +1484,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             )
         if args[0].lower() == "component" and len(args) >= 2:
             component_name = " ".join(args[1:])
-            component = await self._find_component(process, component_name)
+            component = await lookup.find_component(self.env, process, component_name)
             if component is None:
                 return [f"Component '{component_name}' not found."]
             return self.modal.start_prompt(
@@ -2362,7 +1500,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         scope = args[0].lower()
         name = " ".join(args[1:])
         if scope == "stage":
-            stage = await self._find_stage(process, name)
+            stage = await lookup.find_stage(self.env, process, name)
             if stage is None:
                 return [f"Stage '{name}' not found."]
             return self.modal.start_prompt(
@@ -2374,7 +1512,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 title="Edit stage",
             )
         if scope == "component":
-            component = await self._find_component(process, name)
+            component = await lookup.find_component(self.env, process, name)
             if component is None:
                 return [f"Component '{name}' not found."]
             return self.modal.start_prompt(
@@ -2406,14 +1544,14 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         confirmed = "--confirm" in args
         name = " ".join(name_parts)
         if scope == "stage":
-            stage = await self._find_stage(process, name)
+            stage = await lookup.find_stage(self.env, process, name)
             if stage is None:
                 return [f"Stage '{name}' not found."]
             return await self._delete_stage_with_confirmation(
                 stage, ["--confirm"] if confirmed else []
             )
         if scope == "component":
-            component = await self._find_component(process, name)
+            component = await lookup.find_component(self.env, process, name)
             if component is None:
                 return [f"Component '{name}' not found."]
             return await self._delete_component_with_confirmation(
@@ -2463,555 +1601,12 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 lines.append(f"{stage.name}: {link.role.value} → {link.ncrm_id}")
         return lines if found else [*lines, "(none)"]
 
-    async def _show_library_item(self, sub_mode: str, name: str) -> list[str]:
-        items = await self._library_items(sub_mode)
-        lowered = name.lower()
-        for item in items:
-            if _library_item_matches(item, lowered):
-                return await self._show_library_entry(sub_mode, item)
-        return [f"No {sub_mode} item matched '{name}'."]
-
-    async def _show_library_entry(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
-        """Return the sectioned detail page for an already-resolved library *item*."""
-        aliases = await self._library_item_aliases(sub_mode, str(item["id"]))
-        return render_library_detail(item, aliases, width=self.screen.width)
-
-    def _start_library_add_prompt(self, sub_mode: str) -> list[str]:
-        # Each add flow is a three-step chain: collect the lead name, offer to
-        # auto-resolve SMILES/aliases, then collect the remaining fields. On a
-        # successful resolve the retrieved values are shown read-only and only the
-        # remaining fields stay editable (see _offer_augment /
-        # _finish_library_add_augmented); otherwise SMILES is entered manually.
-        if sub_mode == "materials":
-            return self.modal.start_prompt(
-                [FieldSpec("name")],
-                lambda **payload: self._offer_augment("materials", payload.get("name") or ""),
-                title="Add material",
-            )
-        if sub_mode == "ncrm":
-            return self.modal.start_prompt(
-                [FieldSpec("name")],
-                lambda **payload: self._offer_augment("ncrm", payload.get("name") or ""),
-                title="Add NCRM",
-            )
-        if sub_mode == "counterions":
-            return self.modal.start_prompt(
-                [FieldSpec("name")],
-                lambda **payload: self._offer_augment("counterions", payload.get("name") or ""),
-                title="Add counterion",
-            )
-        return ["Choose a library subsection first."]
-
-    def _offer_augment(self, sub_mode: str, name: str) -> list[str]:
-        """Ask whether to auto-resolve SMILES/aliases for *name* before finishing.
-
-        Args:
-            sub_mode: Library subsection (``materials``/``ncrm``/``counterions``).
-            name: The lead chemical name to resolve.
-
-        Returns:
-            Prompt lines for the Yes/No augment question, or the finish form when
-            *name* is empty.
-        """
-        if not name:
-            return self._finish_library_add(sub_mode, name, None, [])
-        label = f"Augment '{name}' with SMILES & aliases?"
-        return self.modal.start_prompt(
-            [FieldSpec(label, field_type="select", options=CONFIRM_OPTIONS, default="no")],
-            lambda **payload: self._resolve_augment(sub_mode, name, payload[field_key(label)]),
-        )
-
-    async def _resolve_augment(self, sub_mode: str, name: str, answer: str | None) -> list[str]:
-        """Run augmentation when confirmed, then open the finish form.
-
-        On a successful resolve, the retrieved SMILES and aliases are shown in a
-        read-only "Retrieved values" section on the finish form (and carried
-        through to be persisted on completion); only the remaining fields stay
-        editable. On a miss (or "No"), the form opens for manual SMILES entry.
-        """
-        if answer != "yes":
-            self._suggestion_inputs = await self._collision_inputs(sub_mode, name, None)
-            return self._finish_library_add(sub_mode, name, None, [])
-        result = await augment_name(name)
-        if result.resolved:
-            self._suggestion_inputs = await self._collision_inputs(sub_mode, name, result.smiles)
-            return self._finish_library_add_augmented(sub_mode, name, result)
-        self._notice = (f"Could not resolve '{name}'. Enter SMILES manually.", "warning")
-        self._suggestion_inputs = await self._collision_inputs(sub_mode, name, None)
-        return self._finish_library_add(sub_mode, name, None, [])
-
-    async def _collision_inputs(
-        self, sub_mode: str, name: str, smiles: str | None
-    ) -> tuple[list[str] | None, bool]:
-        """Gather the collision set and PubChem-ambiguity flag for a suggestion.
-
-        Only materials currently expose a collision/ambiguity source; the other
-        subsections receive rules-only suggestions.
-
-        Args:
-            sub_mode: Library subsection.
-            name: The lead chemical name collected earlier.
-            smiles: The resolved SMILES to validate the suggestion against, if any.
-
-        Returns:
-            A ``(existing_names, ambiguous)`` pair. ``existing_names`` is ``None``
-            for subsections without a collision source.
-        """
-        if sub_mode != "materials":
-            return None, False
-        existing = await existing_display_names(env=self.env)
-        candidate = simplify_name(name, existing_names=existing).display_name
-        ambiguous = (await display_name_is_unambiguous(candidate, smiles)) is False
-        return existing, ambiguous
-
-    # Library add/edit titles keyed by sub-mode. Materials, counterions, and
-    # NCRM entries now share the same shape (name, display_name,
-    # interpret_chemically, smiles), so the add/edit flows are uniform.
-    _LIBRARY_ADD_TITLES = {
-        "materials": "Add material",
-        "counterions": "Add counterion",
-        "ncrm": "Add NCRM",
-    }
-
-    def _library_create_handler(
-        self, sub_mode: str
-    ) -> Callable[[str, dict[str, str | None], list[str]], Awaitable[list[str]]] | None:
-        """Return the ``(name, payload, aliases)`` create handler for *sub_mode*."""
-        handlers = {
-            "materials": self._create_material_from_prompt,
-            "counterions": self._create_counterion_from_prompt,
-            "ncrm": self._create_ncrm_from_prompt,
-        }
-        return handlers.get(sub_mode)
-
-    def _finish_library_add(
-        self,
-        sub_mode: str,
-        name: str,
-        smiles: str | None,
-        aliases: list[str],
-    ) -> list[str]:
-        """Open the final add form for the manual (non-augmented) path.
-
-        Used when the user declined augmentation or it missed: SMILES is an
-        editable field. See :meth:`_finish_library_add_augmented` for the form
-        shown after a successful resolve.
-
-        Args:
-            sub_mode: Library subsection.
-            name: The lead chemical name collected earlier.
-            smiles: Pre-filled SMILES, or ``None`` for manual entry.
-            aliases: Aliases to persist once the entity is created.
-
-        Returns:
-            Prompt-render lines for the finish form.
-        """
-        handler = self._library_create_handler(sub_mode)
-        if handler is None:
-            return ["Choose a library subsection first."]
-        display_field, note = self._suggested_display_name_field(name)
-        info = InfoSection(title="Suggested display name", rows=[("note", note)]) if note else None
-        return self.modal.start_prompt(
-            [
-                display_field,
-                FieldSpec(
-                    "interpret_chemically",
-                    field_type="select",
-                    options=BOOL_OPTIONS,
-                    default="false",
-                ),
-                FieldSpec("smiles", required=False, default=smiles),
-            ],
-            lambda **payload: handler(name, payload, aliases),
-            title=self._LIBRARY_ADD_TITLES[sub_mode],
-            info_section=info,
-        )
-
-    def _suggested_display_name_field(self, name: str) -> tuple[FieldSpec, str | None]:
-        """Build a ``display_name`` field pre-filled with a simplified suggestion.
-
-        The suggestion is a deterministic shortening of *name* (see
-        :func:`~..utils.name_simplifier.simplify_name`); the user can accept it
-        with Enter or type over it. Typing is capped at the hard length limit.
-        Collision inputs gathered by the async augment step (stored in
-        ``self._suggestion_inputs``) are consumed and reset here.
-
-        Args:
-            name: The lead chemical name collected earlier.
-
-        Returns:
-            A ``(field, note)`` pair. ``note`` is a short review message when the
-            suggestion was truncated, disambiguated, or ambiguous, else ``None``.
-        """
-        existing_names, ambiguous = self._suggestion_inputs
-        self._suggestion_inputs = (None, False)
-        suggestion = simplify_name(name, existing_names=existing_names)
-        spec = FieldSpec(
-            "display_name",
-            required=False,
-            default=suggestion.display_name,
-            max_length=30,
-        )
-        note = suggestion.notes[0] if suggestion.notes else None
-        if ambiguous and note is None:
-            note = "Suggestion matches another compound on PubChem — review recommended."
-        return spec, note
-
-    def _finish_library_add_augmented(
-        self,
-        sub_mode: str,
-        name: str,
-        result: ResolveResult,
-    ) -> list[str]:
-        """Open the finish form with augmentation *result* shown read-only.
-
-        Builds the "Retrieved values" section from the resolved name/SMILES/aliases
-        and leaves ``display_name`` and ``interpret_chemically`` editable for all
-        three library subsections. The resolved SMILES is carried through to be
-        persisted on completion.
-
-        Args:
-            sub_mode: Library subsection.
-            name: The lead chemical name collected earlier.
-            result: The successful resolution carrying SMILES, aliases and source.
-
-        Returns:
-            Prompt-render lines for the finish form.
-        """
-        handler = self._library_create_handler(sub_mode)
-        if handler is None:
-            return ["Choose a library subsection first."]
-        display_field, note = self._suggested_display_name_field(name)
-        rows: list[tuple[str, str]] = [("name", name)]
-        if result.smiles:
-            rows.append(("smiles", result.smiles))
-        if result.aliases:
-            rows.append(("aliases", ", ".join(result.aliases)))
-        if note:
-            rows.append(("display-name note", note))
-        info = InfoSection(title=f"Retrieved values (source: {result.source})", rows=rows)
-
-        return self.modal.start_prompt(
-            [
-                display_field,
-                FieldSpec(
-                    "interpret_chemically",
-                    field_type="select",
-                    options=BOOL_OPTIONS,
-                    default="false",
-                ),
-            ],
-            lambda **payload: handler(name, {**payload, "smiles": result.smiles}, result.aliases),
-            title=self._LIBRARY_ADD_TITLES[sub_mode],
-            info_section=info,
-        )
-
-    async def _start_library_edit_prompt(self, sub_mode: str, name: str) -> list[str]:
-        item = await self._find_library_item(sub_mode, name)
-        if item is None:
-            return [f"No {sub_mode} item matched '{name}'."]
-        return self._library_edit_form(sub_mode, item)
-
-    async def _activate_library_row(self, item_id: str) -> list[str]:
-        """Open the detail (show) screen for the caret-selected library row.
-
-        The library screen's navigator carries the entry id; Enter opens its
-        detail page on a new ``library_detail`` frame so ``^C`` returns to the
-        list. (``^E`` still edits the highlighted row directly.)
-        """
-        sub_mode = self.ctx.current.library_sub or "select"
-        item = await self._find_library_item_by_id(sub_mode, item_id)
-        if item is None:
-            return await self._refresh_with_notice("Item not found.", "error")
-        self.ctx.push(
-            ContextFrame(
-                track="library_detail",
-                library_sub=sub_mode,
-                library_detail_id=item_id,
-            )
-        )
-        return await self._render_library_detail(sub_mode, item_id)
-
-    async def _render_library_detail(self, sub_mode: str, item_id: str) -> list[str]:
-        """Render the detail (show) page for one library entry, with its aliases.
-
-        The detail page is not a list screen, so the navigator is cleared (arrow
-        keys scroll the page rather than walking a caret).
-        """
-        self._list_navigator = None
-        item = await self._find_library_item_by_id(sub_mode, item_id)
-        if item is None:
-            return await self._refresh_with_notice("Item not found.", "error")
-        aliases = await self._library_item_aliases(sub_mode, item_id)
-        return render_library_detail(item, aliases, width=self.screen.width)
-
-    async def _library_item_aliases(self, sub_mode: str, item_id: str) -> list[str]:
-        """Return the aliases of one library entry for its subsection."""
-        entry_id = UUID(item_id)
-        if sub_mode == "materials":
-            return await list_material_aliases(entry_id, self.env)
-        if sub_mode == "ncrm":
-            return await list_ncrm_aliases(entry_id, self.env)
-        if sub_mode == "counterions":
-            return await list_counterion_aliases(entry_id, self.env)
-        return []
-
-    def _library_edit_form(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
-        """Start the edit form for an already-resolved library *item*."""
-        if sub_mode == "materials":
-            return self.modal.start_prompt(
-                [
-                    FieldSpec("name", default=str(item["name"])),
-                    FieldSpec(
-                        "display_name",
-                        default=_default_text(item.get("display_name")),
-                        max_length=30,
-                    ),
-                    FieldSpec(
-                        "interpret_chemically",
-                        field_type="select",
-                        options=BOOL_OPTIONS,
-                        default="true" if bool(item.get("interpret_chemically")) else "false",
-                    ),
-                    FieldSpec("smiles", required=False, default=_default_text(item.get("smiles"))),
-                ],
-                lambda **payload: self._update_material_entry(str(item["id"]), payload),
-                title="Edit material",
-            )
-        if sub_mode == "ncrm":
-            return self.modal.start_prompt(
-                [
-                    FieldSpec("name", default=str(item["name"])),
-                    FieldSpec(
-                        "display_name",
-                        default=str(item["display_name"]),
-                        max_length=30,
-                    ),
-                    FieldSpec(
-                        "interpret_chemically",
-                        field_type="select",
-                        options=BOOL_OPTIONS,
-                        default="true" if bool(item.get("interpret_chemically")) else "false",
-                    ),
-                    FieldSpec("smiles", required=False, default=_default_text(item.get("smiles"))),
-                ],
-                lambda **payload: self._update_ncrm_entry(str(item["id"]), payload),
-                title="Edit NCRM",
-            )
-        return self.modal.start_prompt(
-            [
-                FieldSpec("name", default=str(item["name"])),
-                FieldSpec(
-                    "display_name",
-                    default=_default_text(item.get("display_name")),
-                    max_length=30,
-                ),
-                FieldSpec(
-                    "interpret_chemically",
-                    field_type="select",
-                    options=BOOL_OPTIONS,
-                    default="true" if bool(item.get("interpret_chemically")) else "false",
-                ),
-                FieldSpec("smiles", required=False, default=_default_text(item.get("smiles"))),
-            ],
-            lambda **payload: self._update_counterion_entry(str(item["id"]), payload),
-            title="Edit counterion",
-        )
-
-    async def _delete_library_item(self, sub_mode: str, name: str) -> list[str]:
-        item = await self._find_library_item(sub_mode, name)
-        if item is None:
-            return [f"No {sub_mode} item matched '{name}'."]
-        return await self._delete_library_entry(sub_mode, item)
-
-    async def _delete_library_entry(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
-        """Delete an already-resolved library *item* and refresh the screen."""
-        item_uuid = UUID(str(item["id"]))
-        if sub_mode == "materials":
-            success = await delete_material(item_uuid, self.env)
-        elif sub_mode == "ncrm":
-            success = await delete_ncrm_library_entry(item_uuid, self.env)
-        else:
-            success = await delete_counterion(item_uuid, self.env)
-        if not success:
-            return await self._refresh_with_notice("Delete failed.", "error")
-        return await self._refresh_with_notice("Deleted.")
-
-    async def _admin_import(self, args: list[str]) -> list[str]:
-        import_type = args[0].lower()
-        file_path = Path(args[1]).expanduser()
-        dry_run = "--dry-run" in args[2:]
-        skip_errors = "--skip-errors" in args[2:]
-        if not file_path.exists():
-            return [f"File not found: {file_path}"]
-        content = file_path.read_text(encoding="utf-8")
-        if import_type == "materials":
-            counts = await bulk_import_materials(
-                content,
-                self.env,
-                skip_errors=skip_errors,
-                dry_run=dry_run,
-            )
-            created = counts["created"]
-            skipped = counts["skipped"]
-            errors = counts["errors"]
-            return [f"materials import: created={created} skipped={skipped} errors={errors}"]
-        return await self._admin_simple_import(
-            import_type, content, dry_run=dry_run, skip_errors=skip_errors
-        )
-
-    async def _admin_simple_import(
-        self,
-        import_type: str,
-        content: str,
-        *,
-        dry_run: bool,
-        skip_errors: bool,
-    ) -> list[str]:
-        importers = {
-            "ncrm": self._import_ncrm_row,
-            "counterions": self._import_counterion_row,
-        }
-        importer = importers.get(import_type)
-        if importer is None:
-            return ["Supported admin imports: materials, ncrm, counterions"]
-
-        created = 0
-        errors = 0
-        for row in csv.DictReader(StringIO(content)):
-            if dry_run:
-                created += 1
-                continue
-            try:
-                succeeded = await importer(row)
-            except Exception:  # pylint: disable=broad-exception-caught  # one bad row must not abort the import
-                succeeded = False
-            if succeeded:
-                created += 1
-            else:
-                errors += 1
-                if not skip_errors:
-                    break
-        return [f"{import_type} import: created={created} errors={errors} dry_run={dry_run}"]
-
-    async def _import_ncrm_row(self, row: dict[str, str]) -> bool:
-        """Create one NCRM entry plus its ``;``-separated aliases; ``False`` on failure."""
-        result = await create_ncrm_library_entry(
-            NcrmLibraryCreate(
-                name=(row.get("name") or "").strip(),
-                display_name=(row.get("display_name") or "").strip() or None,
-                interpret_chemically=(
-                    (row.get("interpret_chemically") or "false").strip().lower() == "true"
-                ),
-                smiles=(row.get("smiles") or "").strip() or None,
-            ),
-            self.env,
-        )
-        if result is None:
-            return False
-        for alias in split_aliases((row.get("aliases") or "").strip()):
-            await add_ncrm_alias(
-                NcrmLibraryAliasCreate(ncrm_library_id=UUID(str(result.id)), alias=alias),
-                self.env,
-            )
-        return True
-
-    async def _import_counterion_row(self, row: dict[str, str]) -> bool:
-        """Create one counterion plus its ``;``-separated aliases; ``False`` on failure."""
-        result = await create_counterion(
-            CounterionCreate(
-                name=(row.get("name") or "").strip(),
-                display_name=(row.get("display_name") or "").strip() or None,
-                interpret_chemically=(
-                    (row.get("interpret_chemically") or "false").strip().lower() == "true"
-                ),
-                smiles=(row.get("smiles") or "").strip() or None,
-            ),
-            self.env,
-        )
-        if result is None:
-            return False
-        for alias in split_aliases((row.get("aliases") or "").strip()):
-            await add_counterion_alias(
-                CounterionAliasCreate(counterion_id=UUID(str(result.id)), alias=alias),
-                self.env,
-            )
-        return True
-
-    async def _admin_db(self, args: list[str]) -> list[str]:
-        action = args[0].lower()
-        ncrm_only = "--ncrm" in args[1:]
-        dry_run = "--dry-run" in args[1:]
-        if action == "analyze":
-            return await self._admin_db_analyze(ncrm_only)
-        if action == "canonicalize":
-            return await self._admin_db_canonicalize(ncrm_only=ncrm_only, dry_run=dry_run)
-        return ["Usage: /admin db analyze [--ncrm] | /admin db canonicalize [--dry-run] [--ncrm]"]
-
-    async def _admin_db_analyze(self, ncrm_only: bool) -> list[str]:
-        if ncrm_only:
-            items = await list_ncrm_library(self.env)
-            with_smiles = sum(1 for item in items if item.smiles)
-            return [f"NCRM rows: {len(items)}", f"With SMILES: {with_smiles}"]
-        materials = await list_materials(self.env)
-        counterions = await list_counterions(self.env)
-        ncrms = await list_ncrm_library(self.env)
-        return [
-            f"Materials: {len(materials)}",
-            f"Counterions: {len(counterions)}",
-            f"NCRM rows: {len(ncrms)}",
-        ]
-
-    async def _admin_db_canonicalize(self, *, ncrm_only: bool, dry_run: bool) -> list[str]:
-        updated = 0
-        if ncrm_only:
-            items = await list_ncrm_library(self.env)
-            for item in items:
-                updated += await self._canonicalize_ncrm(item, dry_run)
-            return [f"NCRM canonicalized: {updated}", f"Dry run: {dry_run}"]
-        for material in await list_materials(self.env):
-            if material.smiles:
-                canonical = canonicalize_smiles(material.smiles)
-                if canonical and canonical != material.smiles:
-                    updated += 1
-                    if not dry_run:
-                        await update_material(
-                            UUID(str(material.id)), MaterialUpdate(smiles=canonical), self.env
-                        )
-        for counterion in await list_counterions(self.env):
-            if counterion.smiles:
-                canonical = canonicalize_smiles(counterion.smiles)
-                if canonical and canonical != counterion.smiles:
-                    updated += 1
-                    if not dry_run:
-                        await update_counterion(
-                            UUID(str(counterion.id)),
-                            CounterionUpdate(smiles=canonical),
-                            self.env,
-                        )
-        for item in await list_ncrm_library(self.env):
-            updated += await self._canonicalize_ncrm(item, dry_run)
-        return [f"Entries canonicalized: {updated}", f"Dry run: {dry_run}"]
-
-    async def _canonicalize_ncrm(self, item: Any, dry_run: bool) -> int:
-        if not item.smiles:
-            return 0
-        canonical = canonicalize_smiles(item.smiles)
-        if not canonical or canonical == item.smiles:
-            return 0
-        if not dry_run:
-            await update_ncrm_library_entry(
-                UUID(str(item.id)),
-                NcrmLibraryUpdate(smiles=canonical),
-                self.env,
-            )
-        return 1
-
-    async def _open_project(self, project: Project) -> list[str]:
+    async def open_project(self, project: Project) -> list[str]:
+        """Push the project track for *project* and render its screen."""
         self.ctx.push(
             ContextFrame(track="project", project_id=str(project.id), project_name=project.name)
         )
-        self._list_navigator = None
+        self.navigator = None
         self.session.push_project(str(project.id))
         self.session.update_context(
             track="project",
@@ -3020,9 +1615,10 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             stage_id=None,
             component_id=None,
         )
-        return await self._render_project(project)
+        return await self.render_current()
 
-    async def _open_route(self, project: Project, process: ManufacturingProcess) -> list[str]:
+    async def open_route(self, project: Project, process: ManufacturingProcess) -> list[str]:
+        """Push the route track for *process* and render its screen."""
         label = f"{process.route_number}.{process.process_number}"
         self.ctx.push(
             ContextFrame(
@@ -3033,7 +1629,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 route_label=label,
             )
         )
-        self._list_navigator = None
+        self.navigator = None
         self.session.push_route(str(project.id), str(process.id))
         self.session.update_context(
             track="route",
@@ -3042,9 +1638,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             stage_id=None,
             component_id=None,
         )
-        return await render_route_screen(
-            process, self.env, width=self.screen.width, dim=self.screen.dim
-        )
+        return await self.render_current()
 
     async def _open_stage(self, stage: Stage) -> list[str]:
         self.ctx.push(
@@ -3090,13 +1684,13 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 process_id=UUID(str(process.id)),
                 material_id=UUID(str(material.id)),
                 control_strategy_role=payload.get("control_strategy_role"),
-                is_isolated=_as_bool(payload.get("is_isolated")),
+                is_isolated=as_bool(payload.get("is_isolated")),
             ),
             self.env,
         )
         if created is None:
-            return await self._refresh_with_notice("Failed to create component.", "error")
-        return await self._refresh_with_notice("Component created.")
+            return await self.refresh_with_notice("Failed to create component.", "error")
+        return await self.refresh_with_notice("Component created.")
 
     async def _start_stage_component_picker(
         self,
@@ -3191,8 +1785,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             self.env,
         )
         if link is None:
-            return await self._refresh_with_notice("Failed to assign component to stage.", "error")
-        return await self._refresh_with_notice("Component assigned to stage.")
+            return await self.refresh_with_notice("Failed to assign component to stage.", "error")
+        return await self.refresh_with_notice("Component assigned to stage.")
 
     async def _create_stage_risk_from_prompt(
         self,
@@ -3205,15 +1799,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 risk_type=payload.get("risk_type") or "risk",
                 name=payload.get("name") or "Unnamed risk",
                 description=payload.get("description"),
-                current_level=_optional_int(payload.get("current_level")),
+                current_level=optional_int(payload.get("current_level")),
                 proposed_mitigation=payload.get("proposed_mitigation"),
-                mitigated_level=_optional_int(payload.get("mitigated_level")),
+                mitigated_level=optional_int(payload.get("mitigated_level")),
             ),
             self.env,
         )
         if risk is None:
-            return await self._refresh_with_notice("Failed to create stage risk.", "error")
-        return await self._refresh_with_notice("Stage risk created.")
+            return await self.refresh_with_notice("Failed to create stage risk.", "error")
+        return await self.refresh_with_notice("Stage risk created.")
 
     async def _create_process_risk_from_prompt(
         self,
@@ -3226,15 +1820,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 risk_type=payload.get("risk_type") or "risk",
                 name=payload.get("name") or "Unnamed risk",
                 description=payload.get("description"),
-                current_level=_optional_int(payload.get("current_level")),
+                current_level=optional_int(payload.get("current_level")),
                 proposed_mitigation=payload.get("proposed_mitigation"),
-                mitigated_level=_optional_int(payload.get("mitigated_level")),
+                mitigated_level=optional_int(payload.get("mitigated_level")),
             ),
             self.env,
         )
         if risk is None:
-            return await self._refresh_with_notice("Failed to create process risk.", "error")
-        return await self._refresh_with_notice("Process risk created.")
+            return await self.refresh_with_notice("Failed to create process risk.", "error")
+        return await self.refresh_with_notice("Process risk created.")
 
     async def _create_component_risk_from_prompt(
         self,
@@ -3247,15 +1841,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 risk_type=payload.get("risk_type") or "risk",
                 name=payload.get("name") or "Unnamed risk",
                 description=payload.get("description"),
-                current_level=_optional_int(payload.get("current_level")),
+                current_level=optional_int(payload.get("current_level")),
                 proposed_mitigation=payload.get("proposed_mitigation"),
-                mitigated_level=_optional_int(payload.get("mitigated_level")),
+                mitigated_level=optional_int(payload.get("mitigated_level")),
             ),
             self.env,
         )
         if risk is None:
-            return await self._refresh_with_notice("Failed to create component risk.", "error")
-        return await self._refresh_with_notice("Component risk created.")
+            return await self.refresh_with_notice("Failed to create component risk.", "error")
+        return await self.refresh_with_notice("Component risk created.")
 
     async def _start_stage_component_link_picker(self, process: ManufacturingProcess) -> list[str]:
         """Begin the stage → component → type typeahead chain for a link.
@@ -3335,7 +1929,7 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
 
     def _start_stage_ncrm_role_prompt(self, stage_id: str, ncrm_id: str) -> list[str]:
         return self.modal.start_prompt(
-            [FieldSpec("role", field_type="select", options=_enum_options(NcrmRole))],
+            [FieldSpec("role", field_type="select", options=enum_options(NcrmRole))],
             lambda **payload: self._create_stage_ncrm_link(stage_id, ncrm_id, payload),
         )
 
@@ -3351,8 +1945,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             self.env,
         )
         if link is None:
-            return await self._refresh_with_notice("Failed to create stage-NCRM link.", "error")
-        return await self._refresh_with_notice("Stage-NCRM link created.")
+            return await self.refresh_with_notice("Failed to create stage-NCRM link.", "error")
+        return await self.refresh_with_notice("Stage-NCRM link created.")
 
     async def _stage_items(self, process: ManufacturingProcess) -> list[ListItem]:
         """Build picker items for every stage in *process*, labelled by name.
@@ -3384,28 +1978,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             self.env,
         )
         if link is None:
-            return await self._refresh_with_notice("Failed to create stage-NCRM link.", "error")
-        return await self._refresh_with_notice("Stage-NCRM link created.")
-
-    async def _update_project_from_prompt(
-        self,
-        project: Project,
-        payload: dict[str, str | None],
-    ) -> list[str]:
-        therapy_area = payload.get("therapy_area")
-        updated = await update_project(
-            UUID(str(project.id)),
-            ProjectUpdate(
-                name=payload.get("name") or None,
-                therapy_area=TA(therapy_area) if therapy_area else None,
-            ),
-            self.env,
-        )
-        if updated is None:
-            return await self._refresh_with_notice("Failed to update project.", "error")
-        self.ctx.current.project_name = updated.name
-        self.session.update_context(project_id=str(updated.id))
-        return await self._refresh_with_notice(f"Updated project '{updated.name}'.")
+            return await self.refresh_with_notice("Failed to create stage-NCRM link.", "error")
+        return await self.refresh_with_notice("Stage-NCRM link created.")
 
     async def _update_process_from_prompt(
         self,
@@ -3415,16 +1989,16 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         updated = await update_manufacturing_process(
             UUID(str(process.id)),
             ManufacturingProcessUpdate(
-                route_number=_optional_int(payload.get("route_number")),
-                process_number=_optional_int(payload.get("process_number")),
+                route_number=optional_int(payload.get("route_number")),
+                process_number=optional_int(payload.get("process_number")),
             ),
             self.env,
         )
         if updated is None:
-            return await self._refresh_with_notice("Failed to update route.", "error")
+            return await self.refresh_with_notice("Failed to update route.", "error")
         self.ctx.current.route_label = f"{updated.route_number}.{updated.process_number}"
         self.session.update_context(process_id=str(updated.id))
-        return await self._refresh_with_notice(
+        return await self.refresh_with_notice(
             f"Updated route '{updated.route_number}.{updated.process_number}'."
         )
 
@@ -3437,15 +2011,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             UUID(str(stage.id)),
             StageUpdate(
                 name=payload.get("name") or None,
-                number=_optional_int(payload.get("number")),
+                number=optional_int(payload.get("number")),
             ),
             self.env,
         )
         if updated is None:
-            return await self._refresh_with_notice("Failed to update stage.", "error")
+            return await self.refresh_with_notice("Failed to update stage.", "error")
         self.ctx.current.stage_name = updated.name
         self.session.update_context(stage_id=str(updated.id))
-        return await self._refresh_with_notice(f"Updated stage '{updated.name}'.")
+        return await self.refresh_with_notice(f"Updated stage '{updated.name}'.")
 
     async def _update_stage_ncrm_from_prompt(
         self,
@@ -3458,8 +2032,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             self.env,
         )
         if updated is None:
-            return await self._refresh_with_notice("Failed to update NCRM role.", "error")
-        return await self._refresh_with_notice("NCRM role updated.")
+            return await self.refresh_with_notice("Failed to update NCRM role.", "error")
+        return await self.refresh_with_notice("NCRM role updated.")
 
     async def _update_stage_risk_from_prompt(
         self,
@@ -3472,15 +2046,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 risk_type=payload.get("risk_type") or None,
                 name=payload.get("name") or None,
                 description=payload.get("description"),
-                current_level=_optional_int(payload.get("current_level")),
+                current_level=optional_int(payload.get("current_level")),
                 proposed_mitigation=payload.get("proposed_mitigation"),
-                mitigated_level=_optional_int(payload.get("mitigated_level")),
+                mitigated_level=optional_int(payload.get("mitigated_level")),
             ),
             self.env,
         )
         if updated is None:
-            return await self._refresh_with_notice("Failed to update risk.", "error")
-        return await self._refresh_with_notice(f"Updated risk '{updated.name}'.")
+            return await self.refresh_with_notice("Failed to update risk.", "error")
+        return await self.refresh_with_notice(f"Updated risk '{updated.name}'.")
 
     async def _update_process_risk_from_prompt(
         self,
@@ -3493,15 +2067,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 risk_type=payload.get("risk_type") or None,
                 name=payload.get("name") or None,
                 description=payload.get("description"),
-                current_level=_optional_int(payload.get("current_level")),
+                current_level=optional_int(payload.get("current_level")),
                 proposed_mitigation=payload.get("proposed_mitigation"),
-                mitigated_level=_optional_int(payload.get("mitigated_level")),
+                mitigated_level=optional_int(payload.get("mitigated_level")),
             ),
             self.env,
         )
         if updated is None:
-            return await self._refresh_with_notice("Failed to update risk.", "error")
-        return await self._refresh_with_notice(f"Updated risk '{updated.name}'.")
+            return await self.refresh_with_notice("Failed to update risk.", "error")
+        return await self.refresh_with_notice(f"Updated risk '{updated.name}'.")
 
     async def _update_component_risk_from_prompt(
         self,
@@ -3514,15 +2088,15 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 risk_type=payload.get("risk_type") or None,
                 name=payload.get("name") or None,
                 description=payload.get("description"),
-                current_level=_optional_int(payload.get("current_level")),
+                current_level=optional_int(payload.get("current_level")),
                 proposed_mitigation=payload.get("proposed_mitigation"),
-                mitigated_level=_optional_int(payload.get("mitigated_level")),
+                mitigated_level=optional_int(payload.get("mitigated_level")),
             ),
             self.env,
         )
         if updated is None:
-            return await self._refresh_with_notice("Failed to update risk.", "error")
-        return await self._refresh_with_notice(f"Updated risk '{updated.name}'.")
+            return await self.refresh_with_notice("Failed to update risk.", "error")
+        return await self.refresh_with_notice(f"Updated risk '{updated.name}'.")
 
     async def _update_component_from_prompt(
         self,
@@ -3533,22 +2107,22 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             UUID(str(component.id)),
             ComponentUpdate(
                 control_strategy_role=payload.get("control_strategy_role"),
-                is_isolated=_as_bool(payload.get("is_isolated")),
+                is_isolated=as_bool(payload.get("is_isolated")),
             ),
             self.env,
         )
         if updated is None:
-            return await self._refresh_with_notice("Failed to update component.", "error")
-        return await self._refresh_with_notice("Component updated.")
+            return await self.refresh_with_notice("Failed to update component.", "error")
+        return await self.refresh_with_notice("Component updated.")
 
     async def _delete_stage_with_confirmation(self, stage: Stage, args: list[str]) -> list[str]:
         if "--confirm" not in args:
             return ["Re-run with --confirm to delete the stage."]
         success = await delete_stage(UUID(str(stage.id)), self.env)
         if not success:
-            return await self._refresh_with_notice("Stage delete failed.", "error")
+            return await self.refresh_with_notice("Stage delete failed.", "error")
         self._pop_focus_to_parent()
-        return await self._refresh_with_notice("Stage deleted.")
+        return await self.refresh_with_notice("Stage deleted.")
 
     async def _delete_component_with_confirmation(
         self, component: Component, args: list[str]
@@ -3557,9 +2131,9 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             return ["Re-run with --confirm to delete the component."]
         success = await delete_component(UUID(str(component.id)), self.env)
         if not success:
-            return await self._refresh_with_notice("Component delete failed.", "error")
+            return await self.refresh_with_notice("Component delete failed.", "error")
         self._pop_focus_to_parent()
-        return await self._refresh_with_notice("Component deleted.")
+        return await self.refresh_with_notice("Component deleted.")
 
     async def _start_stage_row_unassign(self, stage: Stage) -> list[str]:
         """Confirm-and-unassign the caret-selected component/NCRM/risk row.
@@ -3572,33 +2146,33 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         navigator = self.list_navigator
         selected = navigator.selected if navigator is not None else None
         if selected is None:
-            return await self._refresh_with_notice("Nothing selected.", "warning")
+            return await self.refresh_with_notice("Nothing selected.", "warning")
         kind, _, raw_id = selected.item_id.partition(":")
         if kind == "component":
             link_id = await self._stage_component_link_id(stage, raw_id)
             if link_id is None:
-                return await self._refresh_with_notice("Component not found.", "error")
-            return self._start_confirm(
+                return await self.refresh_with_notice("Component not found.", "error")
+            return self.start_confirm(
                 f"Unassign {selected.label}",
                 lambda: self._unassign_with_notice(
                     delete_stage_component(link_id, self.env), "Component unassigned."
                 ),
             )
         if kind == "ncrm":
-            return self._start_confirm(
+            return self.start_confirm(
                 f"Unassign {selected.label}",
                 lambda: self._unassign_with_notice(
                     delete_stage_ncrm(UUID(raw_id), self.env), "NCRM unassigned."
                 ),
             )
         if kind == "risk":
-            return self._start_confirm(
+            return self.start_confirm(
                 f"Delete risk '{selected.label}'",
                 lambda: self._unassign_with_notice(
                     delete_stage_risk(UUID(raw_id), self.env), "Risk deleted."
                 ),
             )
-        return await self._refresh_with_notice("Nothing to unassign.", "warning")
+        return await self.refresh_with_notice("Nothing to unassign.", "warning")
 
     async def _start_component_row_unassign(self, component: Component) -> list[str]:
         """Confirm-and-delete the caret-selected salt or risk row.
@@ -3610,23 +2184,23 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         navigator = self.list_navigator
         selected = navigator.selected if navigator is not None else None
         if selected is None:
-            return await self._refresh_with_notice("Nothing selected.", "warning")
+            return await self.refresh_with_notice("Nothing selected.", "warning")
         kind, _, raw_id = selected.item_id.partition(":")
         if kind == "salt":
-            return self._start_confirm(
+            return self.start_confirm(
                 f"Unassign salt {selected.label}",
                 lambda: self._unassign_with_notice(
                     delete_component_salt(UUID(raw_id), self.env), "Salt unassigned."
                 ),
             )
         if kind == "risk":
-            return self._start_confirm(
+            return self.start_confirm(
                 f"Delete risk '{selected.label}'",
                 lambda: self._unassign_with_notice(
                     delete_component_risk(UUID(raw_id), self.env), "Risk deleted."
                 ),
             )
-        return await self._refresh_with_notice("Nothing to unassign.", "warning")
+        return await self.refresh_with_notice("Nothing to unassign.", "warning")
 
     async def _stage_component_link_id(self, stage: Stage, component_id: str) -> UUID | None:
         """Resolve the stage-component link id for a component row's component id."""
@@ -3640,8 +2214,8 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         """Await a delete operation, then refresh the screen with a status notice."""
         ok = await delete_coro
         if not ok:
-            return await self._refresh_with_notice("Unassign failed.", "error")
-        return await self._refresh_with_notice(success)
+            return await self.refresh_with_notice("Unassign failed.", "error")
+        return await self.refresh_with_notice(success)
 
     def _pop_focus_to_parent(self) -> None:
         """Leave a focused stage/component screen after its entity was deleted.
@@ -3660,123 +2234,6 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 stage_id=current.stage_id,
                 component_id=current.component_id,
             )
-
-    async def _create_material_from_prompt(
-        self, name: str, payload: dict[str, str | None], aliases: list[str]
-    ) -> list[str]:
-        created = await create_material(
-            MaterialCreate(
-                name=name or "",
-                display_name=payload.get("display_name") or None,
-                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.env,
-        )
-        if created is None:
-            return await self._refresh_with_notice("Failed to create material.", "error")
-        for alias in aliases:
-            await add_material_alias(
-                MaterialAliasCreate(material_id=UUID(str(created.id)), alias=alias),
-                self.env,
-            )
-        return await self._refresh_with_notice(_created_notice("Material", aliases))
-
-    async def _create_ncrm_from_prompt(
-        self, name: str, payload: dict[str, str | None], aliases: list[str]
-    ) -> list[str]:
-        created = await create_ncrm_library_entry(
-            NcrmLibraryCreate(
-                name=name or "",
-                display_name=payload.get("display_name") or None,
-                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.env,
-        )
-        if created is None:
-            return await self._refresh_with_notice("Failed to create NCRM entry.", "error")
-        for alias in aliases:
-            await add_ncrm_alias(
-                NcrmLibraryAliasCreate(ncrm_library_id=UUID(str(created.id)), alias=alias),
-                self.env,
-            )
-        return await self._refresh_with_notice(_created_notice("NCRM entry", aliases))
-
-    async def _create_counterion_from_prompt(
-        self, name: str, payload: dict[str, str | None], aliases: list[str]
-    ) -> list[str]:
-        created = await create_counterion(
-            CounterionCreate(
-                name=name or "",
-                display_name=payload.get("display_name") or None,
-                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.env,
-        )
-        if created is None:
-            return await self._refresh_with_notice("Failed to create counterion.", "error")
-        for alias in aliases:
-            await add_counterion_alias(
-                CounterionAliasCreate(counterion_id=UUID(str(created.id)), alias=alias),
-                self.env,
-            )
-        return await self._refresh_with_notice(_created_notice("Counterion", aliases))
-
-    async def _start_project_material_picker(self, payload: dict[str, str | None]) -> list[str]:
-        materials = await list_materials(self.env)
-        if not materials:
-            return ["Add a material first via /library materials."]
-        items = [ListItem(label=material.name, item_id=str(material.id)) for material in materials]
-        name = payload.get("name") or ""
-        therapy_area = payload.get("therapy_area") or ""
-        return self.modal.start_picker(
-            f"Select material for project '{name}'",
-            items,
-            lambda item: self._create_project_from_selection(name, therapy_area, item),
-        )
-
-    async def _create_project_from_selection(
-        self,
-        name: str,
-        therapy_area: str,
-        material: ListItem,
-    ) -> list[str]:
-        created = await create_project(
-            ProjectCreate(
-                name=name,
-                therapy_area=TA(therapy_area),
-                material_id=UUID(material.item_id),
-            ),
-            self.env,
-        )
-        if created is None:
-            return await self._refresh_with_notice("Failed to create project.", "error")
-        return await self._refresh_with_notice(f"Created project '{created.name}'.")
-
-    async def _create_manufacturing_process_from_prompt(
-        self,
-        project: Project,
-        payload: dict[str, str | None],
-    ) -> list[str]:
-        route_number = int(payload.get("route_number") or 0)
-        process_number = int(payload.get("process_number") or 0)
-        if route_number < 1 or process_number < 1:
-            return ["Route and process numbers must be 1 or greater."]
-        created = await create_manufacturing_process(
-            ManufacturingProcessCreate(
-                project_id=UUID(str(project.id)),
-                route_number=route_number,
-                process_number=process_number,
-            ),
-            self.env,
-        )
-        if created is None:
-            return await self._refresh_with_notice("Failed to create process.", "error")
-        return await self._refresh_with_notice(
-            f"Created process {created.route_number}.{created.process_number}."
-        )
 
     async def _start_salt_picker(self, component: Component) -> list[str]:
         counterions = await list_counterions(self.env)
@@ -3820,193 +2277,14 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
             ComponentSaltCreate(
                 component_id=UUID(str(component.id)),
                 counterion_id=UUID(counterion_id),
-                stoichiometry=_optional_float(payload.get("stoichiometry")),
-                is_fully_defined=_optional_bool(payload.get("is_fully_defined")),
+                stoichiometry=optional_float(payload.get("stoichiometry")),
+                is_fully_defined=optional_bool(payload.get("is_fully_defined")),
             ),
             self.env,
         )
         if created is None:
-            return await self._refresh_with_notice("Failed to create salt record.", "error")
-        return await self._refresh_with_notice("Created salt record.")
-
-    async def _update_material_entry(
-        self, item_id: str, payload: dict[str, str | None]
-    ) -> list[str]:
-        updated = await update_material(
-            UUID(item_id),
-            MaterialUpdate(
-                name=payload.get("name"),
-                display_name=payload.get("display_name") or None,
-                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.env,
-        )
-        if updated is None:
-            return await self._refresh_with_notice("Failed to update material.", "error")
-        return await self._refresh_with_notice("Material updated.")
-
-    async def _update_ncrm_entry(self, item_id: str, payload: dict[str, str | None]) -> list[str]:
-        updated = await update_ncrm_library_entry(
-            UUID(item_id),
-            NcrmLibraryUpdate(
-                display_name=payload.get("display_name"),
-                name=payload.get("name"),
-                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.env,
-        )
-        if updated is None:
-            return await self._refresh_with_notice("Failed to update NCRM.", "error")
-        return await self._refresh_with_notice("NCRM updated.")
-
-    async def _update_counterion_entry(
-        self, item_id: str, payload: dict[str, str | None]
-    ) -> list[str]:
-        updated = await update_counterion(
-            UUID(item_id),
-            CounterionUpdate(
-                name=payload.get("name"),
-                display_name=payload.get("display_name") or None,
-                interpret_chemically=_as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.env,
-        )
-        if updated is None:
-            return await self._refresh_with_notice("Failed to update counterion.", "error")
-        return await self._refresh_with_notice("Counterion updated.")
-
-    async def _current_project(self) -> Project | None:
-        project_id = self.ctx.current.project_id
-        return await self._project_from_id(project_id)
-
-    async def _current_process(self) -> ManufacturingProcess | None:
-        process_id = self.ctx.current.process_id
-        return await self._process_from_id(process_id)
-
-    async def _current_stage(self) -> Stage | None:
-        stage_id = self.ctx.current.stage_id
-        if stage_id is None:
-            return None
-        process = await self._current_process()
-        if process is None:
-            return None
-        for stage in await list_stages_for_process(UUID(str(process.id)), self.env):
-            if str(stage.id) == stage_id:
-                return stage
-        return None
-
-    async def _current_component(self) -> Component | None:
-        component_id = self.ctx.current.component_id
-        if component_id is None:
-            return None
-        return await get_component_by_id(UUID(component_id), self.env)
-
-    async def _project_from_id(self, project_id: str | None) -> Project | None:
-        if project_id is None:
-            return None
-        return await get_project_by_id(UUID(project_id), self.env)
-
-    async def _process_from_id(self, process_id: str | None) -> ManufacturingProcess | None:
-        if process_id is None:
-            return None
-        return await get_process_by_id(UUID(process_id), self.env)
-
-    async def _process_from_route_label(
-        self,
-        project_id: str,
-        route_label: str,
-    ) -> ManufacturingProcess | None:
-        try:
-            route_number_text, process_number_text = route_label.split(".", maxsplit=1)
-            return await get_process_by_route(
-                UUID(project_id),
-                int(route_number_text),
-                int(process_number_text),
-                self.env,
-            )
-        except ValueError:
-            return None
-
-    async def _find_stage(self, process: ManufacturingProcess, name: str) -> Stage | None:
-        lowered = name.lower()
-        exact = await get_stage_by_name(UUID(str(process.id)), name, self.env)
-        if exact is not None:
-            return exact
-        for stage in await list_stages_for_process(UUID(str(process.id)), self.env):
-            if lowered in stage.name.lower():
-                return stage
-        return None
-
-    async def _find_component(self, process: ManufacturingProcess, name: str) -> Component | None:
-        lowered = name.lower()
-        for component in await list_components_for_process(UUID(str(process.id)), self.env):
-            material = await get_material_by_id(UUID(str(component.material_id)), self.env)
-            material_name = material.name if material else ""
-            if (
-                lowered in material_name.lower()
-                or lowered in (component.control_strategy_role or "").lower()
-            ):
-                return component
-        return None
-
-    async def _library_items(self, sub_mode: str) -> list[dict[str, Any]]:
-        """Return library rows as dicts, alphabetised by name with alias counts.
-
-        Each dict carries ``id``, ``name``, ``display_name``,
-        ``interpret_chemically``, ``smiles`` and ``alias_count``. Rows are sorted
-        case-insensitively by name so the rendered table reads alphabetically.
-        """
-        entities: list[Any]
-        counts: dict[str, int]
-        if sub_mode == "materials":
-            entities = await list_materials(self.env)
-            counts = await material_alias_counts(self.env)
-        elif sub_mode == "ncrm":
-            entities = await list_ncrm_library(self.env)
-            counts = await ncrm_alias_counts(self.env)
-        elif sub_mode == "counterions":
-            entities = await list_counterions(self.env)
-            counts = await counterion_alias_counts(self.env)
-        else:
-            return []
-        items = [
-            {
-                "id": entity.id,
-                "name": entity.name,
-                "display_name": entity.display_name,
-                "interpret_chemically": entity.interpret_chemically,
-                "smiles": entity.smiles,
-                "alias_count": counts.get(str(entity.id), 0),
-            }
-            for entity in entities
-        ]
-        items.sort(key=lambda item: str(item["name"]).casefold())
-        return items
-
-    async def _find_library_item(self, sub_mode: str, name: str) -> dict[str, Any] | None:
-        lowered = name.lower()
-        for item in await self._library_items(sub_mode):
-            if _library_item_matches(item, lowered):
-                return item
-        return None
-
-    async def _find_library_item_by_id(self, sub_mode: str, item_id: str) -> dict[str, Any] | None:
-        for item in await self._library_items(sub_mode):
-            if str(item.get("id")) == item_id:
-                return item
-        return None
-
-    async def _recent_project_items(self, projects: list[Project]) -> list[ListItem]:
-        project_map = {str(project.id): project for project in projects}
-        items: list[ListItem] = []
-        for project_id in self.session.recent_projects:
-            project = project_map.get(project_id)
-            if project is not None:
-                items.append(ListItem(label=project.name, subtitle="(recent)", item_id=project_id))
-        return items
+            return await self.refresh_with_notice("Failed to create salt record.", "error")
+        return await self.refresh_with_notice("Created salt record.")
 
     def _risk_fields(self) -> list[FieldSpec]:
         return [
@@ -4033,36 +2311,26 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
                 "current_level",
                 field_type="select",
                 options=LEVEL_OPTIONS,
-                default=_default_text(risk.current_level),
+                default=default_text(risk.current_level),
             ),
             FieldSpec("proposed_mitigation", default=risk.proposed_mitigation),
             FieldSpec(
                 "mitigated_level",
                 field_type="select",
                 options=LEVEL_OPTIONS,
-                default=_default_text(risk.mitigated_level),
+                default=default_text(risk.mitigated_level),
             ),
         ]
-
-    def command_hints(self) -> str:
-        """Return the info-line legend for the current screen.
-
-        The info line carries *screen actions* only: the Ctrl-hotkey actions from
-        the screen's :class:`ScreenSpec` plus its back entry. Interaction grammar
-        (``↑↓``/``Enter``/``/``/``:``/``?``) belongs to the nav-hint line and is
-        deliberately excluded here so the two lines never duplicate a token.
-        """
-        spec = self.current_spec()
-        return " · ".join([*spec.actions, spec.back])
 
     def _help_lines(self, topic: str | None) -> list[str]:
         if topic is not None:
             spec = SCREEN_SPECS.get(topic)
             if spec is None:
                 return [f"Help for {topic}", "", "No detailed help available."]
-            return [f"Help for {topic}", "", *_screen_controls(spec)]
+            return [f"Help for {topic}", "", *screen_controls(spec)]
         key = self.current_screen_key()
-        return [f"Help · {key}", "", *_screen_controls(self.current_spec())]
+        spec = SCREEN_SPECS.get(key, DEFAULT_SPEC)
+        return [f"Help · {key}", "", *screen_controls(spec)]
 
     @staticmethod
     def _coerce_lines(result: Any) -> list[str]:
@@ -4071,134 +2339,3 @@ class CommandDispatcher:  # pylint: disable=too-many-instance-attributes,too-man
         if isinstance(result, str):
             return [result]
         return [str(result)]
-
-
-@dataclass(frozen=True)
-class ScreenSpec:
-    """Capability and hint descriptor for one REPL screen.
-
-    The single source of truth for what a screen offers. The two footer lines
-    derive their contents from it, with a strict division of responsibility:
-
-    * **Nav-hint line** (``screen.draw_nav_hint``) = *interaction grammar*. Built
-      from :attr:`navigable` (``↑↓ navigate · Enter select``) and
-      :attr:`searchable` (``/ search``), plus the always-present ``: command`` and
-      ``? help``. Owned by ``view_hint`` in ``loop.py``.
-    * **Info line** (``screen.draw_info_line``) = *screen actions*. Built from
-      :attr:`actions` (Ctrl-hotkeys) plus :attr:`back`. Owned by
-      :meth:`CommandDispatcher.command_hints`.
-
-    The two lines never share a token: movement and global modes belong to the
-    nav line, entity actions to the info line. ``actions`` therefore lists ONLY
-    Ctrl-<letter> hotkeys, each of which the matching ``_hotkey_<screen>`` handler
-    must actually service.
-
-    Attributes:
-        navigable: Whether ``↑↓``/``Enter`` caret navigation applies (also drives
-            the PgUp/PgDn caret-paging behaviour in ``loop.py``).
-        searchable: Whether incremental "/" search applies.
-        actions: Info-line Ctrl-hotkey entries, e.g. ``("^A add", "^E edit")``.
-        back: Trailing info-line entry (``"^C back"`` or ``"^C quit"``).
-        tab_hint: Nav-line grammar hint for a tabbed screen (e.g. ``"Tab switch
-            tabs"``), or ``None`` when the screen has no tabs.
-    """
-
-    navigable: bool
-    searchable: bool
-    actions: tuple[str, ...]
-    back: str = "^C back"
-    tab_hint: str | None = None
-
-
-# Per-screen capability + hint registry. Keyed by screen key (see
-# ``CommandDispatcher.current_screen_key``), which splits the ``library`` track
-# into its landing page and list sub-modes. ``handle_hotkey`` is the source of
-# truth the ``actions`` entries describe.
-SCREEN_SPECS: dict[str, ScreenSpec] = {
-    "home": ScreenSpec(True, False, ("^P project", "^B library", "^N admin"), back="^C quit"),
-    "project_select": ScreenSpec(True, True, ("^A add project",)),
-    "project": ScreenSpec(True, False, ("^T routes", "^R risks", "^A add process", "^E edit")),
-    "route_select": ScreenSpec(True, True, ()),
-    "route": ScreenSpec(
-        False, True, ("^A add", "^F focus", "^E edit", "^X delete", "^L list", "^R risks")
-    ),
-    "stage_focus": ScreenSpec(
-        True, False, ("^A add", "^L list", "^E edit", "^R risks", "^U unassign", "^X delete")
-    ),
-    "component_focus": ScreenSpec(
-        True, False, ("^A assign salt", "^E edit", "^U unassign", "^X delete", "^R risks")
-    ),
-    "library_home": ScreenSpec(True, False, (), tab_hint="Tab switch tabs"),
-    "library_list": ScreenSpec(
-        True, True, ("^E edit", "^A add", "^X delete", "^F filter", "^K structure")
-    ),
-    "library_detail": ScreenSpec(False, False, ("^E edit", "^K structure")),
-    "admin": ScreenSpec(False, False, ("^A action",)),
-    "risk_mode": ScreenSpec(False, False, ("^A add", "^E edit", "^L refresh")),
-}
-
-# Fallback for an unknown screen key: no capabilities, just a way back.
-_DEFAULT_SPEC = ScreenSpec(False, False, ())
-
-
-def _screen_controls(spec: ScreenSpec) -> list[str]:
-    """Return the complete control list for *spec* (grammar + actions).
-
-    Used by the ``?`` legend, which — unlike the footer — shows everything in one
-    place. The interaction grammar comes first, then the screen's action hotkeys
-    and its back entry.
-    """
-    grammar: list[str] = []
-    if spec.navigable:
-        grammar += ["↑↓ navigate", "Enter select"]
-    if spec.searchable:
-        grammar.append("/ search")
-    if spec.tab_hint:
-        grammar.append(spec.tab_hint)
-    grammar += [": command", "? help"]
-    return [*grammar, *spec.actions, spec.back]
-
-
-def _created_notice(entity: str, aliases: list[str]) -> str:
-    """Build the success notice for a created entity, noting any added aliases."""
-    if not aliases:
-        return f"{entity} created."
-    plural = "alias" if len(aliases) == 1 else "aliases"
-    return f"{entity} created with {len(aliases)} {plural}."
-
-
-def _optional_int(value: str | None) -> int | None:
-    if value is None or value == "":
-        return None
-    return int(value)
-
-
-def _optional_float(value: str | None) -> float | None:
-    if value is None or value == "":
-        return None
-    return float(value)
-
-
-def _optional_bool(value: str | None) -> bool | None:
-    if value is None or value == "":
-        return None
-    return value.strip().lower() in {"1", "true", "yes", "y"}
-
-
-def _as_bool(value: str | None) -> bool:
-    return (value or "false").strip().lower() in {"1", "true", "yes", "y"}
-
-
-def _default_text(value: Any) -> str | None:
-    if value in {None, ""}:
-        return None
-    return str(value)
-
-
-def _library_item_matches(item: dict[str, Any], lowered: str) -> bool:
-    """True if *lowered* matches the item's ``name`` or ``display_name``."""
-    for key in ("name", "display_name"):
-        value = item.get(key)
-        if value and str(value).lower() == lowered:
-            return True
-    return False

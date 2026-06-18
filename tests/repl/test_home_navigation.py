@@ -19,13 +19,9 @@ from riskmanager_cli.operations.manufacturing_process_operations import (
 )
 from riskmanager_cli.operations.material_operations import create_material
 from riskmanager_cli.operations.project_operations import create_project
-from riskmanager_cli.repl.commands import (
-    CTRL_B,
-    CTRL_N,
-    CTRL_P,
-    CommandDispatcher,
-)
+from riskmanager_cli.repl.commands import CommandDispatcher
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
+from riskmanager_cli.repl.hotkeys import CTRL_B, CTRL_N, CTRL_P
 from riskmanager_cli.repl.session_state import SessionState
 from riskmanager_cli.repl_engine.list_navigator import ListItem
 from riskmanager_cli.schema.create import (

@@ -31,16 +31,9 @@ from riskmanager_cli.operations.stage_risk_operations import (
     create_stage_risk,
     list_risks_for_stage,
 )
-from riskmanager_cli.repl.commands import (
-    CTRL_A,
-    CTRL_E,
-    CTRL_F,
-    CTRL_P,
-    CTRL_R,
-    CTRL_X,
-    CommandDispatcher,
-)
+from riskmanager_cli.repl.commands import CommandDispatcher
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
+from riskmanager_cli.repl.hotkeys import CTRL_A, CTRL_E, CTRL_F, CTRL_P, CTRL_R, CTRL_X
 from riskmanager_cli.repl.session_state import SessionState
 from riskmanager_cli.schema.create import (
     ManufacturingProcessCreate,

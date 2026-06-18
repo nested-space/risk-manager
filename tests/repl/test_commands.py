@@ -2,14 +2,9 @@
 
 import pytest
 
-from riskmanager_cli.repl.commands import (
-    SCREEN_SPECS,
-    CommandDispatcher,
-    FieldSpec,
-    PickerState,
-    PromptState,
-)
+from riskmanager_cli.repl.commands import SCREEN_SPECS, CommandDispatcher
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
+from riskmanager_cli.repl_engine.forms import FieldSpec, PickerState, PromptState
 from riskmanager_cli.repl_engine.list_navigator import ListItem, ListNavigator
 
 

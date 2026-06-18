@@ -15,6 +15,16 @@ from __future__ import annotations
 
 from . import layout
 from .controller import ReplController
+from .dispatch import (
+    QUIT,
+    ParsedCommand,
+    Screen,
+    ScreenRouter,
+    ScreenSpec,
+    TabState,
+    parse_command,
+    screen_controls,
+)
 from .forms import (
     FieldSpec,
     InfoSection,
@@ -44,6 +54,15 @@ __all__ = [
     "run_async",
     # the application contract
     "ReplController",
+    # generic screen dispatch
+    "Screen",
+    "ScreenRouter",
+    "ScreenSpec",
+    "TabState",
+    "ParsedCommand",
+    "parse_command",
+    "screen_controls",
+    "QUIT",
     # terminal drawing
     "ScreenManager",
     # forms / modal engine

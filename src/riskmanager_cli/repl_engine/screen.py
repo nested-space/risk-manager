@@ -65,7 +65,7 @@ class ScreenManager:
         }.get(level, self._term.normal)
         return f"{color}{message}{self._term.normal}"
 
-    def draw_full(
+    def draw_full(  # pylint: disable=too-many-arguments  # a full repaint addresses every screen region in one call
         self,
         lines: list[str],
         input_line: str = "",
