@@ -4,12 +4,12 @@ Each :class:`~...repl_engine.dispatch.ScreenSpec` declares what one screen offer
 (navigation, search, tabs, and its Ctrl-hotkey actions); the engine derives the
 footer and ``?`` legend from it. The registry is keyed by screen key (see
 ``CommandDispatcher.current_screen_key``), which splits the ``library`` track into
-its landing page and list sub-modes. The matching ``_hotkey_<screen>`` handler is
-the source of truth the ``actions`` entries describe.
+its landing page and list sub-modes. The matching screen's ``run_hotkey`` is the
+source of truth the ``actions`` entries describe.
 
-This data lives with the screens (not the dispatcher) so both the dispatcher's
-legacy adapter and the extracted :class:`AppScreen` subclasses can share it
-without an import cycle.
+This data lives with the screens (not the dispatcher) so the :class:`AppScreen`
+subclasses and the dispatcher's help/legend lookups share it without an import
+cycle.
 """
 
 from __future__ import annotations
