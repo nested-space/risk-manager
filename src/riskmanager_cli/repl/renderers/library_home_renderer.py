@@ -20,8 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from ..viewport import parse, tag_selected, tag_sticky
-from .layout import (
+from ...repl_engine.layout import (
     bullet_list,
     card,
     card_row,
@@ -33,6 +32,7 @@ from .layout import (
     title,
     vstack,
 )
+from ...repl_engine.viewport import parse, tag_selected, tag_sticky
 
 #: Library track title shown (pinned) at the top of the home page.
 _TITLE = "Risk Manager Library"

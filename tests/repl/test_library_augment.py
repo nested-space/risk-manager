@@ -18,9 +18,9 @@ from riskmanager_cli.model.tables import (
     NcrmLibraryAlias,
 )
 from riskmanager_cli.operations.dmta_operations import ResolveResult
-from riskmanager_cli.repl import commands
 from riskmanager_cli.repl.commands import CommandDispatcher
-from riskmanager_cli.repl.context import ContextManager
+from riskmanager_cli.repl.context import ContextFrame, ContextManager
+from riskmanager_cli.repl.screens import library
 from riskmanager_cli.repl.session_state import SessionState
 
 
@@ -64,7 +64,7 @@ def _patch_resolve(monkeypatch: pytest.MonkeyPatch, result: ResolveResult) -> No
         del name
         return result
 
-    monkeypatch.setattr(commands, "augment_name", fake_augment_name)
+    monkeypatch.setattr(library, "augment_name", fake_augment_name)
 
 
 async def _material(env: Environment, name: str) -> Material:
@@ -96,7 +96,8 @@ async def test_material_add_augment_yes_fills_smiles_and_aliases(
     )
     dispatcher = _make_dispatcher(temp_env)
 
-    dispatcher._start_library_add_prompt("materials")  # pylint: disable=protected-access
+    dispatcher.ctx.push(ContextFrame(track="library", library_sub="materials"))
+    await dispatcher.dispatch("/add")
     await dispatcher.advance_prompt("aspirin")  # name
     await dispatcher.advance_prompt("yes")  # augment? -> yes
     await dispatcher.advance_prompt("")  # display_name (blank -> defaults to name)
@@ -119,7 +120,8 @@ async def test_material_add_augment_unresolved_falls_back_to_manual(
     _patch_resolve(monkeypatch, ResolveResult(name="mystery"))
     dispatcher = _make_dispatcher(temp_env)
 
-    dispatcher._start_library_add_prompt("materials")  # pylint: disable=protected-access
+    dispatcher.ctx.push(ContextFrame(track="library", library_sub="materials"))
+    await dispatcher.dispatch("/add")
     await dispatcher.advance_prompt("mystery")  # name
     await dispatcher.advance_prompt("yes")  # augment? -> yes (but misses)
     await dispatcher.advance_prompt("")  # display_name (blank -> defaults to name)
@@ -140,10 +142,11 @@ async def test_material_add_augment_no_keeps_manual_path(
     async def fail_augment(name: str) -> ResolveResult:  # pragma: no cover - must not run
         raise AssertionError("augment_name should not be called when the user declines")
 
-    monkeypatch.setattr(commands, "augment_name", fail_augment)
+    monkeypatch.setattr(library, "augment_name", fail_augment)
     dispatcher = _make_dispatcher(temp_env)
 
-    dispatcher._start_library_add_prompt("materials")  # pylint: disable=protected-access
+    dispatcher.ctx.push(ContextFrame(track="library", library_sub="materials"))
+    await dispatcher.dispatch("/add")
     await dispatcher.advance_prompt("benzene")  # name
     await dispatcher.advance_prompt("no")  # augment? -> no
     await dispatcher.advance_prompt("")  # display_name (blank -> defaults to name)
@@ -171,7 +174,8 @@ async def test_ncrm_add_augment_uses_name_then_manual_display_name(
     )
     dispatcher = _make_dispatcher(temp_env)
 
-    dispatcher._start_library_add_prompt("ncrm")  # pylint: disable=protected-access
+    dispatcher.ctx.push(ContextFrame(track="library", library_sub="ncrm"))
+    await dispatcher.dispatch("/add")
     await dispatcher.advance_prompt("methanol")  # name (drives lookup)
     await dispatcher.advance_prompt("yes")  # augment? -> yes
     await dispatcher.advance_prompt("MeOH solvent")  # display_name (manual)
@@ -206,11 +210,12 @@ async def test_ncrm_add_augment_shows_retrieved_values_readonly(
     )
     dispatcher = _make_dispatcher(temp_env)
 
-    dispatcher._start_library_add_prompt("ncrm")  # pylint: disable=protected-access
+    dispatcher.ctx.push(ContextFrame(track="library", library_sub="ncrm"))
+    await dispatcher.dispatch("/add")
     await dispatcher.advance_prompt("chloroform")  # name (drives lookup)
     await dispatcher.advance_prompt("yes")  # augment? -> yes
 
-    rendered = "\n".join(dispatcher._render_prompt_lines())  # pylint: disable=protected-access
+    rendered = "\n".join(dispatcher.modal._render_prompt_lines())  # pylint: disable=protected-access
     assert "Retrieved values (source: pubchem)" in rendered
     assert "chloroform" in rendered
     assert "ClC(Cl)Cl" in rendered
@@ -237,7 +242,8 @@ async def test_counterion_add_augment_creates_with_smiles_and_aliases(
     )
     dispatcher = _make_dispatcher(temp_env)
 
-    dispatcher._start_library_add_prompt("counterions")  # pylint: disable=protected-access
+    dispatcher.ctx.push(ContextFrame(track="library", library_sub="counterions"))
+    await dispatcher.dispatch("/add")
     await dispatcher.advance_prompt("chloride")  # name (drives lookup)
     await dispatcher.advance_prompt("yes")  # augment? -> yes
     await dispatcher.advance_prompt("")  # display_name (blank -> defaults to name)
@@ -256,7 +262,8 @@ async def test_material_add_prefills_shortened_display_name(temp_env: Environmen
     """The display_name field is pre-filled with a capped, shortened suggestion."""
     dispatcher = _make_dispatcher(temp_env)
 
-    dispatcher._start_library_add_prompt("materials")  # pylint: disable=protected-access
+    dispatcher.ctx.push(ContextFrame(track="library", library_sub="materials"))
+    await dispatcher.dispatch("/add")
     await dispatcher.advance_prompt("4-Fluoro-2-methoxy-5-nitroaniline")  # name
     await dispatcher.advance_prompt("no")  # decline augment -> manual finish form
 

@@ -16,14 +16,9 @@ from riskmanager_cli.operations.counterion_operations import (
     create_counterion,
     list_counterions,
 )
-from riskmanager_cli.repl.commands import (
-    CTRL_E,
-    CTRL_K,
-    CTRL_O,
-    CTRL_X,
-    CommandDispatcher,
-)
+from riskmanager_cli.repl.commands import CommandDispatcher
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
+from riskmanager_cli.repl.hotkeys import CTRL_E, CTRL_K, CTRL_O, CTRL_X
 from riskmanager_cli.repl.session_state import SessionState
 from riskmanager_cli.schema.create import CounterionAliasCreate, CounterionCreate
 from riskmanager_cli.service.structure_viewer import StructureResult
@@ -161,7 +156,7 @@ async def test_library_ctrl_k_opens_structure(
     await create_counterion(CounterionCreate(name="acetate", smiles="CC(=O)[O-]"), env=temp_env)
     seen: list[str] = []
     monkeypatch.setattr(
-        "riskmanager_cli.repl.commands.show_structure",
+        "riskmanager_cli.repl.screens.library.show_structure",
         lambda smiles, **_kw: seen.append(smiles) or StructureResult.OK,
     )
     dispatcher = _library_dispatcher(temp_env)
@@ -180,7 +175,7 @@ async def test_library_detail_ctrl_k_opens_structure(
     """^K works on the detail screen, acting on the shown entry's SMILES."""
     await create_counterion(CounterionCreate(name="acetate", smiles="CC(=O)[O-]"), env=temp_env)
     monkeypatch.setattr(
-        "riskmanager_cli.repl.commands.show_structure",
+        "riskmanager_cli.repl.screens.library.show_structure",
         lambda _smiles, **_kw: StructureResult.OK,
     )
     dispatcher = _library_dispatcher(temp_env)

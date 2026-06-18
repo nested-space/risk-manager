@@ -16,7 +16,7 @@ Startup sequence:
 4. Create a :class:`blessed.Terminal` instance
 5. Create a :class:`~riskmanager_cli.repl.context.ContextManager` and
    :class:`~riskmanager_cli.repl.screen.ScreenManager`
-6. Call :func:`~riskmanager_cli.repl.loop.start_repl` to enter the event loop
+6. Call :func:`~riskmanager_cli.repl_engine.loop.start_repl` to enter the event loop
 """
 
 from __future__ import annotations
@@ -33,9 +33,9 @@ from .database.db_session import init_db
 from .repl.bootstrap import is_first_run, run_first_time_setup
 from .repl.commands import CommandDispatcher
 from .repl.context import ContextManager
-from .repl.loop import start_repl
-from .repl.screen import ScreenManager
 from .repl.session_state import SessionState
+from .repl_engine.loop import start_repl
+from .repl_engine.screen import ScreenManager
 
 
 def _resolve_env() -> Environment:
@@ -109,13 +109,13 @@ def cli_main() -> None:
     session = SessionState.load()
 
     ctx = ContextManager()
-    screen = ScreenManager(term, ctx)
+    screen = ScreenManager(term)
     dispatcher = CommandDispatcher(ctx, session, screen, env)
 
     exit_code = 0
     try:
         with term.fullscreen(), term.cbreak(), term.hidden_cursor():
-            start_repl(term, ctx, session, screen, dispatcher, env)
+            start_repl(term, screen, dispatcher)
     except KeyboardInterrupt:
         exit_code = 130
     except EOFError:

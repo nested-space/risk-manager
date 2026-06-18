@@ -25,8 +25,8 @@ from ...model.tables import Component, Material
 from ...operations.component_risks_operations import list_risks_for_component
 from ...operations.component_salt_operations import list_salts_for_component
 from ...operations.counterion_operations import get_counterion_by_id
-from ..list_navigator import ListItem
-from .layout import Column, render_table, section_rule, section_width
+from ...repl_engine.layout import Column, render_table, section_rule, section_width
+from ...repl_engine.list_navigator import ListItem
 
 _BODY_INDENT = "  "
 _CARET = "> "

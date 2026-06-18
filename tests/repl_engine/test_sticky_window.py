@@ -2,8 +2,8 @@
 
 import pytest
 
-from riskmanager_cli.repl.renderers.layout import Column, render_box, render_table
-from riskmanager_cli.repl.sticky_window import index_tables, pinned_window, reserved_top
+from riskmanager_cli.repl_engine.layout import Column, render_box, render_table
+from riskmanager_cli.repl_engine.sticky_window import index_tables, pinned_window, reserved_top
 
 
 def _table_lines(headers: list[str], rows: list[list[str]]) -> list[str]:

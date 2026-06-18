@@ -2,7 +2,7 @@
 
 import pytest
 
-from riskmanager_cli.repl.renderers.layout.geometry import (
+from riskmanager_cli.repl_engine.layout.geometry import (
     block_width,
     pad_block,
     pad_line,

@@ -8,9 +8,9 @@ data rows are still visible — the data rows below simply slide under the pinne
 header (the topmost ones are hidden, which keeps every line reachable as you
 scroll).
 
-Tables are detected structurally: only :func:`~.renderers.layout.table.render_table`
-emits a ``├…┼…┤`` separator as the third line of a ``┌…┐`` block, so a box frame
-(``renderers/layout/frame.py``, corners only) is never mistaken for a table. Header,
+Tables are detected structurally: only :func:`~.layout.table.render_table` emits
+a ``├…┼…┤`` separator as the third line of a ``┌…┐`` block, so a box frame
+(``layout/frame.py``, corners only) is never mistaken for a table. Header,
 separator, and border lines only ever carry a space-only gutter (the ``"> "``
 caret appears solely on data rows), so ``lstrip(" ")`` safely normalises a line
 before matching.

@@ -2,15 +2,10 @@
 
 import pytest
 
-from riskmanager_cli.repl.commands import (
-    SCREEN_SPECS,
-    CommandDispatcher,
-    FieldSpec,
-    PickerState,
-    PromptState,
-)
+from riskmanager_cli.repl.commands import SCREEN_SPECS, CommandDispatcher
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
-from riskmanager_cli.repl.list_navigator import ListItem, ListNavigator
+from riskmanager_cli.repl_engine.forms import FieldSpec, PickerState, PromptState
+from riskmanager_cli.repl_engine.list_navigator import ListItem, ListNavigator
 
 
 @pytest.mark.unit
@@ -370,7 +365,7 @@ def _render_dispatcher() -> CommandDispatcher:
 def test_multi_field_form_shows_prefilled_default() -> None:
     """A pre-filled (defaulted) field shows its value in the multi-field form body."""
     dispatcher = _render_dispatcher()
-    dispatcher.start_prompt(
+    dispatcher.modal.start_prompt(
         [
             FieldSpec("display_name"),
             FieldSpec("smiles", required=False, default="CC(C)=O"),
@@ -378,7 +373,7 @@ def test_multi_field_form_shows_prefilled_default() -> None:
         lambda **payload: [],
         title="Add NCRM",
     )
-    rendered = "\n".join(dispatcher._render_prompt_lines())  # pylint: disable=protected-access
+    rendered = "\n".join(dispatcher.modal._render_prompt_lines())  # pylint: disable=protected-access
     assert "CC(C)=O" in rendered
 
 
@@ -386,10 +381,10 @@ def test_multi_field_form_shows_prefilled_default() -> None:
 def test_single_field_form_shows_prefilled_default() -> None:
     """A single-field form surfaces the pre-filled default below the heading."""
     dispatcher = _render_dispatcher()
-    dispatcher.start_prompt(
+    dispatcher.modal.start_prompt(
         [FieldSpec("smiles", required=False, default="CC(=O)O")],
         lambda **payload: [],
         title="Add material",
     )
-    rendered = "\n".join(dispatcher._render_prompt_lines())  # pylint: disable=protected-access
+    rendered = "\n".join(dispatcher.modal._render_prompt_lines())  # pylint: disable=protected-access
     assert "CC(=O)O" in rendered

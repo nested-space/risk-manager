@@ -9,7 +9,7 @@ from riskmanager_cli.repl.renderers.library_home_renderer import (
     OVERVIEW_CARDS,
     render_library_home,
 )
-from riskmanager_cli.repl.viewport import parse
+from riskmanager_cli.repl_engine.viewport import parse
 
 _COUNTS = {"ncrm": 42, "materials": 18, "counterions": 5}
 

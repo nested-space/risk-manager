@@ -13,9 +13,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ...repl_engine.layout import Column, render_table, section_rule, section_width
+from ...repl_engine.list_navigator import ListItem
 from ...utils.formula_parser import render_chemical_formula
-from ..list_navigator import ListItem
-from .layout import Column, render_table, section_rule, section_width
 
 _BODY_INDENT = "  "
 _CARET = "> "

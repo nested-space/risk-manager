@@ -5,7 +5,7 @@ from collections.abc import Callable
 import pytest
 
 from riskmanager_cli.repl.renderers.home_renderer import render_home
-from riskmanager_cli.repl.viewport import parse
+from riskmanager_cli.repl_engine.viewport import parse
 
 _TITLES = ("P R O J E C T", "L I B R A R Y", "A D M I N")
 

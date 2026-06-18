@@ -10,7 +10,7 @@ by the landing screens. They are presentation-only and terminal-agnostic.
 
 from __future__ import annotations
 
-from ...viewport import tag_selected
+from ..viewport import tag_selected
 from .geometry import Block, HAlign, VAlign, block_width, pad_block
 
 

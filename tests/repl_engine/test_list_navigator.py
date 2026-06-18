@@ -2,7 +2,7 @@
 
 import pytest
 
-from riskmanager_cli.repl.list_navigator import ListItem, ListNavigator
+from riskmanager_cli.repl_engine.list_navigator import ListItem, ListNavigator
 
 
 def _nav(count: int) -> ListNavigator:

@@ -42,18 +42,39 @@ It must never appear in `.gitignore` because it is outside the repo.
 
 ## 2. Architecture
 
-### Seven-Layer Model
+### Engine / application split
 
-The application follows a strict seven-layer architecture. Each layer
-communicates ONLY with immediately adjacent layers.
+The TUI is split into two top-level packages with a single, enforced seam:
+
+* **`repl_engine/`** — the **application-agnostic** terminal UI engine: event
+  loop, screen drawing, viewport/scrolling, list navigation, the
+  guided-prompt/picker forms engine, and layout primitives. It has **no
+  knowledge of the risk-manager domain** and **MUST NOT import** from `repl/`,
+  `operations/`, `model/`, `schema/`, `service/`, or `config/`. It may import
+  only stdlib, `blessed`, and other `repl_engine` modules.
+* **`repl/`** — the **application** layer: command dispatch, navigation context,
+  session state, bootstrap, and the domain screen renderers. It depends on
+  `repl_engine` and the operations/model layers.
+
+The seam between them is the `ReplController` protocol
+(`repl_engine/controller.py`). The engine's `start_repl(term, screen, controller)`
+loop drives **any** object implementing that protocol; the application's
+`CommandDispatcher` is the concrete implementation. This dependency inversion is
+what keeps the engine domain-free.
+
+### Layered Model
+
+Each layer communicates ONLY with immediately adjacent layers.
 
 ```
-Entry Point (__main__.py)
-    └── REPL Loop (repl/loop.py)
-            ├── Screen Manager (repl/screen.py)
-            ├── Escape Handler (repl/escape_handler.py)
-            ├── Context Manager (repl/context.py)
-            └── Command Dispatcher (repl/commands.py)
+Entry Point (__main__.py)            ── wires engine + application together
+    └── REPL Loop (repl_engine/loop.py)         [engine] drives a ReplController
+            ├── Screen Manager (repl_engine/screen.py)        [engine]
+            ├── Forms / Modal (repl_engine/forms.py)          [engine]
+            ├── Controller Protocol (repl_engine/controller.py) [engine, the seam]
+            └── Command Dispatcher (repl/commands.py)         [application, implements ReplController]
+                    ├── Context Manager (repl/context.py)
+                    ├── Screen Renderers (repl/renderers/*.py)
                     └── Operations Layer (operations/*_operations.py)
                             └── Database Layer (database/, model/, schema/)
                                             [sidecar] Session State (repl/session_state.py)
@@ -63,9 +84,10 @@ Entry Point (__main__.py)
 
 | Rule | Enforcement |
 |------|------------|
-| `repl/` modules MUST NOT call `print()` directly | All screen output via `ScreenManager.draw_*()` |
+| `repl_engine/` MUST NOT import from `repl/`, `operations/`, `model/`, `schema/`, `service/`, `config/` | Engine stays domain-free; verify with the seam grep (see Quality Gates) |
+| `repl/` and `repl_engine/` modules MUST NOT call `print()` directly | All screen output via `ScreenManager.draw_*()` |
 | `repl/` modules MUST NOT open database sessions | Delegate to operations layer |
-| Operations modules MUST NOT import from `repl/` | No upward dependencies |
+| Operations modules MUST NOT import from `repl/` or `repl_engine/` | No upward dependencies |
 | `database/` and `model/` MUST NOT import from `operations/` | No circular deps |
 | Entry point MUST NOT contain business logic | Config + wiring only |
 
@@ -76,9 +98,22 @@ src/
 └── riskmanager_cli/
     ├── __init__.py
     ├── __main__.py
-    ├── repl/
-    │   ├── renderers/
-    │   └── ...
+    ├── repl_engine/          # application-agnostic TUI engine
+    │   ├── loop.py
+    │   ├── controller.py     # ReplController protocol (the seam)
+    │   ├── screen.py
+    │   ├── keys.py
+    │   ├── forms.py
+    │   ├── viewport.py
+    │   ├── sticky_window.py
+    │   ├── list_navigator.py
+    │   └── layout/
+    ├── repl/                 # application: dispatch, context, renderers
+    │   ├── commands.py
+    │   ├── context.py
+    │   ├── session_state.py
+    │   ├── bootstrap.py
+    │   └── renderers/
     ├── operations/
     ├── model/
     ├── schema/
@@ -89,7 +124,8 @@ src/
 tests/
 ├── conftest.py
 ├── operations/
-├── repl/
+├── repl/                     # application tests
+├── repl_engine/             # engine tests (mirror src/.../repl_engine)
 └── utils/
 ```
 
@@ -281,6 +317,7 @@ invalidates the quality gate.
 | Pylint | `~/.venvs/riskmanager/bin/python -m pylint src/riskmanager_cli/` | Score 10.00/10 |
 | Mypy | `~/.venvs/riskmanager/bin/python -m mypy src/riskmanager_cli/` | 0 errors |
 | Tests | `~/.venvs/riskmanager/bin/python -m pytest tests/ -x` | All green |
+| Engine seam | `grep -rnE 'from \.\.(repl\|operations\|model\|schema\|service\|config)[. ]' src/riskmanager_cli/repl_engine/` | No matches (engine imports no application code) |
 
 ### Suppression Policy
 
