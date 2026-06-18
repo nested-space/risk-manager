@@ -128,25 +128,34 @@ async def render_component_risks(app: CommandDispatcher, component: Component) -
 # --- creating --------------------------------------------------------------
 
 
+def _risk_payload_fields(payload: dict[str, str | None]) -> dict[str, Any]:
+    """Extract the columns every risk schema shares from a completed prompt."""
+    return {
+        "risk_type": payload.get("risk_type") or "risk",
+        "name": payload.get("name") or "Unnamed risk",
+        "description": payload.get("description"),
+        "current_level": optional_int(payload.get("current_level")),
+        "proposed_mitigation": payload.get("proposed_mitigation"),
+        "mitigated_level": optional_int(payload.get("mitigated_level")),
+    }
+
+
+async def _finish_create(app: CommandDispatcher, risk: Any, label: str) -> list[str]:
+    """Report the outcome of a risk create, refreshing the screen with a notice."""
+    if risk is None:
+        return await app.refresh_with_notice(f"Failed to create {label}.", "error")
+    return await app.refresh_with_notice(f"{label.capitalize()} created.")
+
+
 async def create_stage_risk_from_prompt(
     app: CommandDispatcher, stage: Stage, payload: dict[str, str | None]
 ) -> list[str]:
     """Create a stage risk from completed-prompt *payload*."""
     risk = await create_stage_risk(
-        StageRiskCreate(
-            stage_id=UUID(str(stage.id)),
-            risk_type=payload.get("risk_type") or "risk",
-            name=payload.get("name") or "Unnamed risk",
-            description=payload.get("description"),
-            current_level=optional_int(payload.get("current_level")),
-            proposed_mitigation=payload.get("proposed_mitigation"),
-            mitigated_level=optional_int(payload.get("mitigated_level")),
-        ),
+        StageRiskCreate(stage_id=UUID(str(stage.id)), **_risk_payload_fields(payload)),
         app.env,
     )
-    if risk is None:
-        return await app.refresh_with_notice("Failed to create stage risk.", "error")
-    return await app.refresh_with_notice("Stage risk created.")
+    return await _finish_create(app, risk, "stage risk")
 
 
 async def create_process_risk_from_prompt(
@@ -155,19 +164,11 @@ async def create_process_risk_from_prompt(
     """Create a process (route) risk from completed-prompt *payload*."""
     risk = await create_manufacturing_process_risk(
         ManufacturingProcessRiskCreate(
-            manufacturing_process_id=UUID(str(process.id)),
-            risk_type=payload.get("risk_type") or "risk",
-            name=payload.get("name") or "Unnamed risk",
-            description=payload.get("description"),
-            current_level=optional_int(payload.get("current_level")),
-            proposed_mitigation=payload.get("proposed_mitigation"),
-            mitigated_level=optional_int(payload.get("mitigated_level")),
+            manufacturing_process_id=UUID(str(process.id)), **_risk_payload_fields(payload)
         ),
         app.env,
     )
-    if risk is None:
-        return await app.refresh_with_notice("Failed to create process risk.", "error")
-    return await app.refresh_with_notice("Process risk created.")
+    return await _finish_create(app, risk, "process risk")
 
 
 async def create_component_risk_from_prompt(
@@ -175,20 +176,10 @@ async def create_component_risk_from_prompt(
 ) -> list[str]:
     """Create a component risk from completed-prompt *payload*."""
     risk = await create_component_risk(
-        ComponentRiskCreate(
-            component_id=UUID(str(component.id)),
-            risk_type=payload.get("risk_type") or "risk",
-            name=payload.get("name") or "Unnamed risk",
-            description=payload.get("description"),
-            current_level=optional_int(payload.get("current_level")),
-            proposed_mitigation=payload.get("proposed_mitigation"),
-            mitigated_level=optional_int(payload.get("mitigated_level")),
-        ),
+        ComponentRiskCreate(component_id=UUID(str(component.id)), **_risk_payload_fields(payload)),
         app.env,
     )
-    if risk is None:
-        return await app.refresh_with_notice("Failed to create component risk.", "error")
-    return await app.refresh_with_notice("Component risk created.")
+    return await _finish_create(app, risk, "component risk")
 
 
 # --- editing ---------------------------------------------------------------
@@ -260,25 +251,33 @@ async def start_component_risk_edit_form(app: CommandDispatcher, risk_id: str) -
     )
 
 
+def _risk_update_fields(payload: dict[str, str | None]) -> dict[str, Any]:
+    """Extract the columns every risk-update schema shares from a completed prompt."""
+    return {
+        "risk_type": payload.get("risk_type") or None,
+        "name": payload.get("name") or None,
+        "description": payload.get("description"),
+        "current_level": optional_int(payload.get("current_level")),
+        "proposed_mitigation": payload.get("proposed_mitigation"),
+        "mitigated_level": optional_int(payload.get("mitigated_level")),
+    }
+
+
+async def _finish_update(app: CommandDispatcher, updated: Any) -> list[str]:
+    """Report the outcome of a risk update, refreshing the screen with a notice."""
+    if updated is None:
+        return await app.refresh_with_notice("Failed to update risk.", "error")
+    return await app.refresh_with_notice(f"Updated risk '{updated.name}'.")
+
+
 async def update_stage_risk_from_prompt(
     app: CommandDispatcher, risk_id: str, payload: dict[str, str | None]
 ) -> list[str]:
     """Apply the edit-form *payload* to the stage risk with id *risk_id*."""
     updated = await update_stage_risk(
-        UUID(risk_id),
-        StageRiskUpdate(
-            risk_type=payload.get("risk_type") or None,
-            name=payload.get("name") or None,
-            description=payload.get("description"),
-            current_level=optional_int(payload.get("current_level")),
-            proposed_mitigation=payload.get("proposed_mitigation"),
-            mitigated_level=optional_int(payload.get("mitigated_level")),
-        ),
-        app.env,
+        UUID(risk_id), StageRiskUpdate(**_risk_update_fields(payload)), app.env
     )
-    if updated is None:
-        return await app.refresh_with_notice("Failed to update risk.", "error")
-    return await app.refresh_with_notice(f"Updated risk '{updated.name}'.")
+    return await _finish_update(app, updated)
 
 
 async def update_process_risk_from_prompt(
@@ -286,20 +285,9 @@ async def update_process_risk_from_prompt(
 ) -> list[str]:
     """Apply the edit-form *payload* to the process risk with id *risk_id*."""
     updated = await update_manufacturing_process_risk(
-        UUID(risk_id),
-        ManufacturingProcessRiskUpdate(
-            risk_type=payload.get("risk_type") or None,
-            name=payload.get("name") or None,
-            description=payload.get("description"),
-            current_level=optional_int(payload.get("current_level")),
-            proposed_mitigation=payload.get("proposed_mitigation"),
-            mitigated_level=optional_int(payload.get("mitigated_level")),
-        ),
-        app.env,
+        UUID(risk_id), ManufacturingProcessRiskUpdate(**_risk_update_fields(payload)), app.env
     )
-    if updated is None:
-        return await app.refresh_with_notice("Failed to update risk.", "error")
-    return await app.refresh_with_notice(f"Updated risk '{updated.name}'.")
+    return await _finish_update(app, updated)
 
 
 async def update_component_risk_from_prompt(
@@ -307,20 +295,9 @@ async def update_component_risk_from_prompt(
 ) -> list[str]:
     """Apply the edit-form *payload* to the component risk with id *risk_id*."""
     updated = await update_component_risk(
-        UUID(risk_id),
-        ComponentRiskUpdate(
-            risk_type=payload.get("risk_type") or None,
-            name=payload.get("name") or None,
-            description=payload.get("description"),
-            current_level=optional_int(payload.get("current_level")),
-            proposed_mitigation=payload.get("proposed_mitigation"),
-            mitigated_level=optional_int(payload.get("mitigated_level")),
-        ),
-        app.env,
+        UUID(risk_id), ComponentRiskUpdate(**_risk_update_fields(payload)), app.env
     )
-    if updated is None:
-        return await app.refresh_with_notice("Failed to update risk.", "error")
-    return await app.refresh_with_notice(f"Updated risk '{updated.name}'.")
+    return await _finish_update(app, updated)
 
 
 def start_risk_edit_picker(
