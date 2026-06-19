@@ -34,6 +34,9 @@ jobs:
       - name: Install package and dev tools
         run: |
           python -m pip install --upgrade pip
+          # dmta-cli is a required dependency that is not published to PyPI; install
+          # the wheel vendored in lib/ first so the editable install below resolves it.
+          python -m pip install lib/*.whl
           python -m pip install -e ".[dev]"
 
       - name: Ruff lint

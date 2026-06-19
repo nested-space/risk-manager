@@ -15,6 +15,9 @@ MANIFEST
 .eggs/
 wheels/
 *.whl
+# Except the vendored dmta-cli wheel, a required non-PyPI dependency bundled in
+# lib/ (see pyproject.toml dependencies) so the project installs from a clean clone.
+!lib/*.whl
 
 # Virtual environments (project venv lives at ~/.venvs/riskmanager — outside repo)
 .venv/
