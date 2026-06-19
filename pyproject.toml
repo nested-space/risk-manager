@@ -94,13 +94,20 @@ py-version = "3.10"
 max-line-length = 100
 
 [tool.pylint.messages_control]
-# R0801 (duplicate-code) is disabled because the CRUD operations layer uses
-# an intentionally repeated pattern (get_where → update_fields → return record)
-# across typed modules for different SQLModel classes. pylint's SimilarChecker
-# reports R0801 at the runner level — it cannot be suppressed inline — so this
-# is the only available mechanism. All other suppressions must be inline with
-# justification. See AGENTS.md § Suppression Policy.
-disable = ["R0801"]
+# No global message suppressions: every suppression is inline with a per-line
+# justification (see AGENTS.md § Suppression Policy). R0801 (duplicate-code) was
+# previously disabled wholesale; the operations layer now delegates its CRUD
+# shapes to the generic_* helpers, so it is re-enabled with a raised similarity
+# threshold (see [tool.pylint.similarities]) instead.
+disable = []
+
+[tool.pylint.similarities]
+# R0801 is reported at the runner level and cannot be suppressed inline, so this
+# threshold is the only available knob. Entity/screen modules still share short,
+# intentional patterns (risk-table field maps, ContextFrame pushes, prompt
+# builders) up to ~7 lines; a threshold of 8 lets those pass while still flagging
+# larger copy-paste. Lower it again only after eliminating the shared blocks.
+min-similarity-lines = 8
 
 [tool.pylint.typecheck]
 # rdkit.Chem members (MolFromSmiles, MolToSmiles, etc.) are implemented as
