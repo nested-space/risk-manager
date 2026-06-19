@@ -10,8 +10,10 @@ from riskmanager_cli.operations.material_operations import (
     delete_material,
     get_material_by_id,
     list_materials,
+    update_material,
 )
 from riskmanager_cli.schema.create import MaterialCreate
+from riskmanager_cli.schema.update import MaterialUpdate
 
 
 @pytest.mark.unit
@@ -116,6 +118,33 @@ async def test_list_materials_returns_all_created(temp_env: Environment) -> None
     names = [m.name for m in materials]
     assert "MaterialA" in names
     assert "MaterialB" in names
+
+
+@pytest.mark.integration
+async def test_update_material_persists_new_fields(temp_env: Environment) -> None:
+    """update_material applies the payload and returns the updated material."""
+    from uuid import UUID
+
+    created = await create_material(MaterialCreate(name="Paracetamol"), env=temp_env)
+    assert created is not None
+    updated = await update_material(
+        UUID(str(created.id)),
+        MaterialUpdate(display_name="APAP", interpret_chemically=True),
+        env=temp_env,
+    )
+    assert updated is not None
+    assert updated.display_name == "APAP"
+    assert updated.interpret_chemically is True
+    fetched = await get_material_by_id(UUID(str(created.id)), env=temp_env)
+    assert fetched is not None
+    assert fetched.display_name == "APAP"
+
+
+@pytest.mark.integration
+async def test_update_material_with_unknown_uuid_returns_none(temp_env: Environment) -> None:
+    """update_material returns None when the material does not exist."""
+    result = await update_material(uuid4(), MaterialUpdate(display_name="X"), env=temp_env)
+    assert result is None
 
 
 @pytest.mark.integration
