@@ -173,12 +173,12 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
             return await self.render_current()
         if verb == "/help":
             return self._help_lines(args[0] if args else None)
-        if verb == "/admin" and not args:
+        if verb == "/admin":
+            if args:
+                return await self._screens["admin"].run_command(verb, args)
             if self.ctx.current.track != "home":
                 return ["/admin is only available from home."]
             return self.enter_admin()
-        if verb == "/admin" and args:
-            return await self._screens["admin"].run_command(verb, args)
         return None
 
     async def hotkey_global(self, key_text: str) -> list[str] | str | None:
