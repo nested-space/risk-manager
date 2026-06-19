@@ -13,60 +13,24 @@ flows:
   display (``^K``).
 
 Shared row lookups, alias fetches, the edit form, and structure display live on
-:class:`_LibraryMixin` so both screens reuse them without duplication.
+:class:`_LibraryMixin` so both screens reuse them without duplication. The three
+subsections differ only in their operations/schemas/labels, which are captured in
+the per-subsection :class:`~.library_subsections.LibraryDescriptor` registry, so
+the add/edit/delete/list/alias flows are written once and keyed by sub-mode.
 """
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from ...operations.counterion_operations import (
-    add_counterion_alias,
-    counterion_alias_counts,
-    create_counterion,
-    delete_counterion,
-    list_counterion_aliases,
-    list_counterions,
-    update_counterion,
-)
 from ...operations.dmta_operations import ResolveResult, augment_name
 from ...operations.material_operations import (
-    add_material_alias,
-    create_material,
-    delete_material,
     display_name_is_unambiguous,
     existing_display_names,
-    list_material_aliases,
-    list_materials,
-    material_alias_counts,
-    update_material,
-)
-from ...operations.ncrm_library_operations import (
-    add_ncrm_alias,
-    create_ncrm_library_entry,
-    delete_ncrm_library_entry,
-    list_ncrm_aliases,
-    list_ncrm_library,
-    ncrm_alias_counts,
-    update_ncrm_library_entry,
 )
 from ...repl_engine import ListItem, ScreenSpec
 from ...repl_engine.forms import FieldSpec, InfoSection, field_key
-from ...schema.create import (
-    CounterionAliasCreate,
-    CounterionCreate,
-    MaterialAliasCreate,
-    MaterialCreate,
-    NcrmLibraryAliasCreate,
-    NcrmLibraryCreate,
-)
-from ...schema.update import (
-    CounterionUpdate,
-    MaterialUpdate,
-    NcrmLibraryUpdate,
-)
 from ...service.structure_viewer import StructureResult, show_structure
 from ...utils.name_simplifier import simplify_name
 from ..form_fields import BOOL_OPTIONS, CONFIRM_OPTIONS, as_bool, default_text
@@ -82,6 +46,7 @@ from ..renderers.library_renderer import (
     render_library_screen,
 )
 from .base import AppScreen
+from .library_subsections import LIBRARY_DESCRIPTORS, descriptor_for
 from .specs import SCREEN_SPECS
 
 if TYPE_CHECKING:
@@ -125,19 +90,11 @@ class _LibraryMixin(AppScreen):
         ``interpret_chemically``, ``smiles`` and ``alias_count``. Rows are sorted
         case-insensitively by name so the rendered table reads alphabetically.
         """
-        entities: list[Any]
-        counts: dict[str, int]
-        if sub_mode == "materials":
-            entities = await list_materials(self.app.env)
-            counts = await material_alias_counts(self.app.env)
-        elif sub_mode == "ncrm":
-            entities = await list_ncrm_library(self.app.env)
-            counts = await ncrm_alias_counts(self.app.env)
-        elif sub_mode == "counterions":
-            entities = await list_counterions(self.app.env)
-            counts = await counterion_alias_counts(self.app.env)
-        else:
+        descriptor = descriptor_for(sub_mode)
+        if descriptor is None:
             return []
+        entities = await descriptor.list_fn(self.app.env)
+        counts = await descriptor.alias_counts_fn(self.app.env)
         items = [
             {
                 "id": entity.id,
@@ -161,14 +118,10 @@ class _LibraryMixin(AppScreen):
 
     async def _library_item_aliases(self, sub_mode: str, item_id: str) -> list[str]:
         """Return the aliases of one library entry for its subsection."""
-        entry_id = UUID(item_id)
-        if sub_mode == "materials":
-            return await list_material_aliases(entry_id, self.app.env)
-        if sub_mode == "ncrm":
-            return await list_ncrm_aliases(entry_id, self.app.env)
-        if sub_mode == "counterions":
-            return await list_counterion_aliases(entry_id, self.app.env)
-        return []
+        descriptor = descriptor_for(sub_mode)
+        if descriptor is None:
+            return []
+        return await descriptor.alias_list_fn(UUID(item_id), self.app.env)
 
     async def _render_library_detail(self, sub_mode: str, item_id: str) -> list[str]:
         """Render the detail (show) page for one library entry, with its aliases.
@@ -212,46 +165,9 @@ class _LibraryMixin(AppScreen):
 
     def _library_edit_form(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
         """Start the edit form for an already-resolved library *item*."""
-        if sub_mode == "materials":
-            return self.app.modal.start_prompt(
-                [
-                    FieldSpec("name", default=str(item["name"])),
-                    FieldSpec(
-                        "display_name",
-                        default=default_text(item.get("display_name")),
-                        max_length=30,
-                    ),
-                    FieldSpec(
-                        "interpret_chemically",
-                        field_type="select",
-                        options=BOOL_OPTIONS,
-                        default="true" if bool(item.get("interpret_chemically")) else "false",
-                    ),
-                    FieldSpec("smiles", required=False, default=default_text(item.get("smiles"))),
-                ],
-                lambda **payload: self._update_material_entry(str(item["id"]), payload),
-                title="Edit material",
-            )
-        if sub_mode == "ncrm":
-            return self.app.modal.start_prompt(
-                [
-                    FieldSpec("name", default=str(item["name"])),
-                    FieldSpec(
-                        "display_name",
-                        default=str(item["display_name"]),
-                        max_length=30,
-                    ),
-                    FieldSpec(
-                        "interpret_chemically",
-                        field_type="select",
-                        options=BOOL_OPTIONS,
-                        default="true" if bool(item.get("interpret_chemically")) else "false",
-                    ),
-                    FieldSpec("smiles", required=False, default=default_text(item.get("smiles"))),
-                ],
-                lambda **payload: self._update_ncrm_entry(str(item["id"]), payload),
-                title="Edit NCRM",
-            )
+        descriptor = descriptor_for(sub_mode)
+        if descriptor is None:
+            return ["Choose a library subsection first."]
         return self.app.modal.start_prompt(
             [
                 FieldSpec("name", default=str(item["name"])),
@@ -268,17 +184,20 @@ class _LibraryMixin(AppScreen):
                 ),
                 FieldSpec("smiles", required=False, default=default_text(item.get("smiles"))),
             ],
-            lambda **payload: self._update_counterion_entry(str(item["id"]), payload),
-            title="Edit counterion",
+            lambda **payload: self._update_library_entry(sub_mode, str(item["id"]), payload),
+            title=descriptor.edit_title,
         )
 
-    async def _update_material_entry(
-        self, item_id: str, payload: dict[str, str | None]
+    async def _update_library_entry(
+        self, sub_mode: str, item_id: str, payload: dict[str, str | None]
     ) -> list[str]:
-        """Apply the material edit form's *payload* to the entry with *item_id*."""
-        updated = await update_material(
+        """Apply an edit form's *payload* to the entry with *item_id*."""
+        descriptor = descriptor_for(sub_mode)
+        if descriptor is None:
+            return await self.app.refresh_with_notice("Item not found.", "error")
+        updated = await descriptor.update_fn(
             UUID(item_id),
-            MaterialUpdate(
+            descriptor.update_schema(
                 name=payload.get("name"),
                 display_name=payload.get("display_name") or None,
                 interpret_chemically=as_bool(payload.get("interpret_chemically")),
@@ -287,42 +206,8 @@ class _LibraryMixin(AppScreen):
             self.app.env,
         )
         if updated is None:
-            return await self.app.refresh_with_notice("Failed to update material.", "error")
-        return await self.app.refresh_with_notice("Material updated.")
-
-    async def _update_ncrm_entry(self, item_id: str, payload: dict[str, str | None]) -> list[str]:
-        """Apply the NCRM edit form's *payload* to the entry with *item_id*."""
-        updated = await update_ncrm_library_entry(
-            UUID(item_id),
-            NcrmLibraryUpdate(
-                display_name=payload.get("display_name"),
-                name=payload.get("name"),
-                interpret_chemically=as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.app.env,
-        )
-        if updated is None:
-            return await self.app.refresh_with_notice("Failed to update NCRM.", "error")
-        return await self.app.refresh_with_notice("NCRM updated.")
-
-    async def _update_counterion_entry(
-        self, item_id: str, payload: dict[str, str | None]
-    ) -> list[str]:
-        """Apply the counterion edit form's *payload* to the entry with *item_id*."""
-        updated = await update_counterion(
-            UUID(item_id),
-            CounterionUpdate(
-                name=payload.get("name"),
-                display_name=payload.get("display_name") or None,
-                interpret_chemically=as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.app.env,
-        )
-        if updated is None:
-            return await self.app.refresh_with_notice("Failed to update counterion.", "error")
-        return await self.app.refresh_with_notice("Counterion updated.")
+            return await self.app.refresh_with_notice(descriptor.update_fail_notice, "error")
+        return await self.app.refresh_with_notice(descriptor.update_ok_notice)
 
 
 class LibraryScreen(_LibraryMixin):
@@ -334,14 +219,6 @@ class LibraryScreen(_LibraryMixin):
     property lets the engine derive the right capability spec, tab state, and
     legend for whichever view is showing.
     """
-
-    #: Add/edit form titles keyed by sub-mode. Materials, counterions, and NCRM
-    #: entries share the same shape, so the add/edit flows are uniform.
-    _LIBRARY_ADD_TITLES = {
-        "materials": "Add material",
-        "counterions": "Add counterion",
-        "ncrm": "Add NCRM",
-    }
 
     def __init__(self, app: CommandDispatcher) -> None:
         """Bind the screen and reset the transient display-name suggestion inputs."""
@@ -440,9 +317,8 @@ class LibraryScreen(_LibraryMixin):
         :data:`~..renderers.library_home_renderer.OVERVIEW_CARDS`.
         """
         return {
-            "ncrm": len(await list_ncrm_library(self.app.env)),
-            "materials": len(await list_materials(self.app.env)),
-            "counterions": len(await list_counterions(self.app.env)),
+            subsection.value: len(await descriptor.list_fn(self.app.env))
+            for subsection, descriptor in LIBRARY_DESCRIPTORS.items()
         }
 
     async def _render_library_home(self) -> list[str]:
@@ -577,14 +453,13 @@ class LibraryScreen(_LibraryMixin):
         # successful resolve the retrieved values are shown read-only and only the
         # remaining fields stay editable (see _offer_augment /
         # _finish_library_add_augmented); otherwise SMILES is entered manually.
-        titles = {"materials": "Add material", "ncrm": "Add NCRM", "counterions": "Add counterion"}
-        title = titles.get(sub_mode)
-        if title is None:
+        descriptor = descriptor_for(sub_mode)
+        if descriptor is None:
             return ["Choose a library subsection first."]
         return self.app.modal.start_prompt(
             [FieldSpec("name")],
             lambda **payload: self._offer_augment(sub_mode, payload.get("name") or ""),
-            title=title,
+            title=descriptor.add_title,
         )
 
     def _offer_augment(self, sub_mode: str, name: str) -> list[str]:
@@ -649,17 +524,6 @@ class LibraryScreen(_LibraryMixin):
         ambiguous = (await display_name_is_unambiguous(candidate, smiles)) is False
         return existing, ambiguous
 
-    def _library_create_handler(
-        self, sub_mode: str
-    ) -> Callable[[str, dict[str, str | None], list[str]], Awaitable[list[str]]] | None:
-        """Return the ``(name, payload, aliases)`` create handler for *sub_mode*."""
-        handlers = {
-            "materials": self._create_material_from_prompt,
-            "counterions": self._create_counterion_from_prompt,
-            "ncrm": self._create_ncrm_from_prompt,
-        }
-        return handlers.get(sub_mode)
-
     def _finish_library_add(
         self,
         sub_mode: str,
@@ -682,8 +546,8 @@ class LibraryScreen(_LibraryMixin):
         Returns:
             Prompt-render lines for the finish form.
         """
-        handler = self._library_create_handler(sub_mode)
-        if handler is None:
+        descriptor = descriptor_for(sub_mode)
+        if descriptor is None:
             return ["Choose a library subsection first."]
         display_field, note = self._suggested_display_name_field(name)
         info = InfoSection(title="Suggested display name", rows=[("note", note)]) if note else None
@@ -698,8 +562,10 @@ class LibraryScreen(_LibraryMixin):
                 ),
                 FieldSpec("smiles", required=False, default=smiles),
             ],
-            lambda **payload: handler(name, payload, aliases),
-            title=self._LIBRARY_ADD_TITLES[sub_mode],
+            lambda **payload: self._create_library_entry_from_prompt(
+                sub_mode, name, payload, aliases
+            ),
+            title=descriptor.add_title,
             info_section=info,
         )
 
@@ -754,8 +620,8 @@ class LibraryScreen(_LibraryMixin):
         Returns:
             Prompt-render lines for the finish form.
         """
-        handler = self._library_create_handler(sub_mode)
-        if handler is None:
+        descriptor = descriptor_for(sub_mode)
+        if descriptor is None:
             return ["Choose a library subsection first."]
         display_field, note = self._suggested_display_name_field(name)
         rows: list[tuple[str, str]] = [("name", name)]
@@ -777,8 +643,10 @@ class LibraryScreen(_LibraryMixin):
                     default="false",
                 ),
             ],
-            lambda **payload: handler(name, {**payload, "smiles": result.smiles}, result.aliases),
-            title=self._LIBRARY_ADD_TITLES[sub_mode],
+            lambda **payload: self._create_library_entry_from_prompt(
+                sub_mode, name, {**payload, "smiles": result.smiles}, result.aliases
+            ),
+            title=descriptor.add_title,
             info_section=info,
         )
 
@@ -806,23 +674,23 @@ class LibraryScreen(_LibraryMixin):
 
     async def _delete_library_entry(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
         """Delete an already-resolved library *item* and refresh the screen."""
-        item_uuid = UUID(str(item["id"]))
-        if sub_mode == "materials":
-            success = await delete_material(item_uuid, self.app.env)
-        elif sub_mode == "ncrm":
-            success = await delete_ncrm_library_entry(item_uuid, self.app.env)
-        else:
-            success = await delete_counterion(item_uuid, self.app.env)
+        descriptor = descriptor_for(sub_mode)
+        if descriptor is None:
+            return await self.app.refresh_with_notice("Delete failed.", "error")
+        success = await descriptor.delete_fn(UUID(str(item["id"])), self.app.env)
         if not success:
             return await self.app.refresh_with_notice("Delete failed.", "error")
         return await self.app.refresh_with_notice("Deleted.")
 
-    async def _create_material_from_prompt(
-        self, name: str, payload: dict[str, str | None], aliases: list[str]
+    async def _create_library_entry_from_prompt(
+        self, sub_mode: str, name: str, payload: dict[str, str | None], aliases: list[str]
     ) -> list[str]:
-        """Create a material from the finish form, then persist any *aliases*."""
-        created = await create_material(
-            MaterialCreate(
+        """Create a library entry from the finish form, then persist any *aliases*."""
+        descriptor = descriptor_for(sub_mode)
+        if descriptor is None:
+            return ["Choose a library subsection first."]
+        created = await descriptor.create_fn(
+            descriptor.create_schema(
                 name=name or "",
                 display_name=payload.get("display_name") or None,
                 interpret_chemically=as_bool(payload.get("interpret_chemically")),
@@ -831,57 +699,14 @@ class LibraryScreen(_LibraryMixin):
             self.app.env,
         )
         if created is None:
-            return await self.app.refresh_with_notice("Failed to create material.", "error")
+            return await self.app.refresh_with_notice(descriptor.create_fail_notice, "error")
         for alias in aliases:
-            await add_material_alias(
-                MaterialAliasCreate(material_id=UUID(str(created.id)), alias=alias),
-                self.app.env,
+            await descriptor.alias_add_fn(
+                descriptor.alias_factory(UUID(str(created.id)), alias), self.app.env
             )
-        return await self.app.refresh_with_notice(_created_notice("Material", aliases))
-
-    async def _create_ncrm_from_prompt(
-        self, name: str, payload: dict[str, str | None], aliases: list[str]
-    ) -> list[str]:
-        """Create an NCRM entry from the finish form, then persist any *aliases*."""
-        created = await create_ncrm_library_entry(
-            NcrmLibraryCreate(
-                name=name or "",
-                display_name=payload.get("display_name") or None,
-                interpret_chemically=as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.app.env,
+        return await self.app.refresh_with_notice(
+            _created_notice(descriptor.created_label, aliases)
         )
-        if created is None:
-            return await self.app.refresh_with_notice("Failed to create NCRM entry.", "error")
-        for alias in aliases:
-            await add_ncrm_alias(
-                NcrmLibraryAliasCreate(ncrm_library_id=UUID(str(created.id)), alias=alias),
-                self.app.env,
-            )
-        return await self.app.refresh_with_notice(_created_notice("NCRM entry", aliases))
-
-    async def _create_counterion_from_prompt(
-        self, name: str, payload: dict[str, str | None], aliases: list[str]
-    ) -> list[str]:
-        """Create a counterion from the finish form, then persist any *aliases*."""
-        created = await create_counterion(
-            CounterionCreate(
-                name=name or "",
-                display_name=payload.get("display_name") or None,
-                interpret_chemically=as_bool(payload.get("interpret_chemically")),
-                smiles=payload.get("smiles") or None,
-            ),
-            self.app.env,
-        )
-        if created is None:
-            return await self.app.refresh_with_notice("Failed to create counterion.", "error")
-        for alias in aliases:
-            await add_counterion_alias(
-                CounterionAliasCreate(counterion_id=UUID(str(created.id)), alias=alias),
-                self.app.env,
-            )
-        return await self.app.refresh_with_notice(_created_notice("Counterion", aliases))
 
 
 class LibraryDetailScreen(_LibraryMixin):
