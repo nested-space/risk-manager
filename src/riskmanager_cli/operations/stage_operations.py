@@ -2,7 +2,9 @@
 Stage CRUD operations.
 
 All functions are ``async def`` and open their own sessions. On error they
-log via ``print_error`` and return ``None`` / ``[]`` / ``False``.
+log via ``print_error`` and return ``None`` / ``[]`` / ``False``. The common
+CRUD shapes delegate to the ``generic_*`` helpers in :mod:`.base_operations`;
+only stage-specific lookups live here.
 """
 
 from uuid import UUID
@@ -12,7 +14,13 @@ from ..database.db_session import get_db_session
 from ..model.tables import Stage
 from ..schema.create import StageCreate
 from ..schema.update import StageUpdate
-from ..utils.console_formatting import print_error, print_success
+from .base_operations import (
+    db_operation,
+    generic_create,
+    generic_delete_by_id,
+    generic_get_by_id,
+    generic_update,
+)
 
 
 async def create_stage(
@@ -20,31 +28,19 @@ async def create_stage(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Stage | None:
-    """Create a new stage within a manufacturing process.
-
-    Args:
-        data: Validated :class:`~..schema.create.StageCreate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The created :class:`~..model.tables.Stage`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            stage = Stage(
-                process_id=str(data.process_id),
-                name=data.name,
-                number=data.number,
-            )
-            session.add(stage)
-            await session.commit()
-            await session.refresh(stage)
-            print_success(f"Created stage '{stage.name}' (#{stage.number}).")
-            return stage
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to create stage: {exc}")
-        return None
+    """Create a new stage within a manufacturing process; ``None`` on error."""
+    stage = Stage(
+        process_id=str(data.process_id),
+        name=data.name,
+        number=data.number,
+    )
+    return await generic_create(
+        stage,
+        "stage",
+        env,
+        verbose,
+        success_message=f"Created stage '{data.name}' (#{data.number}).",
+    )
 
 
 async def get_stage_by_id(
@@ -52,82 +48,42 @@ async def get_stage_by_id(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Stage | None:
-    """Retrieve a stage by UUID.
-
-    Args:
-        stage_id: UUID of the stage.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.Stage`; ``None`` if not found.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Stage.get_where(session, Stage.id == str(stage_id))
-            return results[0] if results else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get stage by ID: {exc}")
-        return None
+    """Retrieve a stage by UUID; ``None`` if not found."""
+    return await generic_get_by_id(Stage, stage_id, "stage", env, verbose)
 
 
+@db_operation(default=None, error="Failed to get stage by name")
 async def get_stage_by_name(
     process_id: UUID,
     name: str,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Stage | None:
-    """Retrieve a stage by process ID and name.
+    """Retrieve a stage by process ID and name; ``None`` if not found."""
+    async with get_db_session(env, verbose) as session:
+        from sqlalchemy import select  # pylint: disable=import-outside-toplevel
 
-    Args:
-        process_id: UUID of the parent manufacturing process.
-        name: Exact stage name.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.Stage`; ``None`` if not found.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            from sqlalchemy import select  # pylint: disable=import-outside-toplevel
-
-            result = await session.execute(
-                select(Stage)
-                # SQLModel instrumented __eq__ returns ColumnElement[bool] at runtime;
-                # mypy infers bool due to SQLModel/SQLAlchemy stub gap — not a real error.
-                .where(Stage.process_id == str(process_id))  # type: ignore[arg-type]
-                .where(Stage.name == name),  # type: ignore[arg-type]
-            )
-            rows = list(result.scalars().all())
-            return rows[0] if rows else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get stage by name: {exc}")
-        return None
+        result = await session.execute(
+            select(Stage)
+            # SQLModel instrumented __eq__ returns ColumnElement[bool] at runtime;
+            # mypy infers bool due to SQLModel/SQLAlchemy stub gap — not a real error.
+            .where(Stage.process_id == str(process_id))  # type: ignore[arg-type]
+            .where(Stage.name == name),  # type: ignore[arg-type]
+        )
+        rows = list(result.scalars().all())
+        return rows[0] if rows else None
 
 
+@db_operation(default=[], error="Failed to list stages")
 async def list_stages_for_process(
     process_id: UUID,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> list[Stage]:
-    """Return all stages for a manufacturing process, ordered by stage number.
-
-    Args:
-        process_id: UUID of the manufacturing process.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        Ordered list of :class:`~..model.tables.Stage` instances.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Stage.get_where(session, Stage.process_id == str(process_id))
-            return sorted(results, key=lambda s: s.number)
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to list stages: {exc}")
-        return []
+    """Return all stages for a manufacturing process, ordered by stage number."""
+    async with get_db_session(env, verbose) as session:
+        results = await Stage.get_where(session, Stage.process_id == str(process_id))
+        return sorted(results, key=lambda s: s.number)
 
 
 async def update_stage(
@@ -136,29 +92,10 @@ async def update_stage(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Stage | None:
-    """Update fields on an existing stage.
-
-    Args:
-        stage_id: UUID of the stage to update.
-        data: Validated :class:`~..schema.update.StageUpdate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The updated :class:`~..model.tables.Stage`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Stage.get_where(session, Stage.id == str(stage_id))
-            if not results:
-                print_error(f"Stage '{stage_id}' not found.")
-                return None
-            stage = results[0]
-            await stage.update_fields(session, **data.model_dump(exclude_none=True))
-            return stage
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to update stage: {exc}")
-        return None
+    """Update fields on an existing stage; ``None`` on not-found or error."""
+    return await generic_update(
+        Stage, stage_id, "stage", data.model_dump(exclude_none=True), env=env, verbose=verbose
+    )
 
 
 async def delete_stage(
@@ -166,24 +103,5 @@ async def delete_stage(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> bool:
-    """Delete a stage by UUID.
-
-    Args:
-        stage_id: UUID of the stage to delete.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        ``True`` if deleted; ``False`` if not found or on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Stage.get_where(session, Stage.id == str(stage_id))
-            if not results:
-                return False
-            await session.delete(results[0])
-            await session.commit()
-            return True
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to delete stage: {exc}")
-        return False
+    """Delete a stage by UUID; ``False`` if not found or on error."""
+    return await generic_delete_by_id(Stage, stage_id, "stage", env, verbose)

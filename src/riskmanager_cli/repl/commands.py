@@ -169,22 +169,16 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         if verb == "/home":
             self.ctx.reset()
             self.navigator = None
-            self.session.update_context(
-                track="home",
-                project_id=None,
-                process_id=None,
-                stage_id=None,
-                component_id=None,
-            )
+            self._sync_session()
             return await self.render_current()
         if verb == "/help":
             return self._help_lines(args[0] if args else None)
-        if verb == "/admin" and not args:
+        if verb == "/admin":
+            if args:
+                return await self._screens["admin"].run_command(verb, args)
             if self.ctx.current.track != "home":
                 return ["/admin is only available from home."]
             return self.enter_admin()
-        if verb == "/admin" and args:
-            return await self._screens["admin"].run_command(verb, args)
         return None
 
     async def hotkey_global(self, key_text: str) -> list[str] | str | None:
@@ -323,13 +317,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         )
         self.navigator = None
         self.session.push_project(str(project.id))
-        self.session.update_context(
-            track="project",
-            project_id=str(project.id),
-            process_id=None,
-            stage_id=None,
-            component_id=None,
-        )
+        self._sync_session()
         return await self.render_current()
 
     async def open_route(self, project: Project, process: ManufacturingProcess) -> list[str]:
@@ -396,14 +384,7 @@ class CommandDispatcher(ScreenRouter):  # pylint: disable=too-many-instance-attr
         """
         if self.ctx.current.track in {"stage_focus", "component_focus"}:
             self.ctx.pop()
-            current = self.ctx.current
-            self.session.update_context(
-                track=current.track,
-                project_id=current.project_id,
-                process_id=current.process_id,
-                stage_id=current.stage_id,
-                component_id=current.component_id,
-            )
+            self._sync_session()
 
     def _help_lines(self, topic: str | None) -> list[str]:
         if topic is not None:

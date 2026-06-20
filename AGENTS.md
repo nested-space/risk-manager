@@ -108,13 +108,17 @@ src/
     │   ├── sticky_window.py
     │   ├── list_navigator.py
     │   └── layout/
-    ├── repl/                 # application: dispatch, context, renderers
+    ├── repl/                 # application: dispatch, context, screens, renderers
     │   ├── commands.py
     │   ├── context.py
     │   ├── session_state.py
     │   ├── bootstrap.py
+    │   ├── screens/          # one cohesive AppScreen per navigation track
+    │   │   └── library_subsections.py  # LibrarySubsection enum + descriptor registry
     │   └── renderers/
+    │       └── _sections.py  # shared sectioned-screen layout (stage/component focus)
     ├── operations/
+    │   └── base_operations.py  # db_operation decorator + generic_* CRUD helpers
     ├── model/
     ├── schema/
     ├── database/
@@ -131,6 +135,39 @@ tests/
 
 `src/` layout is used. `pyproject.toml` configures `setuptools.packages.find`
 with `where = ["src"]`.
+
+### Reusable Patterns (use these — do NOT hand-roll the boilerplate)
+
+Three shared abstractions exist so common shapes are written once. New code MUST
+reuse them rather than copy the patterns they remove.
+
+**Operations layer — `operations/base_operations.py`.** Every entity operation
+delegates its common CRUD shape instead of repeating the
+`try → async with get_db_session → query → except → return default` block:
+
+* Pure CRUD (`get_*_by_id`, `list_*`, `delete_*`, existence/stats) delegates to the
+  typed `generic_get_by_id` / `generic_list` / `generic_delete_by_id` /
+  `generic_check_exists` / `generic_get_stats` / `generic_create` / `generic_update`
+  helpers (a `TypeVar` bound to `CRUDMixin` preserves the concrete return type).
+* Bespoke operations (entity-specific queries, SMILES validation, alias fan-out)
+  keep their body but wear the `@db_operation(default=…, error="…")` decorator.
+* The operations layer's **single** `broad-except` lives in
+  `base_operations._guarded`; the decorator and every `generic_*` helper route
+  through it. Do NOT add a per-operation `try/except Exception`. (The one other
+  justified `broad-except` is the SAVEPOINT rollback in `seed_operations`.)
+
+**Library subsections — `repl/screens/library_subsections.py`.** The three library
+entity types (materials / NCRM / counterions) differ only in their
+operations/schemas/labels, captured in one `LibraryDescriptor` per
+`LibrarySubsection` enum member. `repl/screens/library.py` keys its
+add/edit/delete/list/alias flows off the descriptor. Adding a fourth library type =
+one enum member + one descriptor; do NOT add parallel `if/elif` chains or
+per-entity `_create_*`/`_update_*` methods.
+
+**Sectioned focus screens — `repl/renderers/_sections.py`.** Stage- and
+component-focus screens share `section_body()` and `render_sectioned_screen()`
+(generic over a small `Row` protocol exposing `item_id` and `cells`). A new focus
+screen reuses them rather than copying the table/caret layout.
 
 ---
 
@@ -279,13 +316,17 @@ def update_material_by_search(...):
 ### Async Patterns
 
 - All operations functions MUST be `async def`
-- Each operation opens its own session via `async with get_db_session(...)`
+- Each operation owns its own session — via a `generic_*` helper, the `@db_operation`
+  decorator, or an explicit `async with get_db_session(...)` for a bespoke body
 - NEVER share sessions between operations
 - NEVER call `asyncio.run()` from within the REPL loop — use `run_async()` from `repl/loop.py`
 
 ### Error Handling
 
 - Operations layer: absorb exceptions, call `print_error()`, return `None`/`[]`/`False`
+  — via the `@db_operation` decorator / `generic_*` helpers, NOT a hand-rolled
+  `try/except` (the single `broad-except` lives in `base_operations._guarded`; see
+  §2 Reusable Patterns)
 - REPL command layer: check operation return value, return `RenderableContent.error(...)` 
 - REPL loop: NEVER exit the process on error (display in output pane, continue)
 - Application exits only on `/quit`, `Ctrl+C`, or `Ctrl+D`
@@ -319,6 +360,10 @@ invalidates the quality gate.
 | Tests | `~/.venvs/riskmanager/bin/python -m pytest tests/ -x` | All green |
 | Engine seam | `grep -rnE 'from \.\.(repl\|operations\|model\|schema\|service\|config)[. ]' src/riskmanager_cli/repl_engine/` | No matches (engine imports no application code) |
 
+All six gates also run in CI on every push to `main` and every pull request via
+`.github/workflows/quality-gates.yml` (Python 3.10 and 3.12). CI is a backstop —
+run the gates locally before pushing; do not rely on CI to catch regressions.
+
 ### Suppression Policy
 
 **Global suppression is FORBIDDEN.**
@@ -347,6 +392,13 @@ encouraged:
 ```python
 # pylint: disable=no-member  # SQLModel metaclass generates attrs at runtime (SQLModel#123)
 ```
+
+**`R0801` (duplicate-code)** is reported at the runner level and cannot be
+suppressed inline. It is **enabled** with a raised `min-similarity-lines` (see
+`[tool.pylint.similarities]` in `pyproject.toml`) rather than disabled, so genuine
+copy-paste is still caught while the small intentional patterns that remain (e.g.
+risk-table field maps, `ContextFrame` pushes) pass. Lower the threshold as shared
+blocks are removed; do NOT re-introduce a global `disable`.
 
 ---
 

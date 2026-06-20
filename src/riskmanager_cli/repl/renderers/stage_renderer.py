@@ -24,11 +24,9 @@ from ...operations.ncrm_library_operations import get_ncrm_by_id
 from ...operations.stage_component_operations import list_stage_components
 from ...operations.stage_ncrm_operations import list_ncrms_for_stage
 from ...operations.stage_risk_operations import list_risks_for_stage
-from ...repl_engine.layout import Column, render_table, section_rule, section_width
+from ...repl_engine.layout import Column
 from ...repl_engine.list_navigator import ListItem
-
-_BODY_INDENT = "  "
-_CARET = "> "
+from ._sections import render_sectioned_screen, section_body
 
 
 @dataclass
@@ -100,50 +98,11 @@ def render_stage_screen(
         two-space-indented sections with a ``>`` caret on the selected row.
     """
     title = f"Stage {stage.number}"
-    lines = [title, "─" * len(title)]
-
     body: list[tuple[str, str | None]] = []
-    body += _section_body("Components", _COMPONENT_COLUMNS, sections.components, width, "(none)")
-    body += _section_body("NCRMs", _NCRM_COLUMNS, sections.ncrms, width, "(none)")
-    body += _section_body("Risks", _RISK_COLUMNS, sections.risks, width, "(no risks recorded)")
-
-    for text, item_id in body:
-        if not text:
-            lines.append("")
-            continue
-        gutter = _CARET if item_id is not None and item_id == selected_id else _BODY_INDENT
-        lines.append(f"{gutter}{text}")
-    return lines
-
-
-def _section_body(
-    title: str,
-    columns: list[Column],
-    rows: list[StageRow],
-    width: int,
-    empty_placeholder: str,
-) -> list[tuple[str, str | None]]:
-    """Build ``(text, item_id)`` body lines for one section.
-
-    A blank line precedes the section rule; the table's data rows carry their
-    row ``item_id`` (everything else is ``None``). Empty sections render the
-    placeholder instead of a table. The table is shrunk to the terminal *width*
-    less the screen inset and the two-column caret/indent gutter.
-    """
-    out: list[tuple[str, str | None]] = [
-        ("", None),
-        (section_rule(title, section_width(width)), None),
-        ("", None),
-    ]
-    if not rows:
-        out.append((empty_placeholder, None))
-        return out
-    table = render_table(columns, [row.cells for row in rows], max_width=width - 4)
-    data_start = 3  # top border, header, separator precede the data rows
-    for index, line in enumerate(table):
-        is_data = data_start <= index < data_start + len(rows)
-        out.append((line, rows[index - data_start].item_id if is_data else None))
-    return out
+    body += section_body("Components", _COMPONENT_COLUMNS, sections.components, width, "(none)")
+    body += section_body("NCRMs", _NCRM_COLUMNS, sections.ncrms, width, "(none)")
+    body += section_body("Risks", _RISK_COLUMNS, sections.risks, width, "(no risks recorded)")
+    return render_sectioned_screen(title, body, selected_id)
 
 
 async def _component_rows(stage: Stage, env: Environment) -> list[StageRow]:

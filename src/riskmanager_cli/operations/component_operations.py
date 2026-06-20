@@ -2,7 +2,9 @@
 Component CRUD operations.
 
 All functions are ``async def`` and open their own sessions. On error they
-log via ``print_error`` and return ``None`` / ``[]`` / ``False``.
+log via ``print_error`` and return ``None`` / ``[]`` / ``False``. The common
+CRUD shapes delegate to the ``generic_*`` helpers in :mod:`.base_operations`;
+only component-specific logic (salt-form display names) lives here.
 """
 
 from uuid import UUID
@@ -12,7 +14,13 @@ from ..database.db_session import get_db_session
 from ..model.tables import Component
 from ..schema.create import ComponentCreate
 from ..schema.update import ComponentUpdate
-from ..utils.console_formatting import print_error, print_success
+from .base_operations import (
+    db_operation,
+    generic_create,
+    generic_delete_by_id,
+    generic_get_by_id,
+    generic_update,
+)
 from .component_salt_operations import list_salts_for_component
 from .counterion_operations import get_counterion_by_id
 from .material_operations import get_material_by_id
@@ -23,32 +31,20 @@ async def create_component(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Component | None:
-    """Create a new component record.
-
-    Args:
-        data: Validated :class:`~..schema.create.ComponentCreate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The created :class:`~..model.tables.Component`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            component = Component(
-                process_id=str(data.process_id),
-                material_id=str(data.material_id),
-                control_strategy_role=data.control_strategy_role,
-                is_isolated=data.is_isolated,
-            )
-            session.add(component)
-            await session.commit()
-            await session.refresh(component)
-            print_success(f"Created component (material ID: {data.material_id}).")
-            return component
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to create component: {exc}")
-        return None
+    """Create a new component record; ``None`` on error."""
+    component = Component(
+        process_id=str(data.process_id),
+        material_id=str(data.material_id),
+        control_strategy_role=data.control_strategy_role,
+        is_isolated=data.is_isolated,
+    )
+    return await generic_create(
+        component,
+        "component",
+        env,
+        verbose,
+        success_message=f"Created component (material ID: {data.material_id}).",
+    )
 
 
 async def get_component_by_id(
@@ -56,23 +52,8 @@ async def get_component_by_id(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Component | None:
-    """Retrieve a component by UUID.
-
-    Args:
-        component_id: UUID of the component.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.Component`; ``None`` if not found.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Component.get_where(session, Component.id == str(component_id))
-            return results[0] if results else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get component by ID: {exc}")
-        return None
+    """Retrieve a component by UUID; ``None`` if not found."""
+    return await generic_get_by_id(Component, component_id, "component", env, verbose)
 
 
 def format_salt_form(base_name: str, salts: list[tuple[float | None, str]]) -> str:
@@ -130,27 +111,15 @@ async def component_display_name(
     return format_salt_form(base, pairs)
 
 
+@db_operation(default=[], error="Failed to list components")
 async def list_components_for_process(
     process_id: UUID,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> list[Component]:
-    """Return all components for a manufacturing process.
-
-    Args:
-        process_id: UUID of the manufacturing process.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        List of :class:`~..model.tables.Component` instances.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            return await Component.get_where(session, Component.process_id == str(process_id))
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to list components: {exc}")
-        return []
+    """Return all components for a manufacturing process."""
+    async with get_db_session(env, verbose) as session:
+        return await Component.get_where(session, Component.process_id == str(process_id))
 
 
 async def update_component(
@@ -159,29 +128,15 @@ async def update_component(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Component | None:
-    """Update fields on an existing component.
-
-    Args:
-        component_id: UUID of the component to update.
-        data: Validated :class:`~..schema.update.ComponentUpdate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The updated :class:`~..model.tables.Component`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Component.get_where(session, Component.id == str(component_id))
-            if not results:
-                print_error(f"Component '{component_id}' not found.")
-                return None
-            component = results[0]
-            await component.update_fields(session, **data.model_dump(exclude_none=True))
-            return component
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to update component: {exc}")
-        return None
+    """Update fields on an existing component; ``None`` on not-found or error."""
+    return await generic_update(
+        Component,
+        component_id,
+        "component",
+        data.model_dump(exclude_none=True),
+        env=env,
+        verbose=verbose,
+    )
 
 
 async def delete_component(
@@ -189,24 +144,5 @@ async def delete_component(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> bool:
-    """Delete a component by UUID.
-
-    Args:
-        component_id: UUID of the component to delete.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        ``True`` if deleted; ``False`` if not found or on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Component.get_where(session, Component.id == str(component_id))
-            if not results:
-                return False
-            await session.delete(results[0])
-            await session.commit()
-            return True
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to delete component: {exc}")
-        return False
+    """Delete a component by UUID; ``False`` if not found or on error."""
+    return await generic_delete_by_id(Component, component_id, "component", env, verbose)

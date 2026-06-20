@@ -2,7 +2,10 @@
 Material CRUD, search, and bulk import operations.
 
 All functions are ``async def`` and open their own sessions. On error they
-log via ``print_error`` and return ``None`` / ``[]`` / ``False``.
+log via ``print_error`` and return ``None`` / ``[]`` / ``False``. The common
+CRUD shapes delegate to the ``generic_*`` helpers in :mod:`.base_operations`;
+only material-specific logic (SMILES search, bulk import, display-name checks)
+lives here.
 """
 
 from collections import Counter
@@ -13,8 +16,16 @@ from ..database.db_session import get_db_session
 from ..model.tables import Material, MaterialAlias
 from ..schema.create import MaterialAliasCreate, MaterialCreate
 from ..schema.update import MaterialUpdate
-from ..utils.console_formatting import print_error, print_success, print_warning
+from ..utils.console_formatting import print_error, print_warning
 from ..utils.parsing import parse_csv_rows, split_aliases
+from .base_operations import (
+    db_operation,
+    generic_create,
+    generic_delete_by_id,
+    generic_get_by_id,
+    generic_list,
+    generic_update,
+)
 from .dmta_operations import augment_name
 from .smiles_operations import (
     canonicalize_smiles,
@@ -23,14 +34,13 @@ from .smiles_operations import (
 )
 
 
+@db_operation(default=None, error="Failed to create material")
 async def create_material(
     data: MaterialCreate,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Material | None:
-    """Create a new material record.
-
-    Validates and canonicalizes the SMILES if provided.
+    """Create a new material record, validating/canonicalizing any SMILES.
 
     Args:
         data: Validated :class:`~..schema.create.MaterialCreate` payload.
@@ -40,29 +50,22 @@ async def create_material(
     Returns:
         The created :class:`~..model.tables.Material`; ``None`` on error.
     """
-    try:
-        smiles: str | None = None
-        if data.smiles:
-            if not is_valid_smiles(data.smiles):
-                print_error(f"Invalid SMILES for material '{data.name}': {data.smiles}")
-                return None
-            smiles = canonicalize_smiles(data.smiles) or data.smiles
+    smiles: str | None = None
+    if data.smiles:
+        if not is_valid_smiles(data.smiles):
+            print_error(f"Invalid SMILES for material '{data.name}': {data.smiles}")
+            return None
+        smiles = canonicalize_smiles(data.smiles) or data.smiles
 
-        async with get_db_session(env, verbose) as session:
-            material = Material(
-                name=data.name,
-                display_name=data.display_name or data.name,
-                interpret_chemically=data.interpret_chemically,
-                smiles=smiles,
-            )
-            session.add(material)
-            await session.commit()
-            await session.refresh(material)
-            print_success(f"Created material '{material.name}'.")
-            return material
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to create material: {exc}")
-        return None
+    material = Material(
+        name=data.name,
+        display_name=data.display_name or data.name,
+        interpret_chemically=data.interpret_chemically,
+        smiles=smiles,
+    )
+    return await generic_create(
+        material, "material", env, verbose, success_message=f"Created material '{data.name}'."
+    )
 
 
 async def get_material_by_id(
@@ -70,72 +73,33 @@ async def get_material_by_id(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Material | None:
-    """Retrieve a material by UUID.
-
-    Args:
-        material_id: UUID of the material.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.Material`; ``None`` if not found.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Material.get_where(session, Material.id == str(material_id))
-            return results[0] if results else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get material by ID: {exc}")
-        return None
+    """Retrieve a material by UUID; ``None`` if not found."""
+    return await generic_get_by_id(Material, material_id, "material", env, verbose)
 
 
+@db_operation(default=None, error="Failed to get material by name")
 async def get_material_by_name(
     name: str,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Material | None:
-    """Retrieve a material by exact name.
-
-    Args:
-        name: Exact material name.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.Material`; ``None`` if not found.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Material.get_where(session, Material.name == name)
-            return results[0] if results else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get material by name: {exc}")
-        return None
+    """Retrieve a material by exact name; ``None`` if not found."""
+    async with get_db_session(env, verbose) as session:
+        results = await Material.get_where(session, Material.name == name)
+        return results[0] if results else None
 
 
+@db_operation(default=None, error="Failed to get material by SMILES")
 async def get_material_by_smiles(
     smiles: str,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Material | None:
-    """Retrieve a material by SMILES string (canonical form).
-
-    Args:
-        smiles: SMILES string (will be canonicalized before lookup).
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.Material`; ``None`` if not found.
-    """
+    """Retrieve a material by SMILES string (canonical form); ``None`` if not found."""
     canonical = canonicalize_smiles(smiles) or smiles
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Material.get_where(session, Material.smiles == canonical)
-            return results[0] if results else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get material by SMILES: {exc}")
-        return None
+    async with get_db_session(env, verbose) as session:
+        results = await Material.get_where(session, Material.smiles == canonical)
+        return results[0] if results else None
 
 
 async def get_material_by_search(
@@ -170,72 +134,36 @@ async def list_materials(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> list[Material]:
-    """Return all materials ordered by name.
-
-    Args:
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        List of :class:`~..model.tables.Material` instances.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Material.get_all(session)
-            return sorted(results, key=lambda m: m.name)
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to list materials: {exc}")
-        return []
+    """Return all materials ordered by name."""
+    return await generic_list(Material, "materials", env, verbose, sort_key=lambda m: m.name)
 
 
+@db_operation(default={}, error="Failed to count material aliases")
 async def material_alias_counts(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> dict[str, int]:
     """Return a mapping of material id to its alias count.
 
-    Args:
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        A ``dict`` keyed by material id string; materials with no aliases are
-        absent. Empty ``dict`` on error.
+    Materials with no aliases are absent from the mapping.
     """
-    try:
-        async with get_db_session(env, verbose) as session:
-            aliases = await MaterialAlias.get_all(session)
-            return dict(Counter(str(alias.material_id) for alias in aliases))
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to count material aliases: {exc}")
-        return {}
+    async with get_db_session(env, verbose) as session:
+        aliases = await MaterialAlias.get_all(session)
+        return dict(Counter(str(alias.material_id) for alias in aliases))
 
 
+@db_operation(default=[], error="Failed to list material aliases")
 async def list_material_aliases(
     material_id: UUID,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> list[str]:
-    """Return the aliases of a single material, sorted case-insensitively.
-
-    Args:
-        material_id: UUID of the material whose aliases to list.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The alias strings in case-insensitive order; empty on error or when the
-        material has none.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            aliases = await MaterialAlias.get_where(
-                session, MaterialAlias.material_id == str(material_id)
-            )
-            return sorted((alias.alias for alias in aliases), key=str.casefold)
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to list material aliases: {exc}")
-        return []
+    """Return the aliases of a single material, sorted case-insensitively."""
+    async with get_db_session(env, verbose) as session:
+        aliases = await MaterialAlias.get_where(
+            session, MaterialAlias.material_id == str(material_id)
+        )
+        return sorted((alias.alias for alias in aliases), key=str.casefold)
 
 
 async def update_material(
@@ -244,33 +172,13 @@ async def update_material(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Material | None:
-    """Update fields on an existing material.
-
-    Args:
-        material_id: UUID of the material to update.
-        data: Validated :class:`~..schema.update.MaterialUpdate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The updated :class:`~..model.tables.Material`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Material.get_where(session, Material.id == str(material_id))
-            if not results:
-                print_error(f"Material '{material_id}' not found.")
-                return None
-            material = results[0]
-            updates = data.model_dump(exclude_none=True)
-            if "smiles" in updates and updates["smiles"]:
-                canonical = canonicalize_smiles(updates["smiles"])
-                updates["smiles"] = canonical or updates["smiles"]
-            await material.update_fields(session, **updates)
-            return material
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to update material: {exc}")
-        return None
+    """Update fields on an existing material; ``None`` on not-found or error."""
+    updates = data.model_dump(exclude_none=True)
+    if updates.get("smiles"):
+        updates["smiles"] = canonicalize_smiles(updates["smiles"]) or updates["smiles"]
+    return await generic_update(
+        Material, material_id, "material", updates, env=env, verbose=verbose
+    )
 
 
 async def delete_material(
@@ -278,27 +186,8 @@ async def delete_material(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> bool:
-    """Delete a material by UUID.
-
-    Args:
-        material_id: UUID of the material to delete.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        ``True`` if deleted; ``False`` if not found or on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Material.get_where(session, Material.id == str(material_id))
-            if not results:
-                return False
-            await session.delete(results[0])
-            await session.commit()
-            return True
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to delete material: {exc}")
-        return False
+    """Delete a material by UUID; ``False`` if not found or on error."""
+    return await generic_delete_by_id(Material, material_id, "material", env, verbose)
 
 
 async def add_material_alias(
@@ -306,26 +195,9 @@ async def add_material_alias(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> MaterialAlias | None:
-    """Add an alias to an existing material.
-
-    Args:
-        data: Validated :class:`~..schema.create.MaterialAliasCreate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The created :class:`~..model.tables.MaterialAlias`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            alias = MaterialAlias(material_id=str(data.material_id), alias=data.alias)
-            session.add(alias)
-            await session.commit()
-            await session.refresh(alias)
-            return alias
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to add material alias: {exc}")
-        return None
+    """Add an alias to an existing material; ``None`` on error."""
+    alias = MaterialAlias(material_id=str(data.material_id), alias=data.alias)
+    return await generic_create(alias, "material alias", env, verbose)
 
 
 async def bulk_import_materials(
@@ -396,6 +268,7 @@ async def bulk_import_materials(
     return counts
 
 
+@db_operation(default=[], error="Failed to gather existing display names")
 async def existing_display_names(
     exclude_id: UUID | None = None,
     env: Environment = Environment.DEV,
@@ -414,21 +287,17 @@ async def existing_display_names(
     Returns:
         The names, display names, and aliases in use; empty on error.
     """
-    try:
-        async with get_db_session(env, verbose) as session:
-            materials = await Material.get_all(session)
-            aliases = await MaterialAlias.get_all(session)
-        names: list[str] = []
-        for material in materials:
-            if exclude_id is not None and str(material.id) == str(exclude_id):
-                continue
-            names.append(material.name)
-            names.append(material.display_name)
-        names.extend(alias.alias for alias in aliases)
-        return names
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to gather existing display names: {exc}")
-        return []
+    async with get_db_session(env, verbose) as session:
+        materials = await Material.get_all(session)
+        aliases = await MaterialAlias.get_all(session)
+    names: list[str] = []
+    for material in materials:
+        if exclude_id is not None and str(material.id) == str(exclude_id):
+            continue
+        names.append(material.name)
+        names.append(material.display_name)
+    names.extend(alias.alias for alias in aliases)
+    return names
 
 
 async def display_name_is_unambiguous(

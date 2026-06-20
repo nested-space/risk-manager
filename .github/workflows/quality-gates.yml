@@ -1,0 +1,64 @@
+name: Quality gates
+
+# Runs the mandatory quality gates from AGENTS.md §6 on every push to main and
+# every pull request, so the 10/10 state no longer depends on each contributor
+# remembering to run all six commands by hand.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the supported floor (requires-python >=3.10); 3.12 matches the
+        # development environment.
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package and dev tools
+        run: |
+          python -m pip install --upgrade pip
+          # dmta-cli is a required dependency that is not published to PyPI; install
+          # the wheel vendored in lib/ first so the editable install below resolves it.
+          python -m pip install lib/*.whl
+          python -m pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: python -m ruff check src/ tests/
+
+      - name: Ruff format
+        run: python -m ruff format --check src/ tests/
+
+      - name: Mypy
+        run: python -m mypy src/riskmanager_cli/
+
+      - name: Pylint (must score 10.00)
+        run: python -m pylint src/riskmanager_cli/ --fail-under=10
+
+      - name: Pytest
+        run: python -m pytest tests/ -x
+
+      - name: Engine seam (repl_engine imports no application code)
+        run: |
+          if grep -rnE 'from \.\.(repl|operations|model|schema|service|config)[. ]' \
+              src/riskmanager_cli/repl_engine/; then
+            echo "::error::Engine seam violation: repl_engine must not import application layers"
+            exit 1
+          fi
+          echo "Engine seam clean."

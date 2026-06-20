@@ -2,7 +2,9 @@
 NCRM library CRUD and search operations.
 
 All functions are ``async def`` and open their own database sessions. On error,
-they log via ``print_error`` and return ``None`` / ``[]`` / ``False``.
+they log via ``print_error`` and return ``None`` / ``[]`` / ``False``. The
+common CRUD shapes delegate to the ``generic_*`` helpers in
+:mod:`.base_operations`; only NCRM-specific logic lives here.
 """
 
 from collections import Counter
@@ -13,16 +15,25 @@ from ..database.db_session import get_db_session
 from ..model.tables import NcrmLibrary, NcrmLibraryAlias
 from ..schema.create import NcrmLibraryAliasCreate, NcrmLibraryCreate
 from ..schema.update import NcrmLibraryUpdate
-from ..utils.console_formatting import print_error, print_success
+from ..utils.console_formatting import print_error
+from .base_operations import (
+    db_operation,
+    generic_create,
+    generic_delete_by_id,
+    generic_get_by_id,
+    generic_list,
+    generic_update,
+)
 from .smiles_operations import canonicalize_smiles, is_valid_smiles
 
 
+@db_operation(default=None, error="Failed to create NCRM entry")
 async def create_ncrm_library_entry(
     data: NcrmLibraryCreate,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> NcrmLibrary | None:
-    """Create a new NCRM library entry.
+    """Create a new NCRM library entry, validating/canonicalizing any SMILES.
 
     Args:
         data: Validated :class:`~..schema.create.NcrmLibraryCreate` payload.
@@ -32,29 +43,23 @@ async def create_ncrm_library_entry(
     Returns:
         The created :class:`~..model.tables.NcrmLibrary`; ``None`` on error.
     """
-    try:
-        smiles: str | None = None
-        if data.smiles:
-            if not is_valid_smiles(data.smiles):
-                print_error(f"Invalid SMILES for NCRM '{data.name}': {data.smiles}")
-                return None
-            smiles = canonicalize_smiles(data.smiles) or data.smiles
+    smiles: str | None = None
+    if data.smiles:
+        if not is_valid_smiles(data.smiles):
+            print_error(f"Invalid SMILES for NCRM '{data.name}': {data.smiles}")
+            return None
+        smiles = canonicalize_smiles(data.smiles) or data.smiles
 
-        async with get_db_session(env, verbose) as session:
-            entry = NcrmLibrary(
-                display_name=data.display_name or data.name,
-                name=data.name,
-                interpret_chemically=data.interpret_chemically,
-                smiles=smiles,
-            )
-            session.add(entry)
-            await session.commit()
-            await session.refresh(entry)
-            print_success(f"Created NCRM entry '{entry.display_name}'.")
-            return entry
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to create NCRM entry: {exc}")
-        return None
+    display_name = data.display_name or data.name
+    entry = NcrmLibrary(
+        display_name=display_name,
+        name=data.name,
+        interpret_chemically=data.interpret_chemically,
+        smiles=smiles,
+    )
+    return await generic_create(
+        entry, "NCRM entry", env, verbose, success_message=f"Created NCRM entry '{display_name}'."
+    )
 
 
 async def get_ncrm_by_id(
@@ -62,119 +67,58 @@ async def get_ncrm_by_id(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> NcrmLibrary | None:
-    """Retrieve an NCRM library entry by UUID.
-
-    Args:
-        ncrm_id: UUID of the NCRM entry.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.NcrmLibrary`; ``None`` if not found.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await NcrmLibrary.get_where(session, NcrmLibrary.id == str(ncrm_id))
-            return results[0] if results else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get NCRM entry by ID: {exc}")
-        return None
+    """Retrieve an NCRM library entry by UUID; ``None`` if not found."""
+    return await generic_get_by_id(NcrmLibrary, ncrm_id, "NCRM entry", env, verbose)
 
 
+@db_operation(default=None, error="Failed to get NCRM entry by display name")
 async def get_ncrm_by_display_name(
     display_name: str,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> NcrmLibrary | None:
-    """Retrieve an NCRM library entry by its display name.
-
-    Args:
-        display_name: Exact display name string.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.NcrmLibrary`; ``None`` if not found.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await NcrmLibrary.get_where(session, NcrmLibrary.display_name == display_name)
-            return results[0] if results else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get NCRM entry by display name: {exc}")
-        return None
+    """Retrieve an NCRM library entry by its display name; ``None`` if not found."""
+    async with get_db_session(env, verbose) as session:
+        results = await NcrmLibrary.get_where(session, NcrmLibrary.display_name == display_name)
+        return results[0] if results else None
 
 
 async def list_ncrm_library(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> list[NcrmLibrary]:
-    """Return all NCRM library entries ordered by display name.
-
-    Args:
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        List of :class:`~..model.tables.NcrmLibrary` instances.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await NcrmLibrary.get_all(session)
-            return sorted(results, key=lambda n: n.display_name)
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to list NCRM library: {exc}")
-        return []
+    """Return all NCRM library entries ordered by display name."""
+    return await generic_list(
+        NcrmLibrary, "NCRM library", env, verbose, sort_key=lambda n: n.display_name
+    )
 
 
+@db_operation(default={}, error="Failed to count NCRM aliases")
 async def ncrm_alias_counts(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> dict[str, int]:
     """Return a mapping of NCRM library entry id to its alias count.
 
-    Args:
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        A ``dict`` keyed by NCRM entry id string; entries with no aliases are
-        absent. Empty ``dict`` on error.
+    Entries with no aliases are absent from the mapping.
     """
-    try:
-        async with get_db_session(env, verbose) as session:
-            aliases = await NcrmLibraryAlias.get_all(session)
-            return dict(Counter(str(alias.ncrm_library_id) for alias in aliases))
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to count NCRM aliases: {exc}")
-        return {}
+    async with get_db_session(env, verbose) as session:
+        aliases = await NcrmLibraryAlias.get_all(session)
+        return dict(Counter(str(alias.ncrm_library_id) for alias in aliases))
 
 
+@db_operation(default=[], error="Failed to list NCRM aliases")
 async def list_ncrm_aliases(
     ncrm_library_id: UUID,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> list[str]:
-    """Return the aliases of a single NCRM library entry, sorted case-insensitively.
-
-    Args:
-        ncrm_library_id: UUID of the NCRM entry whose aliases to list.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The alias strings in case-insensitive order; empty on error or when the
-        entry has none.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            aliases = await NcrmLibraryAlias.get_where(
-                session, NcrmLibraryAlias.ncrm_library_id == str(ncrm_library_id)
-            )
-            return sorted((alias.alias for alias in aliases), key=str.casefold)
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to list NCRM aliases: {exc}")
-        return []
+    """Return the aliases of a single NCRM library entry, sorted case-insensitively."""
+    async with get_db_session(env, verbose) as session:
+        aliases = await NcrmLibraryAlias.get_where(
+            session, NcrmLibraryAlias.ncrm_library_id == str(ncrm_library_id)
+        )
+        return sorted((alias.alias for alias in aliases), key=str.casefold)
 
 
 async def update_ncrm_library_entry(
@@ -183,33 +127,19 @@ async def update_ncrm_library_entry(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> NcrmLibrary | None:
-    """Update fields on an existing NCRM library entry.
-
-    Args:
-        ncrm_id: UUID of the NCRM entry to update.
-        data: Validated :class:`~..schema.update.NcrmLibraryUpdate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The updated :class:`~..model.tables.NcrmLibrary`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await NcrmLibrary.get_where(session, NcrmLibrary.id == str(ncrm_id))
-            if not results:
-                print_error(f"NCRM entry '{ncrm_id}' not found.")
-                return None
-            entry = results[0]
-            updates = data.model_dump(exclude_none=True)
-            if "smiles" in updates and updates["smiles"]:
-                canonical = canonicalize_smiles(updates["smiles"])
-                updates["smiles"] = canonical or updates["smiles"]
-            await entry.update_fields(session, **updates)
-            return entry
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to update NCRM entry: {exc}")
-        return None
+    """Update fields on an existing NCRM library entry; ``None`` on not-found or error."""
+    updates = data.model_dump(exclude_none=True)
+    if updates.get("smiles"):
+        updates["smiles"] = canonicalize_smiles(updates["smiles"]) or updates["smiles"]
+    return await generic_update(
+        NcrmLibrary,
+        ncrm_id,
+        "NCRM entry",
+        updates,
+        env=env,
+        verbose=verbose,
+        not_found_label="NCRM entry",
+    )
 
 
 async def delete_ncrm_library_entry(
@@ -217,27 +147,8 @@ async def delete_ncrm_library_entry(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> bool:
-    """Delete an NCRM library entry by UUID.
-
-    Args:
-        ncrm_id: UUID of the NCRM entry to delete.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        ``True`` if deleted; ``False`` if not found or on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await NcrmLibrary.get_where(session, NcrmLibrary.id == str(ncrm_id))
-            if not results:
-                return False
-            await session.delete(results[0])
-            await session.commit()
-            return True
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to delete NCRM entry: {exc}")
-        return False
+    """Delete an NCRM library entry by UUID; ``False`` if not found or on error."""
+    return await generic_delete_by_id(NcrmLibrary, ncrm_id, "NCRM entry", env, verbose)
 
 
 async def add_ncrm_alias(
@@ -245,23 +156,6 @@ async def add_ncrm_alias(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> NcrmLibraryAlias | None:
-    """Add an alias to an existing NCRM library entry.
-
-    Args:
-        data: Validated :class:`~..schema.create.NcrmLibraryAliasCreate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The created :class:`~..model.tables.NcrmLibraryAlias`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            alias = NcrmLibraryAlias(ncrm_library_id=str(data.ncrm_library_id), alias=data.alias)
-            session.add(alias)
-            await session.commit()
-            await session.refresh(alias)
-            return alias
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to add NCRM alias: {exc}")
-        return None
+    """Add an alias to an existing NCRM library entry; ``None`` on error."""
+    alias = NcrmLibraryAlias(ncrm_library_id=str(data.ncrm_library_id), alias=data.alias)
+    return await generic_create(alias, "NCRM alias", env, verbose)

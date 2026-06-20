@@ -3,7 +3,9 @@ Counterion CRUD and search operations.
 
 All functions are ``async def`` and open their own database sessions via
 :func:`~..database.db_session.get_db_session`. On error, they log via
-``print_error`` and return ``None`` / ``[]`` / ``False``.
+``print_error`` and return ``None`` / ``[]`` / ``False``. The common CRUD
+shapes delegate to the ``generic_*`` helpers in :mod:`.base_operations`; only
+counterion-specific logic (SMILES validation, alias aggregation) lives here.
 """
 
 from collections import Counter
@@ -14,18 +16,25 @@ from ..database.db_session import get_db_session
 from ..model.tables import Counterion, CounterionAlias
 from ..schema.create import CounterionAliasCreate, CounterionCreate
 from ..schema.update import CounterionUpdate
-from ..utils.console_formatting import print_error, print_success
+from ..utils.console_formatting import print_error
+from .base_operations import (
+    db_operation,
+    generic_create,
+    generic_delete_by_id,
+    generic_get_by_id,
+    generic_list,
+    generic_update,
+)
 from .smiles_operations import canonicalize_smiles, is_valid_smiles
 
 
+@db_operation(default=None, error="Failed to create counterion")
 async def create_counterion(
     data: CounterionCreate,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Counterion | None:
-    """Create a new counterion record.
-
-    Validates and canonicalizes the SMILES if provided.
+    """Create a new counterion record, validating/canonicalizing any SMILES.
 
     Args:
         data: Validated :class:`~..schema.create.CounterionCreate` payload.
@@ -35,29 +44,22 @@ async def create_counterion(
     Returns:
         The created :class:`~..model.tables.Counterion`; ``None`` on error.
     """
-    try:
-        smiles: str | None = None
-        if data.smiles:
-            if not is_valid_smiles(data.smiles):
-                print_error(f"Invalid SMILES for counterion '{data.name}': {data.smiles}")
-                return None
-            smiles = canonicalize_smiles(data.smiles) or data.smiles
+    smiles: str | None = None
+    if data.smiles:
+        if not is_valid_smiles(data.smiles):
+            print_error(f"Invalid SMILES for counterion '{data.name}': {data.smiles}")
+            return None
+        smiles = canonicalize_smiles(data.smiles) or data.smiles
 
-        async with get_db_session(env, verbose) as session:
-            counterion = Counterion(
-                name=data.name,
-                display_name=data.display_name or data.name,
-                interpret_chemically=data.interpret_chemically,
-                smiles=smiles,
-            )
-            session.add(counterion)
-            await session.commit()
-            await session.refresh(counterion)
-            print_success(f"Created counterion '{counterion.name}'.")
-            return counterion
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to create counterion: {exc}")
-        return None
+    counterion = Counterion(
+        name=data.name,
+        display_name=data.display_name or data.name,
+        interpret_chemically=data.interpret_chemically,
+        smiles=smiles,
+    )
+    return await generic_create(
+        counterion, "counterion", env, verbose, success_message=f"Created counterion '{data.name}'."
+    )
 
 
 async def get_counterion_by_id(
@@ -65,119 +67,56 @@ async def get_counterion_by_id(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Counterion | None:
-    """Retrieve a counterion by UUID.
-
-    Args:
-        counterion_id: UUID of the counterion.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.Counterion`; ``None`` if not found.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Counterion.get_where(session, Counterion.id == str(counterion_id))
-            return results[0] if results else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get counterion by ID: {exc}")
-        return None
+    """Retrieve a counterion by UUID; ``None`` if not found."""
+    return await generic_get_by_id(Counterion, counterion_id, "counterion", env, verbose)
 
 
+@db_operation(default=None, error="Failed to get counterion by name")
 async def get_counterion_by_name(
     name: str,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Counterion | None:
-    """Retrieve a counterion by exact name.
-
-    Args:
-        name: Exact counterion name.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The :class:`~..model.tables.Counterion`; ``None`` if not found.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Counterion.get_where(session, Counterion.name == name)
-            return results[0] if results else None
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to get counterion by name: {exc}")
-        return None
+    """Retrieve a counterion by exact name; ``None`` if not found."""
+    async with get_db_session(env, verbose) as session:
+        results = await Counterion.get_where(session, Counterion.name == name)
+        return results[0] if results else None
 
 
 async def list_counterions(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> list[Counterion]:
-    """Return all counterions ordered by name.
-
-    Args:
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        List of :class:`~..model.tables.Counterion` instances.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Counterion.get_all(session)
-            return sorted(results, key=lambda c: c.name)
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to list counterions: {exc}")
-        return []
+    """Return all counterions ordered by name."""
+    return await generic_list(Counterion, "counterions", env, verbose, sort_key=lambda c: c.name)
 
 
+@db_operation(default={}, error="Failed to count counterion aliases")
 async def counterion_alias_counts(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> dict[str, int]:
     """Return a mapping of counterion id to its alias count.
 
-    Args:
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        A ``dict`` keyed by counterion id string; counterions with no aliases
-        are absent. Empty ``dict`` on error.
+    Counterions with no aliases are absent from the mapping.
     """
-    try:
-        async with get_db_session(env, verbose) as session:
-            aliases = await CounterionAlias.get_all(session)
-            return dict(Counter(str(alias.counterion_id) for alias in aliases))
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to count counterion aliases: {exc}")
-        return {}
+    async with get_db_session(env, verbose) as session:
+        aliases = await CounterionAlias.get_all(session)
+        return dict(Counter(str(alias.counterion_id) for alias in aliases))
 
 
+@db_operation(default=[], error="Failed to list counterion aliases")
 async def list_counterion_aliases(
     counterion_id: UUID,
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> list[str]:
-    """Return the aliases of a single counterion, sorted case-insensitively.
-
-    Args:
-        counterion_id: UUID of the counterion whose aliases to list.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The alias strings in case-insensitive order; empty on error or when the
-        counterion has none.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            aliases = await CounterionAlias.get_where(
-                session, CounterionAlias.counterion_id == str(counterion_id)
-            )
-            return sorted((alias.alias for alias in aliases), key=str.casefold)
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to list counterion aliases: {exc}")
-        return []
+    """Return the aliases of a single counterion, sorted case-insensitively."""
+    async with get_db_session(env, verbose) as session:
+        aliases = await CounterionAlias.get_where(
+            session, CounterionAlias.counterion_id == str(counterion_id)
+        )
+        return sorted((alias.alias for alias in aliases), key=str.casefold)
 
 
 async def update_counterion(
@@ -186,33 +125,13 @@ async def update_counterion(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> Counterion | None:
-    """Update fields on an existing counterion.
-
-    Args:
-        counterion_id: UUID of the counterion to update.
-        data: Validated :class:`~..schema.update.CounterionUpdate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The updated :class:`~..model.tables.Counterion`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Counterion.get_where(session, Counterion.id == str(counterion_id))
-            if not results:
-                print_error(f"Counterion '{counterion_id}' not found.")
-                return None
-            counterion = results[0]
-            updates = data.model_dump(exclude_none=True)
-            if "smiles" in updates and updates["smiles"]:
-                canonical = canonicalize_smiles(updates["smiles"])
-                updates["smiles"] = canonical or updates["smiles"]
-            await counterion.update_fields(session, **updates)
-            return counterion
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to update counterion: {exc}")
-        return None
+    """Update fields on an existing counterion; ``None`` on not-found or error."""
+    updates = data.model_dump(exclude_none=True)
+    if updates.get("smiles"):
+        updates["smiles"] = canonicalize_smiles(updates["smiles"]) or updates["smiles"]
+    return await generic_update(
+        Counterion, counterion_id, "counterion", updates, env=env, verbose=verbose
+    )
 
 
 async def delete_counterion(
@@ -220,27 +139,8 @@ async def delete_counterion(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> bool:
-    """Delete a counterion by UUID.
-
-    Args:
-        counterion_id: UUID of the counterion to delete.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        ``True`` if deleted; ``False`` if not found or on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            results = await Counterion.get_where(session, Counterion.id == str(counterion_id))
-            if not results:
-                return False
-            await session.delete(results[0])
-            await session.commit()
-            return True
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to delete counterion: {exc}")
-        return False
+    """Delete a counterion by UUID; ``False`` if not found or on error."""
+    return await generic_delete_by_id(Counterion, counterion_id, "counterion", env, verbose)
 
 
 async def add_counterion_alias(
@@ -248,23 +148,6 @@ async def add_counterion_alias(
     env: Environment = Environment.DEV,
     verbose: bool = False,
 ) -> CounterionAlias | None:
-    """Add an alias to an existing counterion.
-
-    Args:
-        data: Validated :class:`~..schema.create.CounterionAliasCreate` payload.
-        env: Database environment.
-        verbose: If ``True``, prints the database path.
-
-    Returns:
-        The created :class:`~..model.tables.CounterionAlias`; ``None`` on error.
-    """
-    try:
-        async with get_db_session(env, verbose) as session:
-            alias = CounterionAlias(counterion_id=str(data.counterion_id), alias=data.alias)
-            session.add(alias)
-            await session.commit()
-            await session.refresh(alias)
-            return alias
-    except Exception as exc:  # pylint: disable=broad-except
-        print_error(f"Failed to add counterion alias: {exc}")
-        return None
+    """Add an alias to an existing counterion; ``None`` on error."""
+    alias = CounterionAlias(counterion_id=str(data.counterion_id), alias=data.alias)
+    return await generic_create(alias, "counterion alias", env, verbose)

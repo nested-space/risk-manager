@@ -723,12 +723,19 @@ export RMGR_SESSION_PATH="$HOME/.rmgr/session.json"
 ~/.venvs/riskmanager/bin/python -m ruff format --check src/ tests/ && \
 ~/.venvs/riskmanager/bin/python -m mypy src/riskmanager_cli/ && \
 ~/.venvs/riskmanager/bin/python -m pylint src/riskmanager_cli/ && \
-~/.venvs/riskmanager/bin/python -m pytest tests/ -x
+~/.venvs/riskmanager/bin/python -m pytest tests/ -x && \
+! grep -rnE 'from \.\.(repl|operations|model|schema|service|config)[. ]' src/riskmanager_cli/repl_engine/
 ```
+
+These gates also run in CI on every push to `main` and every pull request
+(`.github/workflows/quality-gates.yml`, Python 3.10 and 3.12), including the
+engine-seam check. CI is a backstop — run the gates locally before pushing.
 
 Error suppression policy:
 - **Global suppression is forbidden** — no file-level `# pylint: disable` or `mypy ignore_errors`
 - **Inline suppression** only when refactoring is genuinely impossible, with a justification comment
+- **`R0801` (duplicate-code)** is enabled with a raised `min-similarity-lines`
+  threshold (it cannot be suppressed inline), not globally disabled
 
 ### Running Tests
 
