@@ -6,11 +6,12 @@ from collections.abc import Callable
 from uuid import UUID
 
 from ...config.settings import Environment
+from ...model.severity import format_level
 from ...model.tables import ManufacturingProcess
-from ...operations.manufacturing_process_risk_operations import list_risks_for_process
 from ...operations.visualization_operations import (
+    AggregatedRouteRisk,
+    get_aggregated_route_risks,
     get_graph_inputs,
-    get_route_risk_summary,
     get_unconnected_component_names,
 )
 from ...repl_engine.layout import Column, render_box, render_table, section_rule, section_width
@@ -20,13 +21,25 @@ from ...utils.component_graph_layout import (
     StageInput,
     split_for_width,
 )
-from ...utils.manufacturing_layout_engine import RiskDict, render_risk_summary
 
 # Box chrome consumed before the graph: two reserved screen margins, two box
 # borders, and ``2 * _PAD_X`` interior padding columns.
 _PAD_X = 2
 _PAD_Y = 2
 _RESERVED = 2
+
+# Aggregated-risk table columns. ``Title`` is pinned (no priority); the rest drop
+# from least to most important as the terminal narrows, keeping source, title,
+# and level legible longest.
+_RISK_COLUMNS = [
+    Column("Component/Stage", priority=4),
+    Column("Entity name", priority=5),
+    Column("Type", priority=1),
+    Column("Level", align="center", priority=3),
+    Column("Title"),
+    Column("Mitigation", priority=0),
+    Column("Mitigated level", align="center", priority=2),
+]
 
 
 def _identity(text: str) -> str:
@@ -67,8 +80,6 @@ async def render_route_screen(
 
     rule_width = section_width(width)
     process_title = f"Route {process.route_number} Process {process.process_number}"
-    # ``render_risk_summary`` already indents its rows into the body gutter.
-    risk_body = render_risk_summary(await _risk_dashboard(process, env), include_header=False)
     return [
         section_rule(process_title, rule_width),
         "",
@@ -77,26 +88,34 @@ async def render_route_screen(
         "",
         section_rule("Risks", rule_width),
         "",
-        *risk_body,
+        *await _risk_table(process, env, box_width),
     ]
 
 
-async def _risk_dashboard(process: ManufacturingProcess, env: Environment) -> list[RiskDict]:
-    """Collect stage and process risks into the dashboard's input rows."""
-    stage_risks = await get_route_risk_summary(UUID(str(process.id)), env)
-    process_risks = await list_risks_for_process(UUID(str(process.id)), env)
-    dashboard_input: list[RiskDict] = [dict(stage_risk) for stage_risk in stage_risks]
-    for process_risk in process_risks:
-        dashboard_input.append(
-            {
-                "name": process_risk.name,
-                "risk_type": process_risk.risk_type,
-                "current_level": process_risk.current_level,
-                "mitigated_level": process_risk.mitigated_level,
-                "component_name": "Process",
-            }
-        )
-    return dashboard_input
+async def _risk_table(process: ManufacturingProcess, env: Environment, max_width: int) -> list[str]:
+    """Render every route risk (stage, component, process) as one table.
+
+    Falls back to a ``(no risks recorded)`` placeholder when the route has no
+    risks, so the section never renders an empty table frame.
+    """
+    risks = await get_aggregated_route_risks(UUID(str(process.id)), env)
+    if not risks:
+        return ["  (no risks recorded)"]
+    rows = [_risk_row(risk) for risk in risks]
+    return render_table(_RISK_COLUMNS, rows, max_width=max_width)
+
+
+def _risk_row(risk: AggregatedRouteRisk) -> list[str]:
+    """Map an aggregated risk to a cell list matching ``_RISK_COLUMNS``."""
+    return [
+        risk.source,
+        risk.entity_name,
+        risk.risk_type,
+        format_level(risk.current_level),
+        risk.name,
+        risk.proposed_mitigation or "",
+        format_level(risk.mitigated_level),
+    ]
 
 
 async def _diagram_lines(

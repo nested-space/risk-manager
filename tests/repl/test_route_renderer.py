@@ -17,18 +17,24 @@ from riskmanager_cli.operations.component_operations import create_component
 from riskmanager_cli.operations.manufacturing_process_operations import (
     create_manufacturing_process,
 )
+from riskmanager_cli.operations.manufacturing_process_risk_operations import (
+    create_manufacturing_process_risk,
+)
 from riskmanager_cli.operations.material_operations import create_material
 from riskmanager_cli.operations.project_operations import create_project
 from riskmanager_cli.operations.stage_component_operations import create_stage_component
 from riskmanager_cli.operations.stage_operations import create_stage
+from riskmanager_cli.operations.stage_risk_operations import create_stage_risk
 from riskmanager_cli.repl.renderers.route_renderer import render_route_screen
 from riskmanager_cli.schema.create import (
     ComponentCreate,
     ManufacturingProcessCreate,
+    ManufacturingProcessRiskCreate,
     MaterialCreate,
     ProjectCreate,
     StageComponentCreate,
     StageCreate,
+    StageRiskCreate,
 )
 
 
@@ -112,6 +118,43 @@ async def test_render_route_screen_shows_stage_table_when_graph_incomplete(
     assert "#" in header and "Name" in header and "Products" in header
     # The reactant material appears; with no product the Products cell is "—".
     assert any("Reaction" in line and "Toluene" in line and "—" in line for line in lines)
+
+
+@pytest.mark.integration
+async def test_render_route_screen_renders_aggregated_risk_table(
+    temp_env: Environment,
+) -> None:
+    """Stage and process risks render as a table under the Risks rule."""
+    process = await _seed_process(temp_env)
+    process_id = UUID(str(process.id))
+    stage = await create_stage(
+        StageCreate(process_id=process_id, name="Reaction", number=1), env=temp_env
+    )
+    assert stage is not None
+    await create_stage_risk(
+        StageRiskCreate(
+            stage_id=UUID(str(stage.id)), risk_type="Safety", name="Exotherm", current_level=3
+        ),
+        env=temp_env,
+    )
+    await create_manufacturing_process_risk(
+        ManufacturingProcessRiskCreate(
+            manufacturing_process_id=process_id,
+            risk_type="Supply",
+            name="Single source",
+            current_level=5,
+        ),
+        env=temp_env,
+    )
+
+    lines = await render_route_screen(process, temp_env, width=120)
+
+    header = next(line for line in lines if "Component/Stage" in line)
+    for column in ("Entity name", "Type", "Level", "Title", "Mitigation", "Mitigated level"):
+        assert column in header
+    assert any("Stage" in line and "Reaction" in line and "Exotherm" in line for line in lines)
+    assert any("Process" in line and "Single source" in line for line in lines)
+    assert not any("(no risks recorded)" in line for line in lines)
 
 
 @pytest.mark.integration

@@ -15,8 +15,12 @@ from riskmanager_cli.operations.component_operations import (
     create_component,
     list_components_for_process,
 )
+from riskmanager_cli.operations.component_risks_operations import create_component_risk
 from riskmanager_cli.operations.manufacturing_process_operations import (
     create_manufacturing_process,
+)
+from riskmanager_cli.operations.manufacturing_process_risk_operations import (
+    create_manufacturing_process_risk,
 )
 from riskmanager_cli.operations.material_operations import create_material
 from riskmanager_cli.operations.project_operations import create_project
@@ -25,17 +29,22 @@ from riskmanager_cli.operations.stage_component_operations import (
     list_stage_components,
 )
 from riskmanager_cli.operations.stage_operations import create_stage, list_stages_for_process
+from riskmanager_cli.operations.stage_risk_operations import create_stage_risk
 from riskmanager_cli.operations.visualization_operations import (
+    get_aggregated_route_risks,
     get_graph_inputs,
     get_unconnected_component_names,
 )
 from riskmanager_cli.schema.create import (
     ComponentCreate,
+    ComponentRiskCreate,
     ManufacturingProcessCreate,
+    ManufacturingProcessRiskCreate,
     MaterialCreate,
     ProjectCreate,
     StageComponentCreate,
     StageCreate,
+    StageRiskCreate,
 )
 from riskmanager_cli.utils.component_graph_layout import render_component_graph
 
@@ -171,3 +180,61 @@ async def test_unconnected_components_empty_when_all_assigned(
     """When every component is assigned to a stage, there are no orphans."""
     process_id, _comp_b = await _build_linear_process(temp_env)
     assert await get_unconnected_component_names(UUID(process_id), env=temp_env) == []
+
+
+@pytest.mark.integration
+async def test_aggregated_route_risks_collects_stage_component_and_process(
+    temp_env: Environment,
+) -> None:
+    """Risks from a stage, a component, and the process are all aggregated."""
+    process_id, comp_b = await _build_linear_process(temp_env)
+    stage = (await list_stages_for_process(UUID(process_id), env=temp_env))[0]
+
+    await create_stage_risk(
+        StageRiskCreate(
+            stage_id=UUID(str(stage.id)), risk_type="Safety", name="Exotherm", current_level=3
+        ),
+        env=temp_env,
+    )
+    await create_component_risk(
+        ComponentRiskCreate(
+            component_id=UUID(comp_b),
+            risk_type="Quality",
+            name="Impurity",
+            current_level=2,
+            proposed_mitigation="Recrystallise",
+            mitigated_level=1,
+        ),
+        env=temp_env,
+    )
+    await create_manufacturing_process_risk(
+        ManufacturingProcessRiskCreate(
+            manufacturing_process_id=UUID(process_id),
+            risk_type="Supply",
+            name="Single source",
+            current_level=5,
+        ),
+        env=temp_env,
+    )
+
+    risks = await get_aggregated_route_risks(UUID(process_id), env=temp_env)
+
+    by_name = {risk.name: risk for risk in risks}
+    assert by_name["Exotherm"].source == "Stage"
+    assert by_name["Exotherm"].entity_name == stage.name
+    assert by_name["Impurity"].source == "Component"
+    assert by_name["Impurity"].entity_name == "B"
+    assert by_name["Impurity"].proposed_mitigation == "Recrystallise"
+    assert by_name["Single source"].source == "Process"
+    assert by_name["Single source"].entity_name == "—"
+    # Highest current_level first.
+    assert [risk.name for risk in risks] == ["Single source", "Exotherm", "Impurity"]
+
+
+@pytest.mark.integration
+async def test_aggregated_route_risks_empty_when_none_recorded(
+    temp_env: Environment,
+) -> None:
+    """A process with no risks anywhere yields an empty list."""
+    process_id, _comp_b = await _build_linear_process(temp_env)
+    assert await get_aggregated_route_risks(UUID(process_id), env=temp_env) == []

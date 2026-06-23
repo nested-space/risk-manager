@@ -24,10 +24,9 @@ Three invariants are enforced by construction:
 3. **Centered component names.** Each component column is as wide as its widest
    label, and names are centered within it.
 
-Unlike :mod:`.manufacturing_layout_engine` (which lays stages out as a flat
-left-to-right strip of boxes), this engine understands that one component can be
-the product of one stage *and* a reactant of the next, so the process forms a
-graph that converges on a single final product.
+Unlike a flat left-to-right strip of stage boxes, this engine understands that
+one component can be the product of one stage *and* a reactant of the next, so
+the process forms a graph that converges on a single final product.
 
 Robustness:
     Processes are built incrementally, so the graph is frequently incomplete or

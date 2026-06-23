@@ -11,18 +11,47 @@ Why this exists:
     ``StageInput``/``ComponentInput`` structures the layout engines consume.
 """
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from ..config.settings import Environment
+from ..model.tables import ComponentRisk, ManufacturingProcessRisk, StageRisk
 from ..utils.component_graph_layout import (
     ComponentInput,
     StageComponentInput,
     StageInput,
 )
 from .component_operations import component_display_name, list_components_for_process
+from .component_risks_operations import list_risks_for_component
+from .manufacturing_process_risk_operations import list_risks_for_process
 from .stage_component_operations import list_stage_components
 from .stage_operations import list_stages_for_process
 from .stage_risk_operations import list_risks_for_stage
+
+
+@dataclass
+class AggregatedRouteRisk:
+    """One risk gathered from anywhere in a route, tagged with its source.
+
+    Attributes:
+        source: Where the risk lives — ``"Stage"``, ``"Component"``, or
+            ``"Process"``.
+        entity_name: The owning stage or component's display name; ``"—"`` for
+            process-level risks, which have no sub-entity.
+        risk_type: The risk category (e.g. ``"Safety"``).
+        current_level: Unmitigated severity (1-5), or ``None``.
+        name: The risk title.
+        proposed_mitigation: Planned mitigation, or ``None``.
+        mitigated_level: Projected severity after mitigation (1-5), or ``None``.
+    """
+
+    source: str
+    entity_name: str
+    risk_type: str
+    current_level: int | None
+    name: str
+    proposed_mitigation: str | None
+    mitigated_level: int | None
 
 
 async def get_graph_inputs(
@@ -117,15 +146,16 @@ async def get_unconnected_component_names(
     return names
 
 
-async def get_route_risk_summary(
+async def get_aggregated_route_risks(
     process_id: UUID,
     env: Environment = Environment.DEV,
     verbose: bool = False,
-) -> list[dict[str, str | int | None]]:
-    """Collect all stage risks for a process and annotate with stage names.
+) -> list[AggregatedRouteRisk]:
+    """Collect every risk in a route — stage, component, and process-level.
 
-    Fetches each stage in the process, then fetches risks for each stage,
-    injecting the ``stage_name`` key so the risk dashboard can display context.
+    Walks the process's stages and components, fanning out to each one's risks,
+    then appends the process-level risks. Each row is tagged with its ``source``
+    and owning ``entity_name`` so the route view can present a single table.
 
     Args:
         process_id: UUID of the manufacturing process.
@@ -133,20 +163,37 @@ async def get_route_risk_summary(
         verbose: If ``True``, prints the database path.
 
     Returns:
-        A list of risk dicts with an additional ``"stage_name"`` key.
+        All route risks, sorted by ``current_level`` descending.
     """
-    stages = await list_stages_for_process(process_id, env, verbose)
-    all_risks: list[dict[str, str | int | None]] = []
-    for stage in stages:
-        risks = await list_risks_for_stage(UUID(str(stage.id)), env, verbose)
-        for risk in risks:
-            all_risks.append(
-                {
-                    "name": risk.name,
-                    "risk_type": risk.risk_type,
-                    "current_level": risk.current_level,
-                    "mitigated_level": risk.mitigated_level,
-                    "stage_name": stage.name,
-                }
-            )
-    return sorted(all_risks, key=lambda r: r.get("current_level") or 0, reverse=True)
+    risks: list[AggregatedRouteRisk] = []
+
+    for stage in await list_stages_for_process(process_id, env, verbose):
+        for stage_risk in await list_risks_for_stage(UUID(str(stage.id)), env, verbose):
+            risks.append(_aggregate(stage_risk, "Stage", stage.name))
+
+    for component in await list_components_for_process(process_id, env, verbose):
+        entity_name = await component_display_name(component, env, verbose)
+        for component_risk in await list_risks_for_component(UUID(str(component.id)), env, verbose):
+            risks.append(_aggregate(component_risk, "Component", entity_name))
+
+    for process_risk in await list_risks_for_process(process_id, env, verbose):
+        risks.append(_aggregate(process_risk, "Process", "—"))
+
+    return sorted(risks, key=lambda r: r.current_level or 0, reverse=True)
+
+
+def _aggregate(
+    risk: StageRisk | ComponentRisk | ManufacturingProcessRisk,
+    source: str,
+    entity_name: str,
+) -> AggregatedRouteRisk:
+    """Tag a risk record with its ``source`` and owning ``entity_name``."""
+    return AggregatedRouteRisk(
+        source=source,
+        entity_name=entity_name,
+        risk_type=risk.risk_type,
+        current_level=risk.current_level,
+        name=risk.name,
+        proposed_mitigation=risk.proposed_mitigation,
+        mitigated_level=risk.mitigated_level,
+    )
