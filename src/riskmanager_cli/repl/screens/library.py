@@ -31,7 +31,6 @@ from ...operations.material_operations import (
 )
 from ...repl_engine import ListItem, ScreenSpec
 from ...repl_engine.forms import FieldSpec, InfoSection, field_key
-from ...service.structure_viewer import StructureResult, show_structure
 from ...utils.name_simplifier import simplify_name
 from ..form_fields import BOOL_OPTIONS, CONFIRM_OPTIONS, as_bool, default_text
 from ..hotkeys import CTRL_A, CTRL_E, CTRL_F, CTRL_K, CTRL_L, CTRL_X
@@ -137,31 +136,10 @@ class _LibraryMixin(AppScreen):
         return render_library_detail(item, aliases, width=self.app.screen.width)
 
     async def _show_structure_for_item(self, item: dict[str, Any]) -> list[str]:
-        """Render *item*'s SMILES to an image and open it, returning a notice.
-
-        Maps each :class:`StructureResult` to a status notice so every failure
-        path (missing SMILES, render failure, no viewer, launch failure) is
-        reported on the input row.
-        """
+        """Render *item*'s SMILES to an image and open it, returning a notice."""
         name = str(item.get("name") or item.get("display_name") or "item")
         smiles = item.get("smiles")
-        if not smiles:
-            return await self.app.refresh_with_notice(
-                f"No SMILES available for '{name}'.", "warning"
-            )
-        match show_structure(str(smiles)):
-            case StructureResult.OK:
-                return await self.app.refresh_with_notice(f"Opened structure for '{name}'.")
-            case StructureResult.RENDER_FAILED:
-                return await self.app.refresh_with_notice(
-                    "Could not render structure (invalid SMILES).", "error"
-                )
-            case StructureResult.NO_VIEWER:
-                return await self.app.refresh_with_notice(
-                    "No image viewer found (install feh).", "error"
-                )
-            case _:
-                return await self.app.refresh_with_notice("Failed to open image viewer.", "error")
+        return await self.show_structure_notice(name, str(smiles) if smiles else None)
 
     def _library_edit_form(self, sub_mode: str, item: dict[str, Any]) -> list[str]:
         """Start the edit form for an already-resolved library *item*."""

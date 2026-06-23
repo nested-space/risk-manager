@@ -7,6 +7,8 @@ from uuid import UUID
 from ...model.enums import NcrmRole
 from ...model.tables import ManufacturingProcess, Stage
 from ...operations.component_operations import component_display_name, get_component_by_id
+from ...operations.material_operations import get_material_by_id
+from ...operations.ncrm_library_operations import get_ncrm_by_id
 from ...operations.stage_component_operations import (
     delete_stage_component,
     list_stage_components,
@@ -18,7 +20,7 @@ from ...repl_engine.forms import FieldSpec
 from .. import entity_flows, lookup, picker_items, risk_flows, risk_forms
 from ..context import ContextFrame
 from ..form_fields import enum_options
-from ..hotkeys import CTRL_A, CTRL_E, CTRL_L, CTRL_R, CTRL_U, CTRL_X
+from ..hotkeys import CTRL_A, CTRL_E, CTRL_K, CTRL_L, CTRL_R, CTRL_U, CTRL_X
 from ..renderers.stage_renderer import (
     gather_stage_sections,
     render_stage_screen,
@@ -121,6 +123,38 @@ class StageFocusScreen(FocusScreen):
                 f"Delete stage '{stage.name}'",
                 lambda: entity_flows.delete_stage_with_confirmation(self.app, stage, ["--confirm"]),
             )
+        if key_text == CTRL_K:
+            molecule = await self._selected_row_molecule(stage)
+            if molecule is None:
+                return await self.app.refresh_with_notice("No molecule selected.", "warning")
+            return await self.show_structure_notice(*molecule)
+        return None
+
+    async def _selected_row_molecule(self, stage: Stage) -> tuple[str, str | None] | None:
+        """Resolve the caret-selected row to its ``(name, smiles)``.
+
+        Component rows resolve through their material; NCRM rows through their
+        library entry. Risk rows (and an empty selection) carry no molecule and
+        return ``None``.
+        """
+        navigator = self.list_navigator
+        selected = navigator.selected if navigator is not None else None
+        if selected is None:
+            return None
+        kind, _, raw_id = selected.item_id.partition(":")
+        if kind == "component":
+            component = await get_component_by_id(UUID(raw_id), self.app.env)
+            if component is None:
+                return None
+            material = await get_material_by_id(UUID(str(component.material_id)), self.app.env)
+            return None if material is None else (material.name, material.smiles)
+        if kind == "ncrm":
+            links = await list_ncrms_for_stage(UUID(str(stage.id)), self.app.env)
+            link = next((link for link in links if str(link.id) == raw_id), None)
+            if link is None:
+                return None
+            ncrm = await get_ncrm_by_id(UUID(str(link.ncrm_id)), self.app.env)
+            return None if ncrm is None else (ncrm.display_name, ncrm.smiles)
         return None
 
     async def activate(self, item: ListItem) -> list[str]:

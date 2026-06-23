@@ -25,10 +25,14 @@ SCREEN_SPECS: dict[str, ScreenSpec] = {
         False, True, ("^A add", "^F focus", "^E edit", "^X delete", "^L list", "^R risks")
     ),
     "stage_focus": ScreenSpec(
-        True, False, ("^A add", "^L list", "^E edit", "^R risks", "^U unassign", "^X delete")
+        True,
+        False,
+        ("^A add", "^L list", "^E edit", "^R risks", "^U unassign", "^X delete", "^K structure"),
     ),
     "component_focus": ScreenSpec(
-        True, False, ("^A assign salt", "^E edit", "^U unassign", "^X delete", "^R risks")
+        True,
+        False,
+        ("^A assign salt", "^E edit", "^U unassign", "^X delete", "^R risks", "^K structure"),
     ),
     "library_home": ScreenSpec(True, False, (), tab_hint="Tab switch tabs"),
     "library_list": ScreenSpec(

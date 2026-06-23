@@ -156,7 +156,7 @@ async def test_library_ctrl_k_opens_structure(
     await create_counterion(CounterionCreate(name="acetate", smiles="CC(=O)[O-]"), env=temp_env)
     seen: list[str] = []
     monkeypatch.setattr(
-        "riskmanager_cli.repl.screens.library.show_structure",
+        "riskmanager_cli.repl.screens.base.show_structure",
         lambda smiles, **_kw: seen.append(smiles) or StructureResult.OK,
     )
     dispatcher = _library_dispatcher(temp_env)
@@ -175,7 +175,7 @@ async def test_library_detail_ctrl_k_opens_structure(
     """^K works on the detail screen, acting on the shown entry's SMILES."""
     await create_counterion(CounterionCreate(name="acetate", smiles="CC(=O)[O-]"), env=temp_env)
     monkeypatch.setattr(
-        "riskmanager_cli.repl.screens.library.show_structure",
+        "riskmanager_cli.repl.screens.base.show_structure",
         lambda _smiles, **_kw: StructureResult.OK,
     )
     dispatcher = _library_dispatcher(temp_env)

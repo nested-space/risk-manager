@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ...repl_engine import ListItem, ListNavigator, ScreenSpec
+from ...service.structure_viewer import StructureResult, show_structure
 
 if TYPE_CHECKING:
     from ..commands import CommandDispatcher
@@ -76,3 +77,36 @@ class AppScreen:
         """Filter the screen by an incremental query (re-renders by default)."""
         del query
         return await self.app.render_current()
+
+    async def show_structure_notice(self, name: str, smiles: str | None) -> list[str]:
+        """Render *smiles* to an image and open it, returning a status notice.
+
+        Shared ``^K`` behaviour for every screen that shows a molecule: maps each
+        :class:`~...service.structure_viewer.StructureResult` to a notice so every
+        path (missing SMILES, render failure, no viewer, launch failure) is
+        reported on the input row.
+
+        Args:
+            name: Human-readable label for the molecule, used in the notice.
+            smiles: The molecule's SMILES, or ``None`` when it has none.
+
+        Returns:
+            The re-rendered screen lines, with the outcome surfaced as a notice.
+        """
+        if not smiles:
+            return await self.app.refresh_with_notice(
+                f"No SMILES available for '{name}'.", "warning"
+            )
+        match show_structure(str(smiles)):
+            case StructureResult.OK:
+                return await self.app.refresh_with_notice(f"Opened structure for '{name}'.")
+            case StructureResult.RENDER_FAILED:
+                return await self.app.refresh_with_notice(
+                    "Could not render structure (invalid SMILES).", "error"
+                )
+            case StructureResult.NO_VIEWER:
+                return await self.app.refresh_with_notice(
+                    "No image viewer found (install feh).", "error"
+                )
+            case _:
+                return await self.app.refresh_with_notice("Failed to open image viewer.", "error")

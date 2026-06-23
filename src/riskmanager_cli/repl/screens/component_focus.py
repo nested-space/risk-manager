@@ -19,7 +19,7 @@ from ...schema.create import ComponentSaltCreate
 from .. import entity_flows, lookup, risk_flows
 from ..context import ContextFrame
 from ..form_fields import OPTIONAL_BOOL_OPTIONS, optional_bool, optional_float
-from ..hotkeys import CTRL_A, CTRL_E, CTRL_R, CTRL_U, CTRL_X
+from ..hotkeys import CTRL_A, CTRL_E, CTRL_K, CTRL_R, CTRL_U, CTRL_X
 from ..renderers.component_renderer import (
     component_targets,
     gather_component_sections,
@@ -91,6 +91,11 @@ class ComponentFocusScreen(FocusScreen):
         if key_text == CTRL_R:
             self._enter_risk_mode(component)
             return await self.app.render_current()
+        if key_text == CTRL_K:
+            material = await get_material_by_id(UUID(str(component.material_id)), self.app.env)
+            if material is None:
+                return await self.app.refresh_with_notice("Material not found.", "error")
+            return await self.show_structure_notice(material.name, material.smiles)
         return None
 
     async def activate(self, item: ListItem) -> list[str]:
