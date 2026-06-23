@@ -351,6 +351,11 @@ class _StubScreen:
         """Return *text* unchanged (no terminal styling under test)."""
         return text
 
+    @staticmethod
+    def reverse(text: str) -> str:
+        """Bracket *text* so the in-field edit cursor is visible in assertions."""
+        return f"[{text}]"
+
 
 def _render_dispatcher() -> CommandDispatcher:
     """Build a dispatcher whose only used collaborator is the stub screen.
@@ -379,12 +384,41 @@ def test_multi_field_form_shows_prefilled_default() -> None:
 
 @pytest.mark.unit
 def test_single_field_form_shows_prefilled_default() -> None:
-    """A single-field form surfaces the pre-filled default below the heading."""
+    """A single-field edit form shows its pre-filled value in-place for editing."""
     dispatcher = _render_dispatcher()
     dispatcher.modal.start_prompt(
         [FieldSpec("smiles", required=False, default="CC(=O)O")],
         lambda **payload: [],
-        title="Add material",
+        title="Edit material",
     )
-    rendered = "\n".join(dispatcher.modal._render_prompt_lines())  # pylint: disable=protected-access
+    # The loop seeds the editor from the field's default; render it in-place.
+    rendered = "\n".join(dispatcher.modal.render_prompt("CC(=O)O", len("CC(=O)O")))
     assert "CC(=O)O" in rendered
+
+
+@pytest.mark.unit
+def test_active_field_wraps_long_value_in_place() -> None:
+    """A long active value wraps across rows in-place; nothing is clipped."""
+    dispatcher = _render_dispatcher()
+    dispatcher.modal.start_prompt(
+        [FieldSpec("smiles"), FieldSpec("name")],
+        lambda **payload: [],
+        title="Edit material",
+    )
+    long_value = "C" * 120
+    rendered = dispatcher.modal.render_prompt(long_value, len(long_value))
+    assert "".join(rendered).count("C") == 120
+    assert sum(1 for line in rendered if "C" in line) >= 2
+
+
+@pytest.mark.unit
+def test_cursor_marks_active_character() -> None:
+    """The edit cursor highlights the character it sits on, drawn in-place."""
+    dispatcher = _render_dispatcher()
+    dispatcher.modal.start_prompt(
+        [FieldSpec("name"), FieldSpec("smiles")],
+        lambda **payload: [],
+        title="Edit material",
+    )
+    rendered = "\n".join(dispatcher.modal.render_prompt("hello", 1))
+    assert "h[e]llo" in rendered

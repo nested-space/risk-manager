@@ -20,6 +20,7 @@ import blessed
 from .controller import ReplController
 from .keys import is_backspace, is_enter, is_hotkey, is_scroll_key, is_text_input
 from .screen import ScreenManager
+from .text_input import LineEditor
 from .viewport import follow, max_offset, parse, selected_line
 
 T = TypeVar("T")
@@ -54,6 +55,7 @@ def start_repl(  # pylint: disable=too-many-locals,too-many-branches,too-many-st
             :class:`~.controller.ReplController`).
     """
     input_buffer = ""
+    editor = LineEditor()
     last_field_key: tuple[int, int] | None = None
     notice = ""
     mode = "view"  # "view" (hotkeys) | "search" ("/" filter) | "command" (":" line)
@@ -108,28 +110,33 @@ def start_repl(  # pylint: disable=too-many-locals,too-many-branches,too-many-st
         parts.extend([": command", "? help"])
         return "  ·  ".join(parts)
 
-    def sync_prompt_prefill() -> None:
-        """Seed the input buffer with the active prompt field's current value.
+    def sync_editor() -> None:
+        """Seed the in-place line editor when a text/numeric field becomes active.
 
         Edit forms supply each field's existing value as its ``default``. The
-        first time a text/numeric field becomes active we copy that into the
-        live buffer so it shows and can be edited; subsequent keystrokes on the
-        same field leave the buffer alone. Select fields and completed/absent
-        prompts contribute nothing (``prompt_prefill`` returns ``""``).
+        first time a text field becomes active we seed the editor (cursor at the
+        end) so the value shows in-place and can be edited; subsequent keystrokes
+        on the same field leave it alone. Select and completed/absent prompts seed
+        nothing (``prompt_prefill`` returns ``""``).
         """
-        nonlocal input_buffer, last_field_key
+        nonlocal editor, last_field_key
         state = controller.prompt_state
-        if state is None or state.is_complete():
+        if state is None or state.is_complete() or state.is_select_field:
             last_field_key = None
             return
         key = (id(state), state.current_index)
         if key != last_field_key:
             last_field_key = key
-            input_buffer = controller.prompt_prefill()
+            editor = LineEditor.from_text(controller.prompt_prefill())
 
     def redraw() -> None:
         nonlocal scroll_offset
-        sync_prompt_prefill()
+        sync_editor()
+        # A text/numeric prompt is edited in-place: re-render the pane from the
+        # live editor so the value (and any validation message) shows inside the
+        # field box. The bottom row carries only a key hint, not the input.
+        if controller.prompt_state is not None and not controller.prompt_state.is_select_field:
+            reflow(controller.render_prompt(editor.text, editor.cursor))
         scroll_offset = max(0, min(scroll_offset, _max_scroll()))
         screen.draw_status_bar(*controller.header())
         screen.draw_output(view, scroll_offset)
@@ -139,8 +146,7 @@ def start_repl(  # pylint: disable=too-many-locals,too-many-branches,too-many-st
             if controller.prompt_state.is_select_field:
                 screen.draw_nav_hint("↑↓ to move · Enter to select · Esc/Ctrl-C to cancel")
             else:
-                prompt = f"{controller.prompt_state.current_field.label}: "
-                screen.draw_input_line(prompt=prompt, text=input_buffer)
+                screen.draw_nav_hint("Type to edit · ←→ move · Enter confirm · Esc cancel")
         elif mode == "command":
             screen.draw_input_line(prompt=":", text=input_buffer)
         elif mode == "search":
@@ -271,15 +277,24 @@ def start_repl(  # pylint: disable=too-many-locals,too-many-branches,too-many-st
                     redraw()
                     continue
                 if is_enter(key_name, key_text):
-                    set_output(_coerce_lines(run_async(controller.advance_prompt(input_buffer))))
-                    input_buffer = ""
+                    set_output(_coerce_lines(run_async(controller.advance_prompt(editor.text))))
                     consume_notice()
+                elif key_name == "KEY_LEFT":
+                    editor.left()
+                elif key_name == "KEY_RIGHT":
+                    editor.right()
+                elif key_name == "KEY_HOME":
+                    editor.home()
+                elif key_name == "KEY_END":
+                    editor.end()
                 elif is_backspace(key_name, key_text):
-                    input_buffer = input_buffer[:-1]
+                    editor.backspace()
+                    controller.clear_prompt_message()
                 elif is_text_input(key):
                     field_max = controller.prompt_state.current_field.max_length
-                    if field_max is None or len(input_buffer) < field_max:
-                        input_buffer += key_text
+                    if field_max is None or len(editor.text) < field_max:
+                        editor.insert(key_text)
+                        controller.clear_prompt_message()
                 redraw()
                 continue
 

@@ -47,6 +47,10 @@ class ScreenManager:
         """Wrap *text* in the terminal's bold styling."""
         return f"{self._term.bold}{text}{self._term.normal}"
 
+    def reverse(self, text: str) -> str:
+        """Wrap *text* in reverse video, used to draw the in-field edit cursor."""
+        return f"{self._term.reverse}{text}{self._term.normal}"
+
     def style_notice(self, message: str, level: str) -> str:
         """Wrap a status *message* in a colour matching its *level*.
 

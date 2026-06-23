@@ -58,6 +58,11 @@ class _StubScreen:
         return text
 
     @staticmethod
+    def reverse(text: str) -> str:
+        """Return *text* unchanged (no terminal styling under test)."""
+        return text
+
+    @staticmethod
     def style_notice(message: str, level: str) -> str:
         """Return *message* unchanged (no terminal styling under test)."""
         del level

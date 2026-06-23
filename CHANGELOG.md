@@ -32,6 +32,12 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Changed
 
+- Guided-prompt modals now edit text/numeric fields **in-place**: the value is
+  shown and edited inside the field box (with full cursor movement — ←/→/Home/End
+  and insert/backspace) and wraps across lines so long or pre-filled values (e.g.
+  a SMILES string) stay fully visible instead of clipping. The separate bottom
+  typing row is replaced by a key hint. Select fields are unchanged. New engine
+  module `repl_engine/text_input.py` (`LineEditor`).
 - Default database location moved to `~/.rmgr/database/` (`riskmanager.db` /
   `riskmanager-dev.db`); the directory is created automatically. The
   `APP_DB_PATH` / `APP_PROD_DB_PATH` / `APP_DEV_DB_PATH` overrides are unchanged.

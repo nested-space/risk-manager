@@ -39,6 +39,10 @@ class _StubScreen:
         return text
 
     @staticmethod
+    def reverse(text: str) -> str:
+        return text
+
+    @staticmethod
     def style_notice(message: str, level: str) -> str:
         del level
         return message

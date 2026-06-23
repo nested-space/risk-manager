@@ -372,6 +372,14 @@ class ScreenRouter(ABC):  # pylint: disable=too-many-public-methods  # implement
         """Return the editable initial text for the active prompt field."""
         return self.modal.prompt_prefill()
 
+    def render_prompt(self, active_text: str, cursor: int) -> list[str]:
+        """Re-render the active prompt with the live in-place edit buffer."""
+        return self.modal.render_prompt(active_text, cursor)
+
+    def clear_prompt_message(self) -> None:
+        """Drop any pending prompt validation message."""
+        self.modal.clear_prompt_message()
+
     async def advance_prompt(self, value: str) -> list[str]:
         """Submit *value* to the active guided prompt."""
         return await self.modal.advance_prompt(value)

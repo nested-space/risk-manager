@@ -13,6 +13,7 @@ command dispatcher composes one and delegates its modal methods to it.
 from __future__ import annotations
 
 import inspect
+import textwrap
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -312,6 +313,7 @@ class ModalController:
         self._refresh = refresh
         self._prompt_state: PromptState | None = None
         self._prompt_callback: Callable[..., Any] | None = None
+        self._prompt_message: str | None = None
         self._picker_state: PickerState | None = None
 
     @property
@@ -364,7 +366,23 @@ class ModalController:
             info_section=info_section,
         )
         self._prompt_callback = on_complete
+        self._prompt_message = None
         return self._render_prompt_lines()
+
+    def render_prompt(self, active_text: str, cursor: int) -> list[str]:
+        """Re-render the active prompt with the live edit buffer shown in-place.
+
+        The event loop owns the :class:`~.text_input.LineEditor` for the active
+        text/numeric field and passes its ``text`` and ``cursor`` here on every
+        edit, so the value is drawn inside the field box (wrapped, with a cursor)
+        rather than on the bottom row. Any pending validation message is surfaced
+        above the box.
+        """
+        return self._render_prompt_lines(self._prompt_message, active_text, cursor)
+
+    def clear_prompt_message(self) -> None:
+        """Drop any pending validation message (e.g. once the user edits again)."""
+        self._prompt_message = None
 
     async def advance_prompt(self, value: str) -> list[str]:
         """Submit a value to the active guided prompt.
@@ -380,7 +398,9 @@ class ModalController:
         try:
             is_complete = self._prompt_state.submit_value(value)
         except ValueError as exc:
+            self._prompt_message = str(exc)
             return self._render_prompt_lines(str(exc))
+        self._prompt_message = None
         return await self._complete_prompt(is_complete)
 
     def prompt_move(self, direction: str) -> list[str]:
@@ -408,7 +428,9 @@ class ModalController:
         try:
             is_complete = self._prompt_state.submit_selection()
         except ValueError as exc:
+            self._prompt_message = str(exc)
             return self._render_prompt_lines(str(exc))
+        self._prompt_message = None
         return await self._complete_prompt(is_complete)
 
     async def _complete_prompt(self, is_complete: bool) -> list[str]:
@@ -439,6 +461,7 @@ class ModalController:
         """Cancel the active guided prompt and restore the current screen."""
         self._prompt_state = None
         self._prompt_callback = None
+        self._prompt_message = None
         return await self._refresh("Cancelled.", "warning")
 
     def start_picker(
@@ -514,23 +537,27 @@ class ModalController:
         self._picker_state = None
         return await self._refresh("Cancelled.", "warning")
 
-    def _render_prompt_lines(self, message: str | None = None) -> list[str]:
+    def _render_prompt_lines(
+        self, message: str | None = None, active_text: str = "", cursor: int = 0
+    ) -> list[str]:
         """Frame the active guided prompt in a box matching the app aesthetic.
 
         Single-field choosers show just a ``Select {label}`` heading and the
         option list; multi-field forms show a labelled overview of every field
-        (active marked ``▶``, completed showing values, pending dim). Live text
-        input is typed on the bottom row, and the navigation hint is drawn there
-        by the loop — neither is duplicated inside the box. A validation
-        *message* is surfaced as a styled line above the box.
+        (active marked ``▶``, completed showing values, pending dim). The active
+        text/numeric field is edited in-place: *active_text* (the loop's live
+        edit buffer) is drawn inside the field, wrapped across lines so the whole
+        value stays visible, with the edit cursor at *cursor*. The navigation
+        hint is drawn on the bottom row by the loop. A validation *message* is
+        surfaced as a styled line above the box.
         """
         if self._prompt_state is None:
             return [message] if message else []
         state = self._prompt_state
         body = (
-            self._single_field_body(state)
+            self._single_field_body(state, active_text, cursor)
             if len(state.fields) == 1
-            else self._multi_field_body(state)
+            else self._multi_field_body(state, active_text, cursor)
         )
         prefix: list[str] = []
         # Preserve current behavior: single-field forms without an info section
@@ -552,7 +579,7 @@ class ModalController:
         """Return the printable width inside the prompt box (borders + padding)."""
         return max(self._screen.width - 2 - 2 * 2, 0)
 
-    def _single_field_body(self, state: PromptState) -> list[str]:
+    def _single_field_body(self, state: PromptState, active_text: str, cursor: int) -> list[str]:
         """Render a single-field chooser/prompt: a heading plus options or input."""
         current = state.current_field
         if state.is_select_field:
@@ -563,9 +590,8 @@ class ModalController:
                 else []
             )
             return [f"Select {current.label}", "", *options]
-        if current.default is not None:
-            return [f"Enter {current.label}", "", self._screen.dim(current.default)]
-        return [f"Enter {current.label}"]
+        rows = self._render_editable_value(active_text, cursor, self._prompt_interior_width)
+        return [f"Enter {current.label}", "", *rows]
 
     def _info_section_lines(self, section: InfoSection, state: PromptState) -> list[str]:
         """Render a read-only key/value block, aligned with the editable fields.
@@ -588,23 +614,29 @@ class ModalController:
             labels += [label for label, _ in state.info_section.rows]
         return max((len(label) for label in labels), default=0)
 
-    def _multi_field_body(self, state: PromptState) -> list[str]:
-        """Render a multi-field form as a labelled overview of every field."""
+    def _multi_field_body(self, state: PromptState, active_text: str, cursor: int) -> list[str]:
+        """Render a multi-field form as a labelled overview of every field.
+
+        The active text field is edited in-place and wrapped; every other field
+        shows its collected value or dimmed default, also wrapped so long values
+        (e.g. a SMILES string) stay fully visible across continuation lines.
+        """
         lines: list[str] = []
         label_width = self._form_label_width(state)
+        value_width = max(self._prompt_interior_width - (label_width + 4), 1)
+        indent = " " * (label_width + 4)
         for index, field_spec in enumerate(state.fields):
             active = index == state.current_index
             marker = "▶" if active else " "
-            value = state.collected[index]
-            if value is not None:
-                cell = value
-            elif field_spec.default is not None and field_spec.field_type != "select":
-                cell = self._screen.dim(field_spec.default)
-            elif active and not state.is_select_field:
-                cell = self._screen.dim("▏")
-            else:
-                cell = self._screen.dim("—")
-            lines.append(f"{marker} {field_spec.label.ljust(label_width)}  {cell}")
+            editing = active and field_spec.field_type != "select"
+            rows = self._field_cell_rows(
+                field_spec,
+                value=state.collected[index],
+                active_edit=(active_text, cursor) if editing else None,
+                width=value_width,
+            )
+            lines.append(f"{marker} {field_spec.label.ljust(label_width)}  {rows[0]}")
+            lines.extend(f"{indent}{row}" for row in rows[1:])
         if state.is_select_field:
             navigator = state.select_navigator()
             if navigator is not None:
@@ -612,6 +644,55 @@ class ModalController:
                     ["", *navigator.render_lines(self._prompt_interior_width, show_sections=False)]
                 )
         return lines
+
+    def _field_cell_rows(
+        self,
+        field_spec: FieldSpec,
+        *,
+        value: str | None,
+        active_edit: tuple[str, int] | None,
+        width: int,
+    ) -> list[str]:
+        """Return the wrapped value row(s) for one form field.
+
+        When *active_edit* is the active field's ``(text, cursor)`` the value is
+        drawn in-place with the edit cursor; otherwise the collected value or
+        dimmed default is wrapped, falling back to ``—`` until collected.
+        """
+        if active_edit is not None:
+            return self._render_editable_value(active_edit[0], active_edit[1], width)
+        if value is not None:
+            return self._wrap_plain(value, width)
+        if field_spec.default is not None and field_spec.field_type != "select":
+            return [self._screen.dim(row) for row in self._wrap_plain(field_spec.default, width)]
+        return [self._screen.dim("—")]
+
+    @staticmethod
+    def _wrap_plain(value: str, width: int) -> list[str]:
+        """Hard-wrap *value* to *width* columns, never returning an empty list."""
+        return textwrap.wrap(value, width=max(width, 1)) or [value]
+
+    def _render_editable_value(self, text: str, cursor: int, width: int) -> list[str]:
+        """Render *text* hard-wrapped to *width* with a reverse-video edit cursor.
+
+        Hard wrapping (fixed *width* chunks, not word wrapping) keeps every
+        character at a deterministic position so *cursor* maps cleanly onto a
+        wrapped row and column. The cursor highlights the character it sits on,
+        or a trailing space when it rests at the end of the value.
+        """
+        width = max(width, 1)
+        rows = [text[i : i + width] for i in range(0, len(text), width)] or [""]
+        row_index, col = divmod(cursor, width)
+        while row_index >= len(rows):
+            rows.append("")
+        rows[row_index] = self._cursor_row(rows[row_index], col)
+        return rows
+
+    def _cursor_row(self, row: str, col: int) -> str:
+        """Return *row* with the edit cursor drawn at column *col*."""
+        if col < len(row):
+            return f"{row[:col]}{self._screen.reverse(row[col])}{row[col + 1 :]}"
+        return f"{row}{self._screen.reverse(' ')}"
 
     def _render_picker_lines(self) -> list[str]:
         if self._picker_state is None:

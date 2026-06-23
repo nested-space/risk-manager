@@ -96,6 +96,12 @@ class ReplController(Protocol):  # pylint: disable=too-many-public-methods  # th
     def prompt_prefill(self) -> str:
         """Return the editable initial text for the active prompt field."""
 
+    def render_prompt(self, active_text: str, cursor: int) -> list[str]:
+        """Re-render the active prompt with the live in-place edit buffer."""
+
+    def clear_prompt_message(self) -> None:
+        """Drop any pending prompt validation message."""
+
     async def advance_prompt(self, value: str) -> list[str]:
         """Submit *value* to the active guided prompt."""
 

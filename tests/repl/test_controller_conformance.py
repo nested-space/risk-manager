@@ -28,6 +28,11 @@ class _StubScreen:
         """Return *text* unchanged (no terminal styling under test)."""
         return text
 
+    @staticmethod
+    def reverse(text: str) -> str:
+        """Return *text* unchanged (no terminal styling under test)."""
+        return text
+
 
 @pytest.mark.unit
 def test_command_dispatcher_satisfies_repl_controller() -> None:
