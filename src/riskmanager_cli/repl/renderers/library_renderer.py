@@ -13,12 +13,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ...repl_engine.layout import Column, render_table, section_rule, section_width
+from ...repl_engine.layout import (
+    Column,
+    render_table,
+    render_table_blocks,
+    section_rule,
+    section_width,
+)
 from ...repl_engine.list_navigator import ListItem
 from ...utils.formula_parser import render_chemical_formula
+from ._sections import frame_body_line, pair_table_lines
 
 _BODY_INDENT = "  "
-_CARET = "> "
 
 # Name is the identity column and stays; the rest drop on a narrow terminal,
 # SMILES first, then the display name, leaving the alias count longest.
@@ -109,13 +115,11 @@ async def render_library_screen(
         return lines
 
     # Two columns are lost to the screen inset and two to the caret/indent gutter.
-    table = render_table(_COLUMNS, [row.cells for row in rows], max_width=width - 4)
-    data_start = 3  # top border, header, separator precede the data rows
-    for index, line in enumerate(table):
-        is_data = data_start <= index < data_start + len(rows)
-        item_id = rows[index - data_start].item_id if is_data else None
-        gutter = _CARET if item_id is not None and item_id == selected_id else _BODY_INDENT
-        lines.append(f"{gutter}{line}")
+    table, row_line_counts = render_table_blocks(
+        _COLUMNS, [row.cells for row in rows], max_width=width - 4
+    )
+    paired = pair_table_lines(table, row_line_counts, [row.item_id for row in rows])
+    lines.extend(frame_body_line(line, selected_id) for line in paired)
     return lines
 
 

@@ -24,7 +24,7 @@ from .geometry import Block, HAlign, VAlign, block_width, pad_block, pad_line, v
 from .overlay import Placement, overlay
 from .responsive import RowPlan, fit_widths, lay_out_row, select_columns, widest_fitting
 from .stacks import card_row, center_block, hstack, join_horizontal, vstack
-from .table import Column, render_table, section_rule, section_width
+from .table import Column, render_table, render_table_blocks, section_rule, section_width
 from .tabpane import tabpane
 from .widgets import bullet_list, card, subtitle, text_area, title
 
@@ -49,6 +49,7 @@ __all__ = [
     "pad_line",
     "render_box",
     "render_table",
+    "render_table_blocks",
     "section_rule",
     "section_width",
     "select_columns",

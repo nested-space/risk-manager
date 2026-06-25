@@ -7,6 +7,7 @@ sequences); callers that need styling should apply it after layout.
 
 from __future__ import annotations
 
+import textwrap
 from dataclasses import dataclass
 
 from .geometry import HAlign
@@ -68,12 +69,17 @@ class Column:
             minimum width. ``None`` (the default) pins the column in place; a
             lower integer is hidden before a higher one. See
             :func:`responsive.select_columns`.
+        wrap: When ``True``, an over-long cell is wrapped across multiple
+            physical lines (growing the row's height) instead of being clipped
+            with ``…``. The application decides which columns wrap; the engine
+            owns the wrapping mechanics.
     """
 
     header: str
     align: HAlign = "left"
     min_width: int = _DEFAULT_MIN_WIDTH
     priority: int | None = None
+    wrap: bool = False
 
 
 def _align(text: str, width: int, align: HAlign) -> str:
@@ -99,29 +105,67 @@ def _clip(text: str, width: int) -> str:
     return text[: width - 1] + "…"
 
 
-def render_table(
-    columns: list[Column], rows: list[list[str]], *, max_width: int | None = None
-) -> list[str]:
-    """Render *rows* as a box-drawn table with one heading per column.
+def _wrap_cell(text: str, width: int, wrap: bool) -> list[str]:
+    """Return a cell's physical lines: wrapped when *wrap*, else clipped to one."""
+    if not wrap:
+        return [_clip(text, width)]
+    wrapped = textwrap.wrap(text, width=max(width, 1))
+    return wrapped or [""]
 
-    Each column is sized to the widest of its header and cells. When *max_width*
-    is given and the natural table would exceed it, the least-important columns
-    are first hidden (see :func:`responsive.select_columns`) until the survivors'
-    minimum widths fit, then the survivors are shrunk proportionally (see
-    :func:`responsive.fit_widths`) and any cell that no longer fits is elided
-    with ``…``. The returned lines are, in order: the top border, the header
-    row, the header separator, one line per data row, then the bottom border.
-    Callers can therefore find the data-row lines at ``result[3 : 3 + len(rows)]``
-    — dropping columns changes a row's content, never the row count.
+
+def _border(left: str, mid: str, right: str, widths: list[int]) -> str:
+    """Return a box border (``┌┬┐``/``├┼┤``/``└┴┘``) spanning *widths*."""
+    return left + mid.join("─" * (width + 2) for width in widths) + right
+
+
+def _row_line(cells: list[str], widths: list[int], aligns: list[HAlign]) -> str:
+    """Return one physical table line, each cell aligned and padded to its width."""
+    padded = (f" {_align(cell, widths[index], aligns[index])} " for index, cell in enumerate(cells))
+    return "│" + "│".join(padded) + "│"
+
+
+def _data_blocks(
+    columns: list[Column], rows: list[list[str]], widths: list[int], aligns: list[HAlign]
+) -> tuple[list[str], list[int]]:
+    """Render the data rows, wrapping ``wrap`` columns; return lines and row spans."""
+    lines: list[str] = []
+    counts: list[int] = []
+    for row in rows:
+        wrapped = [
+            _wrap_cell(cell, widths[index], columns[index].wrap) for index, cell in enumerate(row)
+        ]
+        height = max((len(cell) for cell in wrapped), default=1)
+        for line in range(height):
+            lines.append(
+                _row_line(
+                    [cell[line] if line < len(cell) else "" for cell in wrapped], widths, aligns
+                )
+            )
+        counts.append(height)
+    return lines, counts
+
+
+def render_table_blocks(
+    columns: list[Column], rows: list[list[str]], *, max_width: int | None = None
+) -> tuple[list[str], list[int]]:
+    """Render *rows* as a box-drawn table, reporting each row's line span.
+
+    Behaves like :func:`render_table` for sizing and column dropping, but a row
+    whose ``wrap=True`` columns overflow grows to several physical lines rather
+    than being clipped. The second return value gives the number of physical
+    lines each data row occupies, in row order, so selectable callers can map a
+    physical line back to its logical row (see :mod:`repl.renderers._sections`).
 
     Args:
-        columns: Column headers, per-column alignment, and drop priority.
+        columns: Column headers, per-column alignment, drop priority, and wrap.
         rows: Cell text per row; each row must have one cell per column.
         max_width: Maximum total columns the table box (borders, padding, and
             content) may occupy. ``None`` leaves the table at its natural size.
 
     Returns:
-        The table's display lines.
+        ``(lines, row_line_counts)`` — the display lines (top border, header,
+        separator, the data rows, bottom border) and the physical-line count of
+        each data row.
     """
     if max_width is not None:
         kept = select_columns(
@@ -143,24 +187,44 @@ def render_table(
         budget = max_width - (3 * len(columns) + 1)
         widths = fit_widths(widths, [column.min_width for column in columns], budget)
 
-    def border(left: str, mid: str, right: str) -> str:
-        return left + mid.join("─" * (width + 2) for width in widths) + right
-
-    def body(cells: list[str], aligns: list[HAlign]) -> str:
-        padded = (
-            f" {_align(_clip(cell, widths[index]), widths[index], aligns[index])} "
-            for index, cell in enumerate(cells)
-        )
-        return "│" + "│".join(padded) + "│"
-
     header_aligns: list[HAlign] = ["left"] * len(columns)
     cell_aligns: list[HAlign] = [column.align for column in columns]
 
+    data_lines, row_line_counts = _data_blocks(columns, rows, widths, cell_aligns)
     lines = [
-        border("┌", "┬", "┐"),
-        body([column.header for column in columns], header_aligns),
-        border("├", "┼", "┤"),
+        _border("┌", "┬", "┐", widths),
+        _row_line([column.header for column in columns], widths, header_aligns),
+        _border("├", "┼", "┤", widths),
+        *data_lines,
+        _border("└", "┴", "┘", widths),
     ]
-    lines.extend(body(row, cell_aligns) for row in rows)
-    lines.append(border("└", "┴", "┘"))
+    return lines, row_line_counts
+
+
+def render_table(
+    columns: list[Column], rows: list[list[str]], *, max_width: int | None = None
+) -> list[str]:
+    """Render *rows* as a box-drawn table with one heading per column.
+
+    Each column is sized to the widest of its header and cells. When *max_width*
+    is given and the natural table would exceed it, the least-important columns
+    are first hidden (see :func:`responsive.select_columns`) until the survivors'
+    minimum widths fit, then the survivors are shrunk proportionally (see
+    :func:`responsive.fit_widths`) and any cell that no longer fits is elided
+    with ``…`` (or wrapped, for a ``wrap=True`` column). The returned lines are,
+    in order: the top border, the header row, the header separator, the data
+    rows, then the bottom border. With no wrapping each row is one line, so the
+    data rows sit at ``result[3 : 3 + len(rows)]``; callers that wrap columns
+    must use :func:`render_table_blocks` to recover per-row line spans.
+
+    Args:
+        columns: Column headers, per-column alignment, drop priority, and wrap.
+        rows: Cell text per row; each row must have one cell per column.
+        max_width: Maximum total columns the table box (borders, padding, and
+            content) may occupy. ``None`` leaves the table at its natural size.
+
+    Returns:
+        The table's display lines.
+    """
+    lines, _ = render_table_blocks(columns, rows, max_width=max_width)
     return lines
