@@ -36,8 +36,8 @@ _RISK_COLUMNS = [
     Column("Entity name", priority=5),
     Column("Type", priority=1),
     Column("Level", align="center", priority=3),
-    Column("Title"),
-    Column("Mitigation", priority=0),
+    Column("Title", wrap=True),
+    Column("Mitigation", priority=0, wrap=True),
     Column("Mitigated level", align="center", priority=2),
 ]
 

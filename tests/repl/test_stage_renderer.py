@@ -28,6 +28,7 @@ from riskmanager_cli.repl.renderers.stage_renderer import (
     render_stage_screen,
     stage_targets,
 )
+from riskmanager_cli.repl_engine.viewport import parse
 from riskmanager_cli.schema.create import (
     ComponentCreate,
     ManufacturingProcessCreate,
@@ -155,7 +156,7 @@ async def test_render_stage_screen_sections_and_tables_are_populated(
         assert name in joined and role in joined
     assert "methanol" in joined and "Solvent" in joined
     # The risk row shows its name and severity-labelled levels (current 4, mitigated 3).
-    assert "Exotherm" in joined and "High (4)" in joined and "Medium (3)" in joined
+    assert "Exotherm" in joined and "H (4)" in joined and "M (3)" in joined
 
     # Reactants sort ahead of the product despite the product being linked first.
     a_row = next(i for i, line in enumerate(lines) if "│ A " in line)
@@ -176,9 +177,11 @@ async def test_render_stage_screen_caret_marks_only_the_selected_row(
 
     lines = render_stage_screen(stage, sections, width=120, selected_id=chosen.item_id)
 
-    caret_lines = [line for line in lines if line.startswith("> ")]
+    view = parse(lines)
+    caret_lines = [line for line in view.lines if line.startswith("> ")]
     assert len(caret_lines) == 1
     assert chosen.label in caret_lines[0]
+    assert view.selected is not None  # selected row is tagged for the viewport
 
 
 @pytest.mark.integration
@@ -196,4 +199,4 @@ async def test_render_stage_screen_empty_sections_show_placeholders(
     assert "(none)" in joined  # components + NCRMs empty
     assert "(no risks recorded)" in joined
     # No caret appears when there is nothing selectable.
-    assert not any(line.startswith("> ") for line in lines)
+    assert not any(line.startswith("> ") for line in parse(lines).lines)

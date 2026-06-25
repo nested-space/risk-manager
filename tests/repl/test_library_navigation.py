@@ -20,6 +20,7 @@ from riskmanager_cli.repl.commands import CommandDispatcher
 from riskmanager_cli.repl.context import ContextFrame, ContextManager
 from riskmanager_cli.repl.hotkeys import CTRL_E, CTRL_K, CTRL_O, CTRL_X
 from riskmanager_cli.repl.session_state import SessionState
+from riskmanager_cli.repl_engine.viewport import parse
 from riskmanager_cli.schema.create import CounterionAliasCreate, CounterionCreate
 from riskmanager_cli.service.structure_viewer import StructureResult
 
@@ -81,7 +82,7 @@ async def test_library_renders_navigable_table_alphabetically(temp_env: Environm
     chloride_at = next(i for i, line in enumerate(lines) if "chloride" in line)
     assert acetate_at < chloride_at
     # The selected row carries the caret.
-    assert any(line.startswith("> ") and "acetate" in line for line in lines)
+    assert any(line.startswith("> ") and "acetate" in line for line in parse(lines).lines)
     # Chloride's single alias is counted.
     assert any("chloride" in line and " 1 " in line for line in lines)
 
@@ -227,7 +228,7 @@ async def test_library_detail_back_returns_to_list_not_home(temp_env: Environmen
     assert popped is not None
     assert dispatcher.ctx.current.track == "library"
     lines = await dispatcher.render_current()
-    assert any(line.startswith("> ") and "acetate" in line for line in lines)
+    assert any(line.startswith("> ") and "acetate" in line for line in parse(lines).lines)
 
 
 @pytest.mark.integration

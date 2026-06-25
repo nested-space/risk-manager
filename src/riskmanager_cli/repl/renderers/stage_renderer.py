@@ -26,7 +26,7 @@ from ...operations.stage_ncrm_operations import list_ncrms_for_stage
 from ...operations.stage_risk_operations import list_risks_for_stage
 from ...repl_engine.layout import Column
 from ...repl_engine.list_navigator import ListItem
-from ._sections import render_sectioned_screen, section_body
+from ._sections import BodyLine, render_sectioned_screen, section_body
 
 
 @dataclass
@@ -55,10 +55,10 @@ class StageSections:
 _COMPONENT_COLUMNS = [Column("Name"), Column("Role", priority=0)]
 _NCRM_COLUMNS = [Column("Name"), Column("Role", priority=0)]
 _RISK_COLUMNS = [
-    Column("Name"),
-    Column("Description", priority=0),
+    Column("Name", wrap=True),
+    Column("Description", priority=0, wrap=True),
     Column("Level", align="center", priority=3),
-    Column("Mitigation", priority=1),
+    Column("Mitigation", priority=1, wrap=True),
     Column("Mitigated level", align="center", priority=2),
 ]
 
@@ -98,7 +98,7 @@ def render_stage_screen(
         two-space-indented sections with a ``>`` caret on the selected row.
     """
     title = f"Stage {stage.number}"
-    body: list[tuple[str, str | None]] = []
+    body: list[BodyLine] = []
     body += section_body("Components", _COMPONENT_COLUMNS, sections.components, width, "(none)")
     body += section_body("NCRMs", _NCRM_COLUMNS, sections.ncrms, width, "(none)")
     body += section_body("Risks", _RISK_COLUMNS, sections.risks, width, "(no risks recorded)")

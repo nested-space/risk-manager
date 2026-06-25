@@ -27,7 +27,7 @@ from ...operations.component_salt_operations import list_salts_for_component
 from ...operations.counterion_operations import get_counterion_by_id
 from ...repl_engine.layout import Column
 from ...repl_engine.list_navigator import ListItem
-from ._sections import render_sectioned_screen, section_body
+from ._sections import BodyLine, render_sectioned_screen, section_body
 
 
 @dataclass
@@ -61,7 +61,7 @@ _SALT_COLUMNS = [
 ]
 _RISK_COLUMNS = [
     Column("Type", priority=1),
-    Column("Name"),
+    Column("Name", wrap=True),
     Column("Level", align="center", priority=2),
     Column("Mitigated", align="center", priority=0),
 ]
@@ -121,7 +121,7 @@ def render_component_screen(
         the two-space-indented sections with a ``>`` caret on the selected row.
     """
     title = f"Component: {display_name}"
-    body: list[tuple[str, str | None]] = []
+    body: list[BodyLine] = []
     body += section_body("Details", _DETAIL_COLUMNS, sections.details, width, "(none)")
     body += section_body("Salts", _SALT_COLUMNS, sections.salts, width, "(no salts)")
     body += section_body("Risks", _RISK_COLUMNS, sections.risks, width, "(no risks recorded)")

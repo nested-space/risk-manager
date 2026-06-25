@@ -35,6 +35,20 @@ class TA(str, Enum):
     RARE_DISEASES = "Rare Diseases"
 
 
+class RiskType(str, Enum):
+    """Whether a risk is a downside threat or an upside opportunity.
+
+    Values are stored as their string representations in SQLite.
+
+    Attributes:
+        THREAT: A downside risk to be mitigated.
+        OPPORTUNITY: An upside risk to be pursued.
+    """
+
+    THREAT = "Threat"
+    OPPORTUNITY = "Opportunity"
+
+
 class NcrmRole(str, Enum):
     """Role of a non-controlled raw material within a manufacturing stage.
 

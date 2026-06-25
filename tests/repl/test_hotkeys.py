@@ -329,7 +329,7 @@ async def test_risk_mode_add_hotkey_creates_stage_risk(temp_env: Environment) ->
 
     await dispatcher.handle_hotkey(CTRL_A)
     assert dispatcher.prompt_state is not None
-    await dispatcher.advance_prompt("Safety")
+    await dispatcher.advance_prompt("Threat")  # risk_type (Threat/Opportunity select)
     await dispatcher.advance_prompt("Exotherm")
     await dispatcher.advance_prompt("")  # description (optional)
     await dispatcher.advance_prompt("4")  # current_level (required select)
@@ -350,10 +350,10 @@ async def test_risk_mode_add_hotkey_creates_process_risk(temp_env: Environment) 
 
     await dispatcher.handle_hotkey(CTRL_A)
     assert dispatcher.prompt_state is not None
-    await dispatcher.advance_prompt("Quality")
+    await dispatcher.advance_prompt("Threat")  # risk_type (Threat/Opportunity select)
     await dispatcher.advance_prompt("Impurity carryover")
     await dispatcher.advance_prompt("")  # description (optional)
-    await dispatcher.advance_prompt("Critical (5)")  # current_level (select by label)
+    await dispatcher.advance_prompt("Very High (5)")  # current_level (select by label)
     await dispatcher.advance_prompt("Inline assay")  # proposed_mitigation (required)
     await dispatcher.advance_prompt("3")  # mitigated_level (select by value)
 
@@ -404,8 +404,11 @@ async def test_risk_mode_edit_hotkey_prefills_and_updates_risk(temp_env: Environ
     await dispatcher.picker_select()
 
     assert dispatcher.prompt_state is not None
-    assert dispatcher.prompt_prefill() == "Safety"  # risk_type pre-filled
-    await dispatcher.advance_prompt("Hazard")  # change risk_type
+    # risk_type is now a Threat/Opportunity select; selects pre-fill via their
+    # navigator, so the text prefill is empty even though the field is active.
+    assert dispatcher.prompt_state.current_field.field_type == "select"
+    assert dispatcher.prompt_prefill() == ""
+    await dispatcher.advance_prompt("Opportunity")  # change risk_type via the select
     assert dispatcher.prompt_prefill() == "Exotherm"  # name pre-filled
     await dispatcher.advance_prompt("Runaway exotherm")  # change name
     for _ in range(4):
@@ -413,7 +416,7 @@ async def test_risk_mode_edit_hotkey_prefills_and_updates_risk(temp_env: Environ
 
     risks = await list_risks_for_stage(UUID(str(stage.id)), env=temp_env)
     assert len(risks) == 1
-    assert risks[0].risk_type == "Hazard"
+    assert risks[0].risk_type == "Opportunity"
     assert risks[0].name == "Runaway exotherm"
     # The level number-selects pre-select the stored values; empty submit keeps them.
     assert (risks[0].current_level, risks[0].mitigated_level) == (5, 2)

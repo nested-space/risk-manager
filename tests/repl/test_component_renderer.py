@@ -30,6 +30,7 @@ from riskmanager_cli.repl.renderers.component_renderer import (
     gather_component_sections,
     render_component_screen,
 )
+from riskmanager_cli.repl_engine.viewport import parse
 from riskmanager_cli.schema.create import (
     ComponentCreate,
     ComponentRiskCreate,
@@ -136,7 +137,7 @@ async def test_render_component_screen_sections_and_tables_are_populated(
     # The salt row shows the counterion and its stoichiometry.
     assert "Chloride" in joined and "1" in joined
     # The risk row shows its name and severity-labelled levels (current 4, mitigated 2).
-    assert "Residual solvent" in joined and "High (4)" in joined and "Low (2)" in joined
+    assert "Residual solvent" in joined and "H (4)" in joined and "L (2)" in joined
 
 
 @pytest.mark.integration
@@ -157,7 +158,7 @@ async def test_component_targets_select_salt_and_risk_rows(temp_env: Environment
         width=120,
         selected_id=salt_target.item_id,
     )
-    caret_lines = [line for line in lines if line.startswith("> ")]
+    caret_lines = [line for line in parse(lines).lines if line.startswith("> ")]
     assert len(caret_lines) == 1
     assert salt_target.label in caret_lines[0]
 
@@ -178,4 +179,4 @@ async def test_render_component_screen_empty_sections_show_placeholders(
     assert "(no salts)" in joined
     assert "(no risks recorded)" in joined
     # No caret appears when there is nothing selectable.
-    assert not any(line.startswith("> ") for line in lines)
+    assert not any(line.startswith("> ") for line in parse(lines).lines)

@@ -9,6 +9,7 @@ from riskmanager_cli.repl.renderers.library_renderer import (
     render_library_detail,
     render_library_screen,
 )
+from riskmanager_cli.repl_engine.viewport import parse
 
 
 def _item(**overrides: Any) -> dict[str, Any]:
@@ -46,11 +47,14 @@ async def test_render_library_caret_marks_selected_row() -> None:
     """The selected row carries a '> ' caret; others are indented."""
     items = [_item(id="a", name="acetone"), _item(id="b", name="butanol")]
     lines = await render_library_screen("materials", items, selected_id="b")
-    caret_lines = [line for line in lines if line.startswith("> ")]
+    view = parse(lines)
+    caret_lines = [line for line in view.lines if line.startswith("> ")]
     assert len(caret_lines) == 1
     assert "butanol" in caret_lines[0]
+    # The selected row is tagged so the viewport keeps it on screen.
+    assert view.selected is not None
     # The unselected data row keeps the two-space gutter.
-    assert any(line.startswith("  ") and "acetone" in line for line in lines)
+    assert any(line.startswith("  ") and "acetone" in line for line in view.lines)
 
 
 @pytest.mark.unit

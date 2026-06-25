@@ -34,7 +34,7 @@ async def render_risk_table(
     columns = [
         Column("#", align="right", min_width=2, priority=3),
         Column("Type", priority=2),
-        Column("Name"),
+        Column("Name", wrap=True),
         Column("Level", priority=4),
         Column("Mitigated", priority=1),
         Column("Scope", priority=0),

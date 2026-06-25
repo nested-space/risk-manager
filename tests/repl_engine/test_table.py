@@ -2,7 +2,12 @@
 
 import pytest
 
-from riskmanager_cli.repl_engine.layout import Column, render_table, section_rule
+from riskmanager_cli.repl_engine.layout import (
+    Column,
+    render_table,
+    render_table_blocks,
+    section_rule,
+)
 
 
 @pytest.mark.unit
@@ -125,3 +130,65 @@ def test_render_table_keeps_pinned_columns_under_pressure() -> None:
     columns = [Column("Name"), Column("Role")]
     lines = render_table(columns, [["Acetonitrile", "Solvent"]], max_width=12)
     assert len(_column_widths(lines[0])) == 2  # both columns kept, merely shrunk
+
+
+@pytest.mark.unit
+def test_render_table_blocks_reports_single_line_rows_without_wrapping() -> None:
+    """With no wrap column, every row is one line and matches ``render_table``."""
+    columns = [Column("Name"), Column("Role")]
+    rows = [["A", "Reactant"], ["B", "Product"]]
+    lines, spans = render_table_blocks(columns, rows)
+    assert lines == render_table(columns, rows)
+    assert spans == [1, 1]
+
+
+@pytest.mark.unit
+def test_render_table_wraps_a_wrap_column_across_lines() -> None:
+    """A ``wrap=True`` column splits a long cell over several physical lines."""
+    columns = [Column("Name"), Column("Note", wrap=True)]
+    rows = [["A", "alpha beta gamma delta epsilon"]]
+    lines, spans = render_table_blocks(columns, rows, max_width=22)
+    # The row occupies more than one physical line and the span reports it.
+    assert spans[0] > 1
+    data = lines[3 : 3 + spans[0]]
+    assert len(data) == spans[0]
+    # No ellipsis: the text wrapped rather than being clipped.
+    assert "…" not in "".join(data)
+    # Every physical line shares the table's single width.
+    assert len({len(line) for line in lines}) == 1
+    # The wrapped words are all present across the row's lines.
+    joined = "".join(data)
+    for word in ("alpha", "beta", "gamma", "delta", "epsilon"):
+        assert word in joined
+
+
+@pytest.mark.unit
+def test_render_table_clips_non_wrap_column_while_wrapping_another() -> None:
+    """A non-wrap column is still clipped even when a sibling column wraps."""
+    columns = [Column("Code", wrap=False), Column("Note", wrap=True)]
+    rows = [["X" * 30, "alpha beta gamma delta"]]
+    lines, _ = render_table_blocks(columns, rows, max_width=24)
+    # The non-wrap Code column gains an ellipsis; only the Note column wraps.
+    assert any("…" in line for line in lines[3:-1])
+
+
+@pytest.mark.unit
+def test_render_table_clips_a_wide_header_to_keep_borders_aligned() -> None:
+    """A header wider than its shrunk column is clipped, not overflowed."""
+    columns = [Column("Component/Stage"), Column("Note", wrap=True)]
+    rows = [["Process", "alpha beta gamma delta epsilon zeta eta"]]
+    lines = render_table(columns, rows, max_width=40)
+    # Every line — borders, header, and wrapped data rows — shares one width.
+    assert len({len(line) for line in lines}) == 1
+    # The over-long header was elided rather than pushing the row wide.
+    assert "…" in lines[1]
+
+
+@pytest.mark.unit
+def test_render_table_blocks_wraps_each_row_independently() -> None:
+    """Per-row spans reflect each row's own height; short rows stay one line."""
+    columns = [Column("Name"), Column("Note", wrap=True)]
+    rows = [["A", "short"], ["B", "one two three four five six seven eight"]]
+    _, spans = render_table_blocks(columns, rows, max_width=20)
+    assert spans[0] == 1
+    assert spans[1] > 1
