@@ -137,7 +137,7 @@ async def test_render_component_screen_sections_and_tables_are_populated(
     # The salt row shows the counterion and its stoichiometry.
     assert "Chloride" in joined and "1" in joined
     # The risk row shows its name and severity-labelled levels (current 4, mitigated 2).
-    assert "Residual solvent" in joined and "High (4)" in joined and "Low (2)" in joined
+    assert "Residual solvent" in joined and "H (4)" in joined and "L (2)" in joined
 
 
 @pytest.mark.integration

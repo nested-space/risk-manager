@@ -90,11 +90,12 @@ async def test_render_project_screen_sections_and_tables_are_populated(
     assert "c1ccccc1" in joined
 
     # The Risks table tallies the seeded level-4 risk into the High band, and the
-    # 1-5 scale adds a Negligible row.
+    # 1-5 scale adds a Very Low row.
     risks_index = next(i for i, line in enumerate(lines) if "─ Risks " in line)
-    high_row = next(line for line in lines[risks_index:] if "High" in line and "│" in line)
+    # Match the "High" band specifically, not the "Very High" row above it.
+    high_row = next(line for line in lines[risks_index:] if "│ High" in line)
     assert "1" in high_row
-    assert any("Negligible" in line and "│" in line for line in lines[risks_index:])
+    assert any("Very Low" in line and "│" in line for line in lines[risks_index:])
 
 
 @pytest.mark.integration

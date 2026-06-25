@@ -156,7 +156,7 @@ async def test_render_stage_screen_sections_and_tables_are_populated(
         assert name in joined and role in joined
     assert "methanol" in joined and "Solvent" in joined
     # The risk row shows its name and severity-labelled levels (current 4, mitigated 3).
-    assert "Exotherm" in joined and "High (4)" in joined and "Medium (3)" in joined
+    assert "Exotherm" in joined and "H (4)" in joined and "M (3)" in joined
 
     # Reactants sort ahead of the product despite the product being linked first.
     a_row = next(i for i, line in enumerate(lines) if "│ A " in line)

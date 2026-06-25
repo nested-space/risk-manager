@@ -353,7 +353,7 @@ async def test_risk_mode_add_hotkey_creates_process_risk(temp_env: Environment) 
     await dispatcher.advance_prompt("Threat")  # risk_type (Threat/Opportunity select)
     await dispatcher.advance_prompt("Impurity carryover")
     await dispatcher.advance_prompt("")  # description (optional)
-    await dispatcher.advance_prompt("Critical (5)")  # current_level (select by label)
+    await dispatcher.advance_prompt("Very High (5)")  # current_level (select by label)
     await dispatcher.advance_prompt("Inline assay")  # proposed_mitigation (required)
     await dispatcher.advance_prompt("3")  # mitigated_level (select by value)
 

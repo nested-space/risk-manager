@@ -83,7 +83,7 @@ class ManufacturingProcessRiskCreate(BaseModel):
         risk_type: Category of risk (e.g. 'Safety', 'Quality', 'Supply').
         name: Short title of the risk.
         description: Optional detailed description.
-        current_level: Current risk score (1–5; 5 = Critical).
+        current_level: Current risk score (1–5; 5 = Very High).
         proposed_mitigation: Proposed action to reduce risk.
         mitigated_level: Projected risk score after mitigation.
     """
@@ -121,7 +121,7 @@ class ComponentRiskCreate(BaseModel):
         risk_type: Category of risk.
         name: Short title of the risk.
         description: Optional detailed description.
-        current_level: Current risk score (1–5; 5 = Critical).
+        current_level: Current risk score (1–5; 5 = Very High).
         proposed_mitigation: Proposed mitigation action.
         mitigated_level: Post-mitigation risk score.
     """
@@ -201,7 +201,7 @@ class StageRiskCreate(BaseModel):
         risk_type: Category of risk (e.g. 'risk', 'ipc').
         name: Short title of the risk.
         description: Optional detailed description.
-        current_level: Current risk score (1–5; 5 = Critical).
+        current_level: Current risk score (1–5; 5 = Very High).
         proposed_mitigation: Proposed mitigation action.
         mitigated_level: Post-mitigation risk score.
     """

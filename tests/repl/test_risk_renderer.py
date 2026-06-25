@@ -26,8 +26,8 @@ async def test_render_risk_table_uses_box_table_with_severity_labels() -> None:
     assert any(line.startswith("┌") for line in lines)
     assert any(line.startswith("│") and "Level" in line for line in lines)
     # Levels are labelled with their severity and number; mitigated likewise.
-    assert "Critical (5)" in joined
-    assert "Low (2)" in joined
+    assert "VH (5)" in joined
+    assert "L (2)" in joined
 
 
 @pytest.mark.unit
