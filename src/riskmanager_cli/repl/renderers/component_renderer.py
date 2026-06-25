@@ -61,7 +61,7 @@ _SALT_COLUMNS = [
 ]
 _RISK_COLUMNS = [
     Column("Type", priority=1),
-    Column("Name"),
+    Column("Name", wrap=True),
     Column("Level", align="center", priority=2),
     Column("Mitigated", align="center", priority=0),
 ]

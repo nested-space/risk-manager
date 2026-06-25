@@ -55,10 +55,10 @@ class StageSections:
 _COMPONENT_COLUMNS = [Column("Name"), Column("Role", priority=0)]
 _NCRM_COLUMNS = [Column("Name"), Column("Role", priority=0)]
 _RISK_COLUMNS = [
-    Column("Name"),
-    Column("Description", priority=0),
+    Column("Name", wrap=True),
+    Column("Description", priority=0, wrap=True),
     Column("Level", align="center", priority=3),
-    Column("Mitigation", priority=1),
+    Column("Mitigation", priority=1, wrap=True),
     Column("Mitigated level", align="center", priority=2),
 ]
 

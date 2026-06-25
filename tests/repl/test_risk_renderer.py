@@ -43,3 +43,28 @@ async def test_render_risk_table_unset_level_renders_dash() -> None:
     risks = [{"risk_type": "Quality", "name": "Carryover", "scope": "1.1"}]
     lines = await render_risk_table(risks, scope_label="route 1.1")
     assert any(" - " in line for line in lines)
+
+
+@pytest.mark.unit
+async def test_render_risk_table_wraps_long_name() -> None:
+    """A long risk name wraps across lines instead of being clipped."""
+    long_name = "Runaway heat during slow reagent addition then late quench step"
+    risks = [
+        {
+            "risk_type": "Safety",
+            "name": long_name,
+            "current_level": 5,
+            "mitigated_level": 2,
+            "scope": "Stage 1",
+        }
+    ]
+
+    lines = await render_risk_table(risks, scope_label="stage · Stage 1", width=60)
+
+    # The data rows between the header separator and the bottom border span more
+    # than one physical line: the Name column wrapped rather than being clipped.
+    data = [line for line in lines if line.startswith("│") and "Level" not in line]
+    assert len(data) > 1
+    joined_words = "".join(data)
+    for word in ("Runaway", "during", "reagent", "addition", "quench", "step"):
+        assert word in joined_words
