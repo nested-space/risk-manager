@@ -173,6 +173,18 @@ def test_render_table_clips_non_wrap_column_while_wrapping_another() -> None:
 
 
 @pytest.mark.unit
+def test_render_table_clips_a_wide_header_to_keep_borders_aligned() -> None:
+    """A header wider than its shrunk column is clipped, not overflowed."""
+    columns = [Column("Component/Stage"), Column("Note", wrap=True)]
+    rows = [["Process", "alpha beta gamma delta epsilon zeta eta"]]
+    lines = render_table(columns, rows, max_width=40)
+    # Every line — borders, header, and wrapped data rows — shares one width.
+    assert len({len(line) for line in lines}) == 1
+    # The over-long header was elided rather than pushing the row wide.
+    assert "…" in lines[1]
+
+
+@pytest.mark.unit
 def test_render_table_blocks_wraps_each_row_independently() -> None:
     """Per-row spans reflect each row's own height; short rows stay one line."""
     columns = [Column("Name"), Column("Note", wrap=True)]

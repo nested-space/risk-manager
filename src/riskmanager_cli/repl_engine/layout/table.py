@@ -119,8 +119,16 @@ def _border(left: str, mid: str, right: str, widths: list[int]) -> str:
 
 
 def _row_line(cells: list[str], widths: list[int], aligns: list[HAlign]) -> str:
-    """Return one physical table line, each cell aligned and padded to its width."""
-    padded = (f" {_align(cell, widths[index], aligns[index])} " for index, cell in enumerate(cells))
+    """Return one physical table line, each cell clipped, aligned, and padded.
+
+    Clipping guards single-line cells that exceed their column width — the header
+    and any non-wrap data cell. Wrapped cell lines are already within width, so
+    the clip is a no-op for them.
+    """
+    padded = (
+        f" {_align(_clip(cell, widths[index]), widths[index], aligns[index])} "
+        for index, cell in enumerate(cells)
+    )
     return "│" + "│".join(padded) + "│"
 
 
